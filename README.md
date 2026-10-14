@@ -1,244 +1,254 @@
-📘 Normas de Desarrollo y Colaboración del Proyecto
+# Normas de desarrollo y colaboración
 
-1. Objetivo
+Guía de trabajo para los equipos que colaboran en este repositorio. Establece cómo organizar el desarrollo, solicitar cambios entre áreas, documentar avances e integrar entregas.
 
-Este documento establece las normas de trabajo, organización y colaboración entre los equipos de desarrollo.
+**El cumplimiento de estas normas es obligatorio para todos los integrantes del proyecto.** Su objetivo es mantener un repositorio organizado, evitar conflictos y facilitar el seguimiento de los compromisos establecidos con el cliente.
 
-El objetivo es mantener un repositorio organizado, facilitar el seguimiento de avances, evitar conflictos entre equipos y garantizar el cumplimiento de los lineamientos establecidos por el cliente.
+## Índice
 
-El cumplimiento de estas normas es obligatorio para todos los integrantes del proyecto.
+- [1. Equipos y responsabilidades](#1-equipos-y-responsabilidades)
+- [2. Ramas de trabajo](#2-ramas-de-trabajo)
+- [3. Límites entre equipos](#3-límites-entre-equipos)
+- [4. Solicitudes mediante GitHub Issues](#4-solicitudes-mediante-github-issues)
+- [5. Registro de avances](#5-registro-de-avances)
+- [6. Pull Requests e integración](#6-pull-requests-e-integración)
+- [7. Coordinación y dependencias](#7-coordinación-y-dependencias)
+- [8. Lista de verificación](#8-lista-de-verificación)
+- [9. Excepciones y responsabilidad](#9-excepciones-y-responsabilidad)
 
-2. Equipos de trabajo
+## 1. Equipos y responsabilidades
 
-El proyecto está dividido en cinco áreas de desarrollo, cada una responsable de sus propias implementaciones.
-Cada equipo deberá trabajar exclusivamente dentro del alcance asignado a su área.
+El proyecto se organiza en cinco áreas. Cada equipo desarrolla, verifica y documenta las implementaciones correspondientes a su alcance asignado.
 
-3. Organización mediante ramas (branches)
+| Equipo | Rama de trabajo | Archivo de avances |
+| --- | --- | --- |
+| Backend | `equipo/backend` | `docs/avances/backend.md` |
+| Frontend | `equipo/frontend` | `docs/avances/frontend.md` |
+| Base de Datos | `equipo/base-de-datos` | `docs/avances/base-de-datos.md` |
+| Dashboards | `equipo/dashboards` | `docs/avances/dashboards.md` |
+| APIs e Implementación | `equipo/apis-implementacion` | `docs/avances/apis-implementacion.md` |
 
-3.1. Creación obligatoria de ramas
+Si una funcionalidad involucra varias áreas, cada equipo implementará únicamente su parte. Antes de modificar un archivo compartido o cuya responsabilidad no esté clara, se deberá acordar y registrar su alcance mediante un Issue.
 
-Cada equipo deberá crear su propia rama de trabajo dentro del repositorio de GitHub.
+## 2. Ramas de trabajo
 
-Las ramas propuestas son:
+Cada equipo deberá:
 
-Equipo	Rama
-Backend	equipo/backend
-Frontend	equipo/frontend
-Base de Datos	equipo/base-de-datos
-Dashboards	equipo/dashboards
-APIs e Implementación	equipo/apis-implementacion
+1. Crear su rama de trabajo a partir de `main`, utilizando el nombre indicado en la tabla anterior.
+2. Mantenerla actualizada con los cambios aprobados en `main`.
+3. Realizar commits que permitan identificar los cambios realizados.
+4. Verificar el funcionamiento de sus implementaciones antes de solicitar su integración.
+5. Integrar sus entregas mediante Pull Requests revisados.
 
-Estas ramas deberán crearse a partir de main.
+**`main` es la referencia estable del proyecto.** Las integraciones de código y documentación deberán pasar por revisión antes de incorporarse a esta rama.
 
-Cada equipo será responsable de mantener actualizada su rama, realizar sus commits y verificar el funcionamiento de sus implementaciones.
+## 3. Límites entre equipos
 
-3.2. Restricción de modificaciones entre equipos
+> **Disposición obligatoria del cliente:** ningún equipo podrá modificar directamente el código, los archivos o la rama de trabajo de otro equipo sin autorización previa.
 
-⚠️ REGLA OBLIGATORIA DEL CLIENTE
+Esta restricción se aplica a todos los equipos:
 
-Está terminantemente prohibido que un equipo modifique directamente el código, los archivos o la rama de trabajo pertenecientes a otro equipo sin autorización.
+- Backend no puede modificar por cuenta propia los archivos de Frontend.
+- Frontend no puede modificar por cuenta propia la implementación de Backend.
+- Base de Datos, Dashboards y APIs e Implementación deben respetar los mismos límites.
+- Ningún integrante puede realizar cambios por su cuenta en la rama de otro equipo.
+- Un Pull Request tampoco autoriza a incluir modificaciones en archivos ajenos al alcance del equipo.
 
-Cualquier cambio requerido en un área distinta deberá solicitarse mediante GitHub Issues.
+**Necesitar una modificación no autoriza a realizarla.** Los cambios entre áreas deberán solicitarse mediante GitHub Issues y ser revisados y ejecutados por el equipo responsable. Toda excepción requiere autorización previa y un registro en GitHub.
 
-Esto significa que:
+## 4. Solicitudes mediante GitHub Issues
 
-* Backend no puede modificar directamente archivos propiedad de Frontend.
-* Frontend no puede modificar directamente la implementación de Backend.
-* Base de Datos, Dashboards y APIs e Implementación deben respetar igualmente los límites de los demás equipos.
-* Ningún integrante podrá ingresar a la rama de otro equipo para efectuar cambios por su cuenta.
-* Las solicitudes de modificación deberán ser revisadas y ejecutadas por el equipo responsable.
+### Cuándo crear un Issue
 
-Que un equipo necesite una modificación no lo autoriza a realizarla por sí mismo.
+Toda solicitud que requiera una modificación por parte de otro equipo deberá registrarse en un Issue. El registro debe permitir comprender qué se necesita, quién debe atenderlo y cómo verificar su resolución.
 
-4. Registro obligatorio de avances
+### Procedimiento
 
-Cada equipo deberá documentar sus principales avances mediante un archivo Markdown (.md).
+1. Crear el Issue e identificar al equipo solicitante y al equipo responsable.
+2. Describir el comportamiento actual y el resultado esperado.
+3. Adjuntar la información técnica necesaria y los criterios de aceptación.
+4. Indicar la prioridad y las dependencias o bloqueos conocidos.
+5. El equipo responsable revisará la solicitud, comunicará los impedimentos y realizará los cambios en su propia rama.
+6. Vincular el Pull Request o commit que resuelva la solicitud.
+7. Verificar los criterios de aceptación antes de cerrar el Issue.
 
-Estos documentos deberán estar disponibles en la rama principal main, independientemente de que el desarrollo continúe en las ramas de cada equipo.
+Los acuerdos alcanzados en reuniones o mensajes deberán registrarse en el Issue correspondiente. Cada solicitud debe mantenerse actualizada hasta su resolución.
 
-4.1. Organización de los archivos
+### Ejemplo de colaboración
 
-Se utilizará la siguiente estructura:
+Backend entrega los campos `X` e `Y`, pero Frontend muestra únicamente `X`. Si se necesita mostrar también `Y`, Backend deberá crear un Issue dirigido a Frontend, describir el cambio y proporcionar los datos de integración. Frontend revisará e implementará la modificación en su propia rama.
 
-repositorio/
-├── README.md
-├── docs/
-│   └── avances/
-│       ├── backend.md
-│       ├── frontend.md
-│       ├── base-de-datos.md
-│       ├── dashboards.md
-│       └── apis-implementacion.md
+### Plantilla recomendada
 
-Cada equipo es responsable de crear, mantener y actualizar únicamente su archivo de avances.
+Copiar esta plantilla en el cuerpo del Issue y sustituir los campos entre corchetes:
 
-4.2. ¿Qué debe documentarse?
+```markdown
+## Equipos
+- Solicitante: [equipo que solicita el cambio]
+- Responsable: [equipo que debe implementarlo]
 
-Los archivos Markdown deberán registrar los hitos importantes del desarrollo, no necesariamente cada cambio pequeño o cada commit.
-
-Como mínimo, cada registro deberá incluir:
-
-* Fecha: día en que se completó el avance.
-* Hito: nombre del avance realizado.
-* Descripción: explicación de la funcionalidad implementada.
-* Estado: completado, en progreso o bloqueado.
-* Responsables: integrantes involucrados.
-* Evidencia: enlaces a commits, pull requests, capturas o pruebas, cuando corresponda.
-* Dependencias: si existe algún requerimiento pendiente de otro equipo.
-
-4.3. Ejemplo de registro
-
-# Avances - Equipo Backend
-## Hito 1: Implementación de autenticación
-**Fecha:** 14/10/2026
-**Estado:** Completado
-**Responsables:** Equipo Backend
-### Descripción
-Se implementó el sistema de autenticación
-para el inicio de sesión de usuarios.
-### Funcionalidades
-- Validación de credenciales.
-- Generación de tokens de autenticación.
-- Manejo de errores de acceso.
-### Evidencias
-- Commit: [enlace al commit]
-- Pruebas: [enlace o descripción]
-### Dependencias
-Se requiere que Frontend integre el
-formulario de inicio de sesión.
-Issue relacionado: #12
-
-4.4. Publicación de avances en main
-
-Los equipos deberán publicar sus avances importantes en main mediante un Pull Request (PR) dedicado exclusivamente a la documentación.
-
-Para evitar integrar código aún no aprobado, las actualizaciones documentales deberán prepararse en una rama temporal creada desde main, sin incluir los cambios de desarrollo pendientes de la rama del equipo.
-
-El proceso será:
-
-1. Completar un hito significativo en la rama del equipo.
-2. Actualizar el archivo Markdown correspondiente.
-3. Crear un Pull Request de documentación hacia main.
-4. Obtener la revisión correspondiente.
-5. Incorporar el registro de avances a main.
-
-No es necesario finalizar todo el desarrollo para publicar los hitos alcanzados.
-
-Los archivos de avances deberán reflejar el progreso real del proyecto.
-
-5. Comunicación obligatoria mediante GitHub Issues
-
-5.1. Solicitudes entre equipos
-
-Toda solicitud que requiera una modificación por parte de otro equipo deberá registrarse mediante un GitHub Issue.
-
-No se permitirá utilizar modificaciones directas en ramas ajenas como alternativa a este procedimiento.
-
-5.2. Ejemplo práctico
-
-Supongamos que el equipo Backend implementa una función que devuelve los valores X e Y, pero el equipo Frontend solamente muestra X.
-
-Si Backend necesita que Frontend también muestre Y, deberá:
-
-1. Crear un nuevo Issue en GitHub.
-2. Indicar que la solicitud está dirigida al equipo Frontend.
-3. Describir el comportamiento actual y el comportamiento esperado.
-4. Adjuntar la información técnica necesaria.
-5. Esperar a que Frontend revise y realice la modificación en su propia rama.
-
-Backend no podrá modificar directamente el código de Frontend para implementar este cambio.
-
-El mismo procedimiento aplica a todos los equipos.
-
-5.3. Formato recomendado de Issues
-
-## Equipo solicitante
-Backend
-## Equipo responsable
-Frontend
 ## Tipo de solicitud
-Integración / Modificación
+[Integración / Modificación / Corrección]
+
 ## Descripción
-Se requiere mostrar el campo Y,
-actualmente disponible desde Backend.
+[Qué se necesita y por qué]
+
 ## Comportamiento actual
-La interfaz solamente muestra X.
+[Qué ocurre actualmente]
+
 ## Comportamiento esperado
-La interfaz deberá mostrar X e Y.
+[Qué debe ocurrir después del cambio]
+
 ## Información técnica
-Endpoint: GET /api/ejemplo
-Campos disponibles: X, Y
+[Endpoints, campos, contratos, capturas o enlaces pertinentes]
+
 ## Criterios de aceptación
-- El campo Y debe visualizarse correctamente.
-- No debe afectarse la visualización de X.
-- Se debe verificar la integración.
+- [ ] [Resultado verificable]
+- [ ] [Comportamiento existente que debe conservarse]
+- [ ] [Comprobación de integración necesaria]
+
+## Dependencias o bloqueos
+[Requerimientos pendientes y sus Issues, o «Sin dependencias»]
+
 ## Prioridad
-Media
+[Alta / Media / Baja, con su justificación]
+
 ## Estado
 Pendiente de revisión
+```
 
-5.4. Seguimiento de solicitudes
+## 5. Registro de avances
 
-Cada Issue deberá mantenerse actualizado hasta su resolución.
+Cada equipo deberá registrar sus hitos importantes en un archivo Markdown (`.md`). No es necesario documentar cada cambio pequeño ni cada commit; sí los avances relevantes, las dependencias y los bloqueos.
 
-El equipo responsable deberá revisar la solicitud, comunicar impedimentos si existieran y vincular el Pull Request o commit que resuelva el requerimiento.
+### Estructura de referencia
 
-Una vez verificada su implementación, podrá cerrarse el Issue.
+Los archivos de avances deberán estar disponibles en `main`, aunque el desarrollo continúe en las ramas de los equipos:
 
-Los acuerdos realizados mediante reuniones o mensajes deberán quedar registrados en el Issue correspondiente para mantener la trazabilidad.
+```text
+repositorio/
+├── README.md
+└── docs/
+    └── avances/
+        ├── backend.md
+        ├── frontend.md
+        ├── base-de-datos.md
+        ├── dashboards.md
+        └── apis-implementacion.md
+```
 
-6. Reglas para Pull Requests
+Cada equipo deberá crear, mantener y actualizar únicamente su propio archivo de avances. Esta estructura describe la organización requerida; no afirma que los archivos ya estén creados.
 
-Las integraciones de código hacia main deberán efectuarse mediante Pull Requests revisados.
+### Contenido mínimo de cada registro
 
-Cada Pull Request deberá:
+| Campo | Información requerida |
+| --- | --- |
+| Fecha | Fecha del registro; si el hito está completado, fecha de finalización. |
+| Hito | Nombre concreto del avance. |
+| Descripción | Funcionalidad implementada o trabajo realizado. |
+| Estado | Completado, en progreso o bloqueado. |
+| Responsables | Integrantes involucrados. |
+| Evidencia | Enlaces a commits, PR, capturas o resultados de pruebas, cuando corresponda. |
+| Dependencias | Requerimientos pendientes de otros equipos e Issues relacionados. |
 
-* Identificar claramente al equipo responsable.
-* Describir los cambios realizados.
-* Vincular los Issues relacionados, cuando existan.
-* Contener únicamente cambios autorizados dentro del alcance del equipo.
-* Superar las verificaciones y revisiones correspondientes antes de integrarse.
+Los registros deberán reflejar el progreso real. Las pruebas pendientes deben distinguirse de las ejecutadas y una funcionalidad en progreso no debe presentarse como completada.
 
-La rama main deberá mantenerse como referencia estable del proyecto.
+### Plantilla de un hito
 
-Ningún equipo podrá utilizar un Pull Request para incorporar modificaciones no autorizadas en archivos de otra área.
+El archivo tendrá un único título principal, por ejemplo `# Avances — Equipo Backend`. Para cada hito, añadir un bloque como el siguiente:
 
-7. Coordinación entre equipos
+```markdown
+## [Nombre del hito]
 
-Para evitar bloqueos y facilitar la integración, cada equipo deberá:
+- **Fecha:** [AAAA-MM-DD]
+- **Estado:** [Completado / En progreso / Bloqueado]
+- **Responsables:** [integrantes involucrados]
 
-1. Mantener su rama de trabajo actualizada respecto de los cambios aprobados en main.
-2. Registrar los hitos relevantes en su archivo Markdown.
-3. Comunicar las dependencias mediante GitHub Issues.
-4. Revisar periódicamente las solicitudes que le hayan sido asignadas.
-5. Coordinar con los demás equipos antes de realizar cambios en contratos, interfaces o estructuras compartidas.
-6. Informar oportunamente los bloqueos que puedan afectar al resto del proyecto.
+### Descripción
+[Explicación del avance y su alcance]
 
-En caso de que una funcionalidad involucre más de un área, cada equipo implementará únicamente la parte correspondiente a su responsabilidad.
+### Funcionalidades
+- [Funcionalidad implementada]
+- [Funcionalidad implementada]
 
-8. Resumen de las normas obligatorias
+### Evidencias y pruebas
+- Commit o PR: [añadir enlace real]
+- Pruebas ejecutadas: [descripción y resultados]
+- Pruebas pendientes o limitaciones: [indicar cuáles, si existen]
 
-Norma	Cumplimiento
-Crear una rama exclusiva por equipo	Obligatorio
-Trabajar dentro del área asignada	Obligatorio
-Documentar hitos importantes en Markdown	Obligatorio
-Publicar los avances documentados en main	Obligatorio
-Solicitar cambios entre equipos mediante Issues	Obligatorio
-Revisar los PR antes de integrarlos a main	Obligatorio
-Modificar directamente ramas de otros equipos	Prohibido
-Modificar código ajeno sin autorización	Prohibido
-Integrar cambios no aprobados a main	Prohibido
+### Dependencias
+[Requerimiento pendiente y referencia al Issue, o «Sin dependencias»]
+```
 
-⸻
+### Publicación de avances en `main`
 
-9. Disposición final
+Los hitos se publicarán mediante un **Pull Request exclusivo de documentación**. Para evitar incorporar código pendiente de aprobación:
 
-Estas normas buscan asegurar una colaboración ordenada, transparente y verificable durante todo el ciclo de desarrollo.
+1. Identificar el hito que se registrará y su estado real en la rama del equipo.
+2. Crear una rama temporal desde `main` actualizado.
+3. Añadir o actualizar en esa rama únicamente el archivo de avances del equipo.
+4. Abrir un PR hacia `main` y comprobar que contiene solo la documentación prevista.
+5. Obtener la revisión correspondiente e integrar el PR.
 
-Cada equipo es responsable tanto de la calidad de sus entregables como del cumplimiento de los procesos de coordinación establecidos.
+No es necesario finalizar todo el desarrollo para publicar un hito. Publicar su registro **no equivale a aprobar ni integrar el código** de la rama del equipo.
 
-Las restricciones de modificación entre equipos son una disposición expresa del cliente y deberán respetarse durante todo el proyecto.
+## 6. Pull Requests e integración
 
-Cualquier excepción deberá contar con autorización previa y quedar documentada en GitHub.
+Toda integración hacia `main` deberá realizarse mediante un Pull Request revisado.
 
-La comunicación, documentación y trazabilidad forman parte del trabajo de desarrollo, no son actividades opcionales.
+Cada PR deberá:
+
+- Identificar claramente al equipo responsable.
+- Describir los cambios y su propósito.
+- Vincular los Issues relacionados, cuando existan.
+- Incluir únicamente cambios autorizados dentro del alcance del equipo.
+- Indicar las verificaciones realizadas y sus resultados.
+- Superar las verificaciones y revisiones correspondientes antes de integrarse.
+
+No se podrán incorporar cambios no aprobados a `main` ni utilizar un PR para eludir las restricciones entre equipos.
+
+## 7. Coordinación y dependencias
+
+Para facilitar la integración, cada equipo deberá:
+
+1. Mantener su rama actualizada respecto de `main`.
+2. Registrar los hitos relevantes y publicar su documentación.
+3. Comunicar las dependencias mediante Issues.
+4. Revisar periódicamente las solicitudes dirigidas a su área.
+5. Coordinar antes de modificar contratos, interfaces o estructuras compartidas.
+6. Informar oportunamente los bloqueos que puedan afectar a otros equipos.
+
+Los cambios que involucren varias áreas deberán coordinarse antes de implementarse. Los acuerdos, dependencias y autorizaciones deben quedar vinculados al Issue correspondiente.
+
+## 8. Lista de verificación
+
+Antes de solicitar la integración de una entrega:
+
+- [ ] Los cambios se realizaron en la rama correspondiente.
+- [ ] Todos los archivos modificados pertenecen al alcance asignado o cuentan con autorización documentada.
+- [ ] Las solicitudes y dependencias entre equipos están registradas en Issues.
+- [ ] El PR describe los cambios y vincula los Issues relacionados.
+- [ ] Se registraron las pruebas ejecutadas, sus resultados y las limitaciones reales.
+- [ ] Los hitos relevantes están documentados y su publicación en `main` se gestionó mediante un PR de documentación.
+
+Antes de integrar el PR:
+
+- [ ] Se completaron las verificaciones y revisiones correspondientes.
+- [ ] Los cambios están aprobados para su incorporación a `main`.
+
+| Obligatorio | Prohibido |
+| --- | --- |
+| Usar una rama de trabajo por equipo. | Modificar ramas ajenas por cuenta propia. |
+| Respetar el alcance asignado. | Modificar código o archivos ajenos sin autorización. |
+| Documentar los hitos relevantes en Markdown. | Presentar avances o pruebas pendientes como completados. |
+| Publicar los registros de avances en `main`. | Mezclar código pendiente en un PR exclusivo de documentación. |
+| Solicitar cambios entre equipos mediante Issues. | Sustituir las solicitudes por modificaciones directas no autorizadas. |
+| Revisar los PR antes de integrarlos. | Incorporar cambios no aprobados a `main`. |
+
+## 9. Excepciones y responsabilidad
+
+Cualquier excepción deberá contar con **autorización previa** y quedar documentada en GitHub, indicando su alcance y los equipos involucrados.
+
+Cada equipo es responsable de la calidad de sus entregables y del cumplimiento de estas normas. Las restricciones entre áreas son una disposición expresa del cliente y deberán respetarse durante todo el proyecto.
+
+**La comunicación, la documentación y la trazabilidad forman parte del trabajo de desarrollo.**
