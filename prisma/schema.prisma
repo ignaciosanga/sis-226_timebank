@@ -1,6 +1,6 @@
 // Fuente objetivo: documentaci_n_de_la_base_de_datos.md (v0.3.1, 12 tablas).
 // El SQL/JSON de sis-226_timebank describe el modelo legado de 18 tablas.
-// Este contrato no aplica migraciones ni modifica una base de datos existente.
+// Compose aplica las migraciones versionadas a su PostgreSQL local independiente.
 generator client {
   provider     = "prisma-client"
   output       = "../src/generated/prisma"

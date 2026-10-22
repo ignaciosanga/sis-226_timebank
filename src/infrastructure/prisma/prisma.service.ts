@@ -21,10 +21,7 @@ export class PrismaService implements OnModuleDestroy {
 
   constructor(private readonly config: ConfigService<Environment, true>) {}
 
-  /** Conexion diferida: /health nunca abre una conexion a PostgreSQL.
-   * Tras la introspeccion, sustituir este limite de ciclo de vida por el tipo
-   * generado en los repositorios oficiales y vincular USERS_REPOSITORY.
-   */
+  /** Conexion compartida y diferida; /health/ready comprueba el destino real. */
   connect(): Promise<PrismaClient> {
     if (!this.config.get('DATABASE_ENABLED', { infer: true })) {
       return Promise.reject(
@@ -41,14 +38,14 @@ export class PrismaService implements OnModuleDestroy {
   private async open(): Promise<PrismaClient> {
     let generated: GeneratedClientModule;
     try {
-      // Carga diferida para compilar sin inventar modelos cuando falta el esquema.
+      // Carga diferida del cliente generado y compilado junto con la aplicacion.
       generated = createRequire(__filename)(
         resolve(__dirname, '../../generated/prisma/client'),
       ) as GeneratedClientModule;
       if (typeof generated.PrismaClient !== 'function') throw new Error();
     } catch {
       throw new ServiceUnavailableException(
-        'Cliente Prisma oficial pendiente de generacion',
+        'Cliente Prisma no disponible; ejecutar prisma generate y compilar',
       );
     }
     const adapter = new PrismaPg({

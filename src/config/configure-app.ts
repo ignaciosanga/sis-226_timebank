@@ -1,4 +1,4 @@
-﻿import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
@@ -32,7 +32,7 @@ export function configureApp(app: INestApplication): void {
       new DocumentBuilder()
         .setTitle('Banco de Tiempo Universitario')
         .setDescription(
-          'v0.4: autenticaciÃ³n, catÃ¡logos, disponibilidad, solicitudes, reservas y crÃ©ditos de tiempo transaccionales en memoria. Reglas provisionales; integraciÃ³n PostgreSQL pendiente.',
+          'v0.4: autenticacion JWT, catalogos, disponibilidad, solicitudes, reservas y creditos de tiempo transaccionales. PostgreSQL con modelo optimizado de 12 tablas y Docker Compose local.',
         )
         .setVersion('0.4.0')
         .addBearerAuth()

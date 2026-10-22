@@ -2,24 +2,38 @@
 
 Backend NestJS adaptado al **modelo optimizado de 12 tablas**, elegido por el usuario y definido en [la documentación de BD](documentaci_n_de_la_base_de_datos.md). El SQL/JSON anterior de 18 tablas es legado y no se aplica automáticamente.
 
-## Ejecutar
+## Levantar con Docker Desktop
 
-Node.js 24 y npm 11:
+Requisitos: Docker Desktop con motor Linux activo, Node.js 24 y npm 11.
 
 ```powershell
 npm.cmd ci
-npm.cmd run setup:env
-npm.cmd run build
-npm.cmd start
+npm.cmd run setup:docker
+docker compose up --build -d
 ```
 
-La instalación genera el cliente Prisma localmente; no crea ni migra la BD. `setup:env` conserva cualquier `.env` existente. El modo predeterminado es memoria; los datos desaparecen al reiniciar.
+`setup:docker` genera claves locales y conserva secretos existentes. Compose levanta PostgreSQL 16.15, aplica las migraciones de las **12 tablas de negocio**, carga una carrera, cuatro categorías y cinco habilidades de desarrollo e inicia el backend en modo **prisma**. `db-init` termina con código 0; PostgreSQL y backend quedan activos en Docker Desktop. Prisma añade su tabla técnica `_prisma_migrations`.
+
+La BD usa `127.0.0.1:55432`, base `timebank_local`, con usuario y clave de `.env`. Dentro de Docker se usa `postgres:5432`. Los datos persisten en `timebank_postgres_data`; `docker compose down` los conserva. Eliminar el volumen borra los datos. No se ejecutan los scripts legados de 18 tablas.
+
+Si la instancia anterior en memoria ocupa 4000, detenerla antes de levantar Compose o definir `BACKEND_PORT=4001` en `.env` y usar esa URL para la API. `POSTGRES_PORT` permite cambiar el puerto publicado de la BD.
 
 - Health: http://localhost:4000/health
+- Conexión y tablas: http://localhost:4000/health/ready
 - Swagger: http://localhost:4000/docs
 - OpenAPI: http://localhost:4000/docs-json
 
-Para ADMIN temporal con contraseña aleatoria: `npm.cmd run start:memory-admin -- admin@example.test`, después de compilar y detener otra instancia en el mismo puerto.
+Crear un ADMIN persistente local con contraseña aleatoria:
+
+```powershell
+docker compose exec backend node scripts/create-dev-admin.cjs admin@example.test
+```
+
+El comando muestra la clave y no modifica usuarios existentes. Autenticar con `POST /auth/login`. No hay cuentas predefinidas. Esta utilidad y las cargas de créditos son exclusivas de desarrollo.
+
+Para trabajar en Node contra la BD de Compose: levantar solo `postgres`, ejecutar `npm.cmd run db:migrate`, activar `LOCAL_DEVELOPMENT_SEED=true` para ejecutar `npm.cmd run db:seed:local`, compilar y ejecutar `npm.cmd start`. `setup:docker` configura la URL local cuando no había otra. Revisar `.env` si ya existía una conexión distinta. Detener el backend de Docker antes de usar su mismo puerto en Node. Memoria sigue disponible con `PERSISTENCE_MODE=memory` y `DATABASE_ENABLED=false`, con datos efímeros.
+
+Ver [la guía del frontend](docs/frontend-integration.md) para URL, CORS, sesión y flujo de intercambio.
 
 ## Modelo y funcionalidades
 
@@ -46,7 +60,7 @@ Memoria usa borradores y commit único; una excepción descarta los cambios prev
 
 ## Flujo local
 
-1. Arrancar el comando ADMIN temporal y autenticarlo en Swagger.
+1. Levantar Compose, crear el ADMIN persistente y autenticarlo en Swagger.
 2. Registrar ofertante/solicitante usando un UUID de `GET /careers`; autenticar cada uno.
 3. El ofertante publica una habilidad y un horario futuro.
 4. ADMIN carga al solicitante: POST `/credits/grants`, `{ "userId": "UUID", "amount": "8", "reason": "Prueba local" }`.
@@ -58,9 +72,9 @@ Memoria usa borradores y commit único; una excepción descarta los cambios prev
 
 ## Persistencia PostgreSQL
 
-`prisma/schema.prisma` define las12 tablas con UUID, timestamptz, INTEGER, JSONB, claves y relaciones. Los adaptadores reales se seleccionan con `PERSISTENCE_MODE=prisma`, `DATABASE_ENABLED=true` y `DATABASE_URL` del entorno autorizado. No hay semillas de prueba insertadas automáticamente en PostgreSQL. No activar el modo contra la base legada de18 tablas.
+`prisma/schema.prisma` define las 12 tablas con UUID, timestamptz, INTEGER, JSONB, claves y relaciones. Los adaptadores se seleccionan con `PERSISTENCE_MODE=prisma`, `DATABASE_ENABLED=true` y `DATABASE_URL`. Compose fija estos valores para su propia BD local. `prisma/migrations` contiene la creación del modelo y restricciones de saldos, retenciones, intervalos, participantes, semestre y puntuaciones. Se aplican con `prisma migrate deploy`, conservando las tablas al reiniciar. No aplicar contra el modelo legado de 18 tablas sin un plan de migración de sus datos.
 
-El adaptador coordina escrituras con transacción y bloqueo asesor común entre instancias de este backend; idempotencia y metadata de API se guardan en AUDITORIA dentro del mismo commit, sin añadir tablas o columnas. Las escrituras externas deben respetar el protocolo o las restricciones acordadas con BD. Se requieren pruebas reales contra un destino autorizado antes de certificar concurrencia/durabilidad de PostgreSQL; no se ejecutaron conexiones ni migraciones durante esta entrega.
+El adaptador coordina escrituras con transacción y bloqueo asesor común entre instancias del backend; idempotencia y metadata de API se guardan en AUDITORIA dentro del mismo commit. Escritores externos deben respetar el protocolo. Antes de detener las pruebas se verificaron PostgreSQL real, dos instancias concurrentes, cobro único, rollback e idempotencia después de reiniciar en una BD temporal independiente. No se modificó una BD compartida.
 
 Variables restantes: PORT4000; CORS_ORIGINS; RATE_LIMIT_TTL_MS60000; RATE_LIMIT_MAX100; JWT_SECRET obligatoria >=32 caracteres; JWT_EXPIRES_IN_SECONDS900; JWT_ISSUER; JWT_AUDIENCE; SWAGGER_ENABLED=true. Ver `.env.example`. Producción con memoria se rechaza. Nunca publicar `.env`.
 
@@ -75,10 +89,12 @@ npm.cmd run format:check
 npm.cmd run prisma:validate
 ```
 
-Pruebas de memoria/HTTP y contrato de esquema están automatizadas. Pruebas reales PostgreSQL, notificaciones, calificaciones y recuperación de contraseña siguen pendientes. No se modificó una BD compartida.
+Antes de la última instrucción aprobaron 157 pruebas unitarias, 132 HTTP y el escenario real de PostgreSQL. No se ejecutaron nuevas pruebas después. La construcción completa de Docker quedó detenida durante la descarga de su imagen base; el despliegue completo y los ajustes finales quedan sin nueva verificación. Notificaciones, calificaciones y recuperación de contraseña no tienen endpoints implementados.
 
 ## Documentación
 
+- [Integración del frontend](docs/frontend-integration.md)
+- [Reporte de PostgreSQL y Docker](docs/progress-postgresql-docker.md)
 - [Entrega actual v0.4](docs/progress-v0.4.md)
 - [Fuente optimizada de BD](documentaci_n_de_la_base_de_datos.md)
 - [Diferencias de las fuentes y scripts heredados](docs/schema-source-discrepancies.md)

@@ -2,7 +2,7 @@
   "name": "banco-tiempo-backend",
   "version": "0.4.0",
   "private": true,
-  "description": "Backend v0.3 del Banco de Tiempo Universitario: reservas y creditos transaccionales en memoria",
+  "description": "Backend del Banco de Tiempo Universitario con PostgreSQL y modelo optimizado de 12 tablas",
   "license": "UNLICENSED",
   "type": "commonjs",
   "engines": {
@@ -12,6 +12,13 @@
   "scripts": {
     "postinstall": "prisma generate",
     "setup:env": "node scripts/setup-env.cjs",
+    "setup:docker": "node scripts/setup-docker-env.cjs",
+    "docker:up": "docker compose up --build -d --wait --wait-timeout 180",
+    "docker:down": "docker compose down",
+    "db:init": "prisma migrate deploy && node scripts/seed-local.cjs",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed:local": "node scripts/seed-local.cjs",
+    "admin:local": "node scripts/create-dev-admin.cjs",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
     "start:dev": "ts-node-dev --respawn --transpile-only src/main.ts",
@@ -22,6 +29,7 @@
     "test": "jest --runInBand",
     "test:cov": "jest --runInBand --coverage",
     "test:e2e": "jest --config test/jest-e2e.config.cjs --runInBand",
+    "test:postgres": "npm run build && node scripts/test-postgres.cjs",
     "prisma:validate": "prisma validate",
     "prisma:introspect": "prisma db pull",
     "prisma:generate": "prisma generate"

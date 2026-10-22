@@ -68,6 +68,13 @@ describe('Aplicacion real sin PostgreSQL (e2e)', () => {
     expect(response.body.info.version).toBe('0.4.0');
   });
 
+  it('publica readiness indicando el modo de persistencia', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/health/ready')
+      .expect(200);
+    expect(response.body).toEqual({ status: 'ok', persistence: 'memory' });
+  });
+
   it('permite el origen configurado', async () => {
     const response = await request(app.getHttpServer())
       .get('/health')

@@ -32,7 +32,8 @@ export class AuthController {
   @Post('register')
   @ApiCreatedResponse({
     type: PublicUser,
-    description: 'Perfil ESTUDIANTE en memoria; sin cuenta de créditos',
+    description:
+      'Usuario Estudiante con saldo inicial cero en el almacenamiento configurado',
   })
   @ApiConflictResponse({ description: 'Correo no disponible' })
   register(@Body() input: RegisterDto) {
