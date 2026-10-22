@@ -1,254 +1,434 @@
-# Normas de desarrollo y colaboración
+# Banco de Tiempo Universitario — Backend
 
-Guía de trabajo para los equipos que colaboran en este repositorio. Establece cómo organizar el desarrollo, solicitar cambios entre áreas, documentar avances e integrar entregas.
+**Primera versión del equipo Backend · v0.1.0 · Rama `Backend`**
 
-**El cumplimiento de estas normas es obligatorio para todos los integrantes del proyecto.** Su objetivo es mantener un repositorio organizado, evitar conflictos y facilitar el seguimiento de los compromisos establecidos con el cliente.
+Backend del proyecto SIS-226 para intercambiar habilidades entre estudiantes utilizando créditos de tiempo. Esta entrega incluye la infraestructura HTTP y la base de seguridad, y prepara su integración con el esquema PostgreSQL del equipo de BD.
 
-## Índice
+> **Estado real:** `GET /health` y Swagger están disponibles. Autenticación y perfil tienen servicios probados con repositorios simulados, pero sus endpoints todavía no están publicados. No hay operaciones reales de PostgreSQL ni gestión de créditos implementada.
 
-- [1. Equipos y responsabilidades](#1-equipos-y-responsabilidades)
-- [2. Ramas de trabajo](#2-ramas-de-trabajo)
-- [3. Límites entre equipos](#3-límites-entre-equipos)
-- [4. Solicitudes mediante GitHub Issues](#4-solicitudes-mediante-github-issues)
-- [5. Registro de avances](#5-registro-de-avances)
-- [6. Pull Requests e integración](#6-pull-requests-e-integración)
-- [7. Coordinación y dependencias](#7-coordinación-y-dependencias)
-- [8. Lista de verificación](#8-lista-de-verificación)
-- [9. Excepciones y responsabilidad](#9-excepciones-y-responsabilidad)
+## Contenido
 
-## 1. Equipos y responsabilidades
+- [Alcance](#alcance)
+- [Tecnologías](#tecnologías)
+- [Instalación y ejecución](#instalación-y-ejecución)
+- [Variables de entorno](#variables-de-entorno)
+- [Arquitectura y estructura](#arquitectura-y-estructura)
+- [Procesamiento de solicitudes](#procesamiento-de-solicitudes)
+- [API](#api)
+- [Autenticación, usuarios y roles](#autenticación-usuarios-y-roles)
+- [Créditos de tiempo](#créditos-de-tiempo)
+- [PostgreSQL y Prisma](#postgresql-y-prisma)
+- [Pruebas](#pruebas)
+- [Docker](#docker)
+- [Colaboración y siguientes pasos](#colaboración-y-siguientes-pasos)
+- [Resolución de problemas](#resolución-de-problemas)
+- [Documentación](#documentación)
 
-El proyecto se organiza en cinco áreas. Cada equipo desarrolla, verifica y documenta las implementaciones correspondientes a su alcance asignado.
+## Alcance
 
-| Equipo | Rama de trabajo | Archivo de avances |
-| --- | --- | --- |
-| Backend | `equipo/backend` | `docs/avances/backend.md` |
-| Frontend | `equipo/frontend` | `docs/avances/frontend.md` |
-| Base de Datos | `equipo/base-de-datos` | `docs/avances/base-de-datos.md` |
-| Dashboards | `equipo/dashboards` | `docs/avances/dashboards.md` |
-| APIs e Implementación | `equipo/apis-implementacion` | `docs/avances/apis-implementacion.md` |
+| Componente                                                  | Estado en v0.1.0                                        |
+| ----------------------------------------------------------- | ------------------------------------------------------- |
+| NestJS, entorno validado y puerto 4000                      | Implementado                                            |
+| Health y Swagger/OpenAPI                                    | Operativos sin PostgreSQL                               |
+| Helmet, CORS, throttling y validación global                | Implementados                                           |
+| Errores seguros y eliminación de contraseñas/hashes en JSON | Implementados                                           |
+| Argon2id, JWT, Passport, guards y decorators RBAC           | Implementados y probados                                |
+| Servicios de registro, login y perfil                       | Preparados; pruebas con repositorio simulado            |
+| Endpoints Auth/Users                                        | No registrados; devuelven 404                           |
+| Prisma 7 y adaptador PostgreSQL                             | Configurados; falta esquema oficial y cliente generado  |
+| Repositorio real y transacciones                            | Pendientes                                              |
+| Saldo inicial                                               | Pendiente del PO; el servicio de registro se bloquea    |
+| Habilidades, horarios, intercambios y demás módulos         | Directorios documentados; reglas pendientes             |
+| Reservas, confirmaciones, retenciones y transferencias      | Sin implementación de negocio                           |
+| Dockerfile/Compose                                          | Preparados; configuración validada, ejecución pendiente |
 
-Si una funcionalidad involucra varias áreas, cada equipo implementará únicamente su parte. Antes de modificar un archivo compartido o cuya responsabilidad no esté clara, se deberá acordar y registrar su alcance mediante un Issue.
+Los módulos futuros no aparecen en Swagger como terminados. No hay una BD alternativa ni persistencia en memoria para simular el funcionamiento del producto.
 
-## 2. Ramas de trabajo
+## Tecnologías
 
-Cada equipo deberá:
+| Área                   | Tecnología / versión instalada de referencia              |
+| ---------------------- | --------------------------------------------------------- |
+| Entorno                | Node.js 24 LTS, verificado con 24.21.0                    |
+| Paquetes               | npm 11, verificado con 11.19.0                            |
+| Lenguaje               | TypeScript 5.9.3                                          |
+| Framework HTTP         | NestJS common/core/platform-express 11.2.7                |
+| Configuración          | @nestjs/config 4.0.4 y dotenv                             |
+| Persistencia preparada | PostgreSQL; Prisma CLI/Client 7.10.1                      |
+| Adaptador y driver     | @prisma/adapter-pg 7.10.1 y pg 8.23.1                     |
+| Autenticación          | @nestjs/jwt 11.0.2, @nestjs/passport 11.0.5, Passport JWT |
+| Contraseñas            | Argon2 0.44.0, variante Argon2id                          |
+| Validación             | class-validator 0.14.4, class-transformer 0.5.1           |
+| Seguridad HTTP         | Helmet 8.3.0, CORS y @nestjs/throttler 6.7.1              |
+| Documentación API      | @nestjs/swagger 11.4.7, OpenAPI                           |
+| Pruebas                | Jest 29.7.0, Nest Testing y Supertest 7.3.1               |
+| Calidad                | ESLint 9.39.5, typescript-eslint y Prettier 3.9.10        |
+| Contenedores           | Docker y Docker Compose                                   |
 
-1. Crear su rama de trabajo a partir de `main`, utilizando el nombre indicado en la tabla anterior.
-2. Mantenerla actualizada con los cambios aprobados en `main`.
-3. Realizar commits que permitan identificar los cambios realizados.
-4. Verificar el funcionamiento de sus implementaciones antes de solicitar su integración.
-5. Integrar sus entregas mediante Pull Requests revisados.
+`package-lock.json` fija el árbol reproducible: instalar con `npm ci`. Prisma CLI, cliente y adaptador están fijados exactamente a 7.10.1; no se mezclan APIs de Prisma 8.
 
-**`main` es la referencia estable del proyecto.** Las integraciones de código y documentación deberán pasar por revisión antes de incorporarse a esta rama.
+La aplicación usa CommonJS en package.json y TypeScript. El generador `prisma-client` declara `moduleFormat = "cjs"` para mantener ese formato cuando se reciban los modelos oficiales.
 
-## 3. Límites entre equipos
+## Instalación y ejecución
 
-> **Disposición obligatoria del cliente:** ningún equipo podrá modificar directamente el código, los archivos o la rama de trabajo de otro equipo sin autorización previa.
+### Clonar la rama
 
-Esta restricción se aplica a todos los equipos:
-
-- Backend no puede modificar por cuenta propia los archivos de Frontend.
-- Frontend no puede modificar por cuenta propia la implementación de Backend.
-- Base de Datos, Dashboards y APIs e Implementación deben respetar los mismos límites.
-- Ningún integrante puede realizar cambios por su cuenta en la rama de otro equipo.
-- Un Pull Request tampoco autoriza a incluir modificaciones en archivos ajenos al alcance del equipo.
-
-**Necesitar una modificación no autoriza a realizarla.** Los cambios entre áreas deberán solicitarse mediante GitHub Issues y ser revisados y ejecutados por el equipo responsable. Toda excepción requiere autorización previa y un registro en GitHub.
-
-## 4. Solicitudes mediante GitHub Issues
-
-### Cuándo crear un Issue
-
-Toda solicitud que requiera una modificación por parte de otro equipo deberá registrarse en un Issue. El registro debe permitir comprender qué se necesita, quién debe atenderlo y cómo verificar su resolución.
-
-### Procedimiento
-
-1. Crear el Issue e identificar al equipo solicitante y al equipo responsable.
-2. Describir el comportamiento actual y el resultado esperado.
-3. Adjuntar la información técnica necesaria y los criterios de aceptación.
-4. Indicar la prioridad y las dependencias o bloqueos conocidos.
-5. El equipo responsable revisará la solicitud, comunicará los impedimentos y realizará los cambios en su propia rama.
-6. Vincular el Pull Request o commit que resuelva la solicitud.
-7. Verificar los criterios de aceptación antes de cerrar el Issue.
-
-Los acuerdos alcanzados en reuniones o mensajes deberán registrarse en el Issue correspondiente. Cada solicitud debe mantenerse actualizada hasta su resolución.
-
-### Ejemplo de colaboración
-
-Backend entrega los campos `X` e `Y`, pero Frontend muestra únicamente `X`. Si se necesita mostrar también `Y`, Backend deberá crear un Issue dirigido a Frontend, describir el cambio y proporcionar los datos de integración. Frontend revisará e implementará la modificación en su propia rama.
-
-### Plantilla recomendada
-
-Copiar esta plantilla en el cuerpo del Issue y sustituir los campos entre corchetes:
-
-```markdown
-## Equipos
-- Solicitante: [equipo que solicita el cambio]
-- Responsable: [equipo que debe implementarlo]
-
-## Tipo de solicitud
-[Integración / Modificación / Corrección]
-
-## Descripción
-[Qué se necesita y por qué]
-
-## Comportamiento actual
-[Qué ocurre actualmente]
-
-## Comportamiento esperado
-[Qué debe ocurrir después del cambio]
-
-## Información técnica
-[Endpoints, campos, contratos, capturas o enlaces pertinentes]
-
-## Criterios de aceptación
-- [ ] [Resultado verificable]
-- [ ] [Comportamiento existente que debe conservarse]
-- [ ] [Comprobación de integración necesaria]
-
-## Dependencias o bloqueos
-[Requerimientos pendientes y sus Issues, o «Sin dependencias»]
-
-## Prioridad
-[Alta / Media / Baja, con su justificación]
-
-## Estado
-Pendiente de revisión
+```bash
+git clone --branch Backend https://github.com/ignaciosanga/sis-226_timebank.git
+cd sis-226_timebank
 ```
 
-## 5. Registro de avances
+El backend está en la raíz de esta rama; no hay una carpeta backend adicional.
 
-Cada equipo deberá registrar sus hitos importantes en un archivo Markdown (`.md`). No es necesario documentar cada cambio pequeño ni cada commit; sí los avances relevantes, las dependencias y los bloqueos.
+### Windows / PowerShell
 
-### Estructura de referencia
+```powershell
+npm.cmd ci
+npm.cmd run setup:env
+npm.cmd run build
+npm.cmd start
+```
 
-Los archivos de avances deberán estar disponibles en `main`, aunque el desarrollo continúe en las ramas de los equipos:
+`npm.cmd` evita el bloqueo de npm.ps1 sin modificar la política de PowerShell.
+
+### Linux, macOS u otra terminal
+
+```bash
+npm ci
+npm run setup:env
+npm run build
+npm start
+```
+
+Para desarrollo con recarga: `npm run start:dev`. Detener con `Ctrl+C`.
+
+`setup:env` crea .env a partir de .env.example, genera una clave JWT aleatoria de 48 bytes y deja PostgreSQL deshabilitado. No imprime el secreto ni sobrescribe un .env existente.
+
+| Recurso local | URL                             |
+| ------------- | ------------------------------- |
+| Health        | http://localhost:4000/health    |
+| Swagger UI    | http://localhost:4000/docs      |
+| OpenAPI JSON  | http://localhost:4000/docs-json |
+
+## Variables de entorno
+
+| Variable               | Valor inicial / requisito                   | Finalidad                              |
+| ---------------------- | ------------------------------------------- | -------------------------------------- |
+| NODE_ENV               | development, test o production              | Entorno                                |
+| PORT                   | 4000; entero 1–65535                        | Puerto HTTP                            |
+| CORS_ORIGINS           | http://localhost:3000,http://localhost:5173 | Orígenes permitidos separados por coma |
+| RATE_LIMIT_TTL_MS      | 60000; entero positivo                      | Ventana en milisegundos                |
+| RATE_LIMIT_MAX         | 100; entero positivo                        | Solicitudes por ruta/IP y ventana      |
+| JWT_SECRET             | Obligatoria, mínimo 32 caracteres           | Firma/verificación                     |
+| JWT_EXPIRES_IN_SECONDS | 900; entero 1–86400                         | Vigencia del access token              |
+| JWT_ISSUER             | banco-tiempo-backend                        | Emisor esperado                        |
+| JWT_AUDIENCE           | banco-tiempo-clients                        | Audiencia esperada                     |
+| DATABASE_URL           | Vacía hasta recibir acceso autorizado       | Conexión PostgreSQL                    |
+| DATABASE_ENABLED       | false; solo true/false                      | Permite solicitar conexión diferida    |
+| SWAGGER_ENABLED        | true; solo true/false                       | Publicación de documentación           |
+
+El entorno se valida antes de escuchar. Los errores indican nombres de variables sin imprimir valores. No hay clave JWT de respaldo: incluso arrancar sin BD requiere una clave válida, porque se inicializa la infraestructura de AuthModule.
+
+CORS exige orígenes HTTP/HTTPS completos, sin comodines ni rutas. Las variables del proceso tienen prioridad sobre .env. Las pruebas omiten ese archivo.
+
+.env, credenciales, tokens y claves privadas no se versionan. Solo se publica .env.example con secretos vacíos.
+
+## Arquitectura y estructura
+
+Monolito modular con Clean Architecture simplificada:
+
+- **Controladores:** atienden HTTP, reciben DTO y delegan.
+- **Servicios:** contienen los casos de uso y las reglas.
+- **Puertos de repositorio:** definen las operaciones de persistencia necesarias.
+- **Infraestructura:** adapta Prisma/PostgreSQL al contrato de la aplicación.
 
 ```text
-repositorio/
-├── README.md
-└── docs/
-    └── avances/
-        ├── backend.md
-        ├── frontend.md
-        ├── base-de-datos.md
-        ├── dashboards.md
-        └── apis-implementacion.md
+.
+├── src/
+│   ├── main.ts
+│   ├── app.module.ts
+│   ├── config/
+│   ├── common/
+│   │   ├── decorators/
+│   │   ├── enums/
+│   │   ├── filters/
+│   │   ├── guards/
+│   │   └── interceptors/
+│   ├── infrastructure/prisma/
+│   └── modules/
+│       ├── auth/
+│       ├── users/
+│       ├── health/
+│       ├── roles/
+│       ├── skills/
+│       ├── availability/
+│       ├── exchanges/
+│       ├── reservations/
+│       ├── confirmations/
+│       ├── credits/
+│       ├── notifications/
+│       ├── ratings/
+│       └── audit/
+├── prisma/schema.prisma
+├── prisma.config.ts
+├── scripts/setup-env.cjs
+├── test/
+├── docs/
+├── .env.example
+├── Dockerfile
+├── compose.yaml
+└── package.json
 ```
 
-Cada equipo deberá crear, mantener y actualizar únicamente su propio archivo de avances. Esta estructura describe la organización requerida; no afirma que los archivos ya estén creados.
+Los módulos posteriores contienen README de alcance, sin clases vacías ni endpoints ficticios.
 
-### Contenido mínimo de cada registro
+| Archivo                                                 | Responsabilidad                                        |
+| ------------------------------------------------------- | ------------------------------------------------------ |
+| src/main.ts                                             | Arranque, puerto validado y hooks de cierre            |
+| src/app.module.ts                                       | Composición y protecciones globales                    |
+| src/config/environment.ts                               | Tipos y validación del entorno                         |
+| src/config/configure-app.ts                             | Helmet, CORS, ValidationPipe y Swagger                 |
+| src/common/filters/http-exception.filter.ts             | Errores uniformes sin detalles internos 5xx            |
+| src/common/interceptors/sensitive-fields.interceptor.ts | Elimina password, passwordHash y password_hash de JSON |
+| src/modules/auth/auth.service.ts                        | Registro condicionado y login                          |
+| src/modules/auth/password.service.ts                    | Hash/verificación Argon2id                             |
+| src/modules/auth/jwt.strategy.ts                        | Verifica JWT y consulta estado/roles actuales          |
+| src/modules/users/users.service.ts                      | Perfil y campos permitidos                             |
+| src/modules/users/users.repository.ts                   | Puerto y contrato de registro atómico                  |
+| src/infrastructure/prisma/prisma.service.ts             | Carga diferida y ciclo de vida del cliente             |
+| prisma.config.ts                                        | Configuración CLI Prisma 7 y URL fuera del schema      |
 
-| Campo | Información requerida |
-| --- | --- |
-| Fecha | Fecha del registro; si el hito está completado, fecha de finalización. |
-| Hito | Nombre concreto del avance. |
-| Descripción | Funcionalidad implementada o trabajo realizado. |
-| Estado | Completado, en progreso o bloqueado. |
-| Responsables | Integrantes involucrados. |
-| Evidencia | Enlaces a commits, PR, capturas o resultados de pruebas, cuando corresponda. |
-| Dependencias | Requerimientos pendientes de otros equipos e Issues relacionados. |
+## Procesamiento de solicitudes
 
-Los registros deberán reflejar el progreso real. Las pruebas pendientes deben distinguirse de las ejecutadas y una funcionalidad en progreso no debe presentarse como completada.
+1. NestJS valida el entorno e inicia los módulos.
+2. Helmet configura cabeceras de seguridad y CORS controla orígenes del navegador.
+3. El guard global aplica límites por ruta/IP.
+4. En controladores protegidos, JwtAuthGuard autentica y RolesGuard comprueba permisos.
+5. ValidationPipe valida DTO, rechaza campos adicionales y evita conversiones implícitas.
+6. El controlador delega al servicio y este al puerto de persistencia cuando corresponda.
+7. El interceptor elimina contraseñas y hashes de las respuestas JSON.
+8. El filtro global entrega errores consistentes y oculta los detalles internos.
 
-### Plantilla de un hito
+El throttling actual está en memoria por proceso. Varias instancias requerirán almacenamiento compartido. No se confía en X-Forwarded-For por defecto; cualquier proxy debe configurarse explícitamente.
 
-El archivo tendrá un único título principal, por ejemplo `# Avances — Equipo Backend`. Para cada hito, añadir un bloque como el siguiente:
+## API
 
-```markdown
-## [Nombre del hito]
+### Disponible: GET /health
 
-- **Fecha:** [AAAA-MM-DD]
-- **Estado:** [Completado / En progreso / Bloqueado]
-- **Responsables:** [integrantes involucrados]
-
-### Descripción
-[Explicación del avance y su alcance]
-
-### Funcionalidades
-- [Funcionalidad implementada]
-- [Funcionalidad implementada]
-
-### Evidencias y pruebas
-- Commit o PR: [añadir enlace real]
-- Pruebas ejecutadas: [descripción y resultados]
-- Pruebas pendientes o limitaciones: [indicar cuáles, si existen]
-
-### Dependencias
-[Requerimiento pendiente y referencia al Issue, o «Sin dependencias»]
+```http
+GET http://localhost:4000/health
 ```
 
-### Publicación de avances en `main`
+Respuesta HTTP 200:
 
-Los hitos se publicarán mediante un **Pull Request exclusivo de documentación**. Para evitar incorporar código pendiente de aprobación:
+```json
+{
+  "status": "ok",
+  "service": "banco-tiempo-backend"
+}
+```
 
-1. Identificar el hito que se registrará y su estado real en la rama del equipo.
-2. Crear una rama temporal desde `main` actualizado.
-3. Añadir o actualizar en esa rama únicamente el archivo de avances del equipo.
-4. Abrir un PR hacia `main` y comprobar que contiene solo la documentación prevista.
-5. Obtener la revisión correspondiente e integrar el PR.
+Es liveness del proceso: no abre una conexión ni certifica el estado de PostgreSQL. Swagger y OpenAPI solo documentan esta ruta.
 
-No es necesario finalizar todo el desarrollo para publicar un hito. Publicar su registro **no equivale a aprobar ni integrar el código** de la rama del equipo.
+### Previsto, todavía no publicado
 
-## 6. Pull Requests e integración
+| Ruta                | Finalidad                            | Seguridad prevista              |
+| ------------------- | ------------------------------------ | ------------------------------- |
+| POST /auth/register | Crear estudiante, rol y cuenta       | Pública; rol ESTUDIANTE forzado |
+| POST /auth/login    | Verificar credenciales y generar JWT | Pública                         |
+| GET /users/me       | Consultar el perfil                  | JWT de usuario activo           |
+| PATCH /users/me     | Actualizar el perfil permitido       | JWT de usuario activo           |
 
-Toda integración hacia `main` deberá realizarse mediante un Pull Request revisado.
+Estas rutas responden **404** en esta versión. Su contrato debe acordarse con APIs y BD antes de publicarlas.
 
-Cada PR deberá:
+Registro preparado: nombre, apellido, correo, password, idCarrera y semestre. Perfil editable: nombre, apellido, idCarrera y semestre. No se aceptan roles, estado, saldo, hashes ni un ID de usuario alternativo.
 
-- Identificar claramente al equipo responsable.
-- Describir los cambios y su propósito.
-- Vincular los Issues relacionados, cuando existan.
-- Incluir únicamente cambios autorizados dentro del alcance del equipo.
-- Indicar las verificaciones realizadas y sus resultados.
-- Superar las verificaciones y revisiones correspondientes antes de integrarse.
+Login previsto: access_token, token_type="Bearer" y perfil público sin hash. Consultar [api-contract.md](docs/api-contract.md) para límites y validaciones.
 
-No se podrán incorporar cambios no aprobados a `main` ni utilizar un PR para eludir las restricciones entre equipos.
+### Errores
 
-## 7. Coordinación y dependencias
+```json
+{
+  "statusCode": 400,
+  "message": ["correo must be an email"],
+  "timestamp": "2026-10-21T16:00:00.000Z"
+}
+```
 
-Para facilitar la integración, cada equipo deberá:
+message puede ser texto o una lista. Los errores 5xx son genéricos, sin stack trace ni detalles del driver.
 
-1. Mantener su rama actualizada respecto de `main`.
-2. Registrar los hitos relevantes y publicar su documentación.
-3. Comunicar las dependencias mediante Issues.
-4. Revisar periódicamente las solicitudes dirigidas a su área.
-5. Coordinar antes de modificar contratos, interfaces o estructuras compartidas.
-6. Informar oportunamente los bloqueos que puedan afectar a otros equipos.
+Códigos preparados: 400 validación; 401 autenticación; 403 permisos; 404 ruta inexistente; 409 correo duplicado; 429 rate limiting; 503 dependencia/política pendiente. Los casos de autenticación se verifican en controladores exclusivos de Jest, no en endpoints publicados.
 
-Los cambios que involucren varias áreas deberán coordinarse antes de implementarse. Los acuerdos, dependencias y autorizaciones deben quedar vinculados al Issue correspondiente.
+## Autenticación, usuarios y roles
 
-## 8. Lista de verificación
+### Registro preparado
 
-Antes de solicitar la integración de una entrega:
+El servicio exige una política aprobada de créditos iniciales; hoy vale null y bloquea el registro. Después normaliza el correo, comprueba disponibilidad, hashea con Argon2id, fuerza ESTUDIANTE y solicita una sola operación de repositorio para crear usuario, relación de rol y cuenta.
 
-- [ ] Los cambios se realizaron en la rama correspondiente.
-- [ ] Todos los archivos modificados pertenecen al alcance asignado o cuentan con autorización documentada.
-- [ ] Las solicitudes y dependencias entre equipos están registradas en Issues.
-- [ ] El PR describe los cambios y vincula los Issues relacionados.
-- [ ] Se registraron las pruebas ejecutadas, sus resultados y las limitaciones reales.
-- [ ] Los hitos relevantes están documentados y su publicación en `main` se gestionó mediante un PR de documentación.
+El adaptador real deberá ejecutar esa operación en una transacción y traducir la violación concurrente de correo único a conflicto. Las pruebas actuales verifican el contrato de una única operación, no una transacción PostgreSQL.
 
-Antes de integrar el PR:
+### Login preparado
 
-- [ ] Se completaron las verificaciones y revisiones correspondientes.
-- [ ] Los cambios están aprobados para su incorporación a `main`.
+Busca el correo normalizado, verifica Argon2id, exige estado activo y registra el último acceso condicionado a que el usuario siga activo. Con credenciales válidas genera un JWT con sub, iat, exp, iss y aud.
 
-| Obligatorio | Prohibido |
-| --- | --- |
-| Usar una rama de trabajo por equipo. | Modificar ramas ajenas por cuenta propia. |
-| Respetar el alcance asignado. | Modificar código o archivos ajenos sin autorización. |
-| Documentar los hitos relevantes en Markdown. | Presentar avances o pruebas pendientes como completados. |
-| Publicar los registros de avances en `main`. | Mezclar código pendiente en un PR exclusivo de documentación. |
-| Solicitar cambios entre equipos mediante Issues. | Sustituir las solicitudes por modificaciones directas no autorizadas. |
-| Revisar los PR antes de integrarlos. | Incorporar cambios no aprobados a `main`. |
+Usuario inexistente, contraseña incorrecta y suspensión reciben el mismo mensaje de credenciales inválidas. Para usuarios inexistentes se verifica un hash de descarte real, evitando omitir todo el trabajo criptográfico.
 
-## 9. Excepciones y responsabilidad
+Argon2id utiliza sal automática, memoria de 19456 KiB, dos iteraciones y paralelismo uno. Nunca se guarda ni se devuelve la contraseña en texto plano.
 
-Cualquier excepción deberá contar con **autorización previa** y quedar documentada en GitHub, indicando su alcance y los equipos involucrados.
+### JWT y RBAC
 
-Cada equipo es responsable de la calidad de sus entregables y del cumplimiento de estas normas. Las restricciones entre áreas son una disposición expresa del cliente y deberán respetarse durante todo el proyecto.
+- Firma HS256 con clave del entorno y expiración configurable.
+- Passport verifica firma, emisor, audiencia y expiración.
+- La estrategia vuelve a consultar al usuario activo y sus roles actuales.
+- JwtAuthGuard autentica; RolesGuard comprueba permisos de @Roles(...).
+- @CurrentUser() entrega el principal autenticado.
+- La identidad proviene del JWT verificado, no de un ID en body/query.
+- La suspensión debe impedir acceso incluso con un token todavía vigente.
 
-**La comunicación, la documentación y la trazabilidad forman parte del trabajo de desarrollo.**
+Roles previstos: ESTUDIANTE y ADMIN. La administración persistente de roles está pendiente. No hay refresh tokens, recuperación de contraseña ni revocación remota implementados.
+
+### Perfil y datos sensibles
+
+UsersService utiliza una lista explícita de campos editables. PublicUser proyecta la respuesta sin hash; el interceptor elimina además password/passwordHash/password_hash de JSON como defensa adicional.
+
+Sin un proveedor real de USERS_REPOSITORY, los servicios fallan explícitamente. La aplicación no registra un repositorio que invente usuarios o saldos.
+
+## Créditos de tiempo
+
+**Este flujo es un diseño para fases futuras; no está implementado en v0.1.0.** La equivalencia exacta tiempo/crédito, precisión, redondeo y saldo inicial requieren aprobación del PO.
+
+- **Saldo:** créditos registrados en la cuenta.
+- **Créditos retenidos:** cantidad comprometida en reservas pendientes.
+- **Disponibles:** saldo menos creditos_retenidos.
+
+Flujo previsto:
+
+1. Comprobar créditos disponibles antes de comprometer una reserva.
+2. Retener la cantidad correspondiente sin transferirla todavía.
+3. Tras la finalización y confirmación válidas, descontar al solicitante y acreditar al ofertante de forma atómica.
+4. Registrar movimientos con saldos y retenciones anteriores/posteriores.
+5. Liberar la retención ante una cancelación válida.
+6. Evitar transferencias duplicadas ante confirmaciones o solicitudes repetidas.
+
+Ejemplo solo ilustrativo: saldo 5 y retenidos 2 implican 3 disponibles. No configura una política inicial ni crea datos.
+
+El modelo informado incluye CUENTAS_CREDITO, MOVIMIENTOS_CREDITO y TRANSFERENCIAS_CREDITO. Sus tipos, restricciones y relaciones se implementarán contra la fuente oficial.
+
+No hay créditos de bienvenida, penalizaciones ni endpoints de saldo en esta entrega. El usuario nunca podrá modificar sus créditos desde el perfil.
+
+## PostgreSQL y Prisma
+
+Durante la preparación inicial no se recibió SQL/DBML ni conexión autorizada al esquema oficial. schema.prisma declara solo proveedor y generador, sin modelos supuestos.
+
+PrismaService prepara PrismaPg con conexión diferida, timeout de conexión de cinco segundos, máximo diez conexiones y desconexión al cerrar. Su interfaz actual cubre el ciclo de vida; las consultas tipadas del repositorio siguen pendientes.
+
+Cuando BD entregue la fuente definitiva:
+
+1. Confirmar destino de desarrollo, permisos, tipos, estados, índices y relaciones.
+2. Configurar DATABASE_URL localmente sin compartir credenciales.
+3. Introspectar y generar:
+
+```bash
+npm run prisma:introspect
+npm run prisma:validate
+npm run prisma:generate
+npm run build
+```
+
+4. Revisar el schema y conservar moduleFormat="cjs" y la salida src/generated/prisma.
+5. Implementar el repositorio tipado, mapear IDs/estados/roles y vincular USERS_REPOSITORY.
+6. Aprobar el saldo inicial y probar unicidad, concurrencia y rollback en una BD autorizada.
+7. Registrar controladores Auth/Users y completar OpenAPI.
+
+prisma db pull lee la BD y modifica el schema local. Las migraciones oficiales pertenecen a BD: no ejecutar db push, migrate dev, migrate reset ni SQL destructivo sobre una base compartida.
+
+DATABASE_ENABLED=true solo permite solicitar conexión diferida; **no crea repositorios ni activa endpoints**. El inventario de las 18 tablas y dependencias está en [pending-decisions.md](docs/pending-decisions.md).
+
+## Pruebas
+
+```bash
+npm run build
+npm run lint
+npm test
+npm run test:e2e
+npm run format:check
+npm run prisma:validate
+```
+
+Opcionales: npm run test:cov para cobertura y npm run format para aplicar formato. En PowerShell usar npm.cmd.
+
+| Verificación de referencia | Resultado                         |
+| -------------------------- | --------------------------------- |
+| Build                      | Correcto                          |
+| ESLint                     | Sin errores ni advertencias       |
+| Unitarias                  | 5 suites, 33 pruebas aprobadas    |
+| HTTP/E2E                   | 2 suites, 35 pruebas aprobadas    |
+| Formato                    | Correcto                          |
+| Prisma validate            | Schema preparatorio válido        |
+| HTTP en puerto 4000        | Health y Swagger respondieron 200 |
+| Compose config             | Configuración válida              |
+
+Se cubren validación, credenciales incorrectas, Argon2id real, JWT firmado/vencido/audiencia inválida, estado suspendido, roles, identidad autenticada, restricciones de perfil, hashes ocultos, errores seguros y límites.
+
+Los mocks solo se usan en pruebas. Las rutas `/__test__` están en test/security.e2e-spec.ts, no se importan desde src ni se compilan en dist. Ninguna prueba actual necesita ni modifica una BD compartida.
+
+No se verificaron consultas/transacciones reales ni ejecución de contenedores. Ver [el registro completo](docs/verification.md).
+
+## Docker
+
+Con Docker y su motor activos:
+
+```bash
+npm run setup:env
+docker compose config --quiet
+docker compose up --build
+```
+
+Detener con `docker compose down`.
+
+Compose publica 127.0.0.1:4000, monta el código, conserva dependencias Linux en volúmenes y ejecuta como usuario node. Su healthcheck consulta /health. No levanta una BD alternativa ni importa SQL.
+
+Dockerfile contiene targets development, build y runtime. .env está excluido del contexto de construcción; las variables se inyectan al ejecutar. Tras cambiar dependencias, actualizar el volumen con `docker compose run --rm backend npm ci` y reconstruir.
+
+Compose validó correctamente. El motor estaba detenido durante la comprobación inicial: la imagen y su ejecución permanecen pendientes.
+
+## Colaboración y siguientes pasos
+
+Esta es la primera entrega del **equipo Backend**, no el primer commit del historial del repositorio. Se conserva main como base y no se integran cambios en otras ramas.
+
+La rama se denomina Backend por solicitud expresa del desarrollador. Las normas generales proponen equipo/backend; la diferencia queda registrada en [el avance del equipo](docs/avances/backend.md). El README original del grupo se conserva en [docs/collaboration.md](docs/collaboration.md).
+
+| Responsable   | Dependencia                                               |
+| ------------- | --------------------------------------------------------- |
+| BD            | SQL/DBML definitivo, conexión autorizada y restricciones  |
+| PO            | Saldo inicial, unidades, redondeos y políticas            |
+| Backend       | Repositorios, transacciones e integración Auth/Users      |
+| APIs/Frontend | Acordar campos, errores, IDs, CORS y consumo del contrato |
+
+Orden recomendado: Users/Auth integrados → Skills → Availability → Exchanges → Reservations → Confirmations/Credits. Notificaciones, calificaciones y auditoría se incorporarán con sus contratos correspondientes.
+
+No se desarrolla Frontend ni API Gateway. Integrar en main y publicar avances allí requiere el proceso de revisión del grupo.
+
+## Resolución de problemas
+
+| Situación                    | Acción                                                         |
+| ---------------------------- | -------------------------------------------------------------- |
+| npm.ps1 bloqueado            | Usar npm.cmd                                                   |
+| JWT_SECRET inválida          | Crear .env con setup:env o configurar la clave local existente |
+| Puerto 4000 ocupado          | Detener el proceso propio o cambiar PORT                       |
+| Auth/Users devuelve 404      | Estado esperado hasta completar su integración                 |
+| Cliente Prisma ausente       | Recibir esquema oficial, introspectar y generar                |
+| DATABASE_ENABLED sin URL     | Configurar conexión autorizada o mantener false                |
+| Swagger no disponible        | Revisar SWAGGER_ENABLED y reiniciar                            |
+| Docker no conecta            | Iniciar su motor y repetir la comprobación                     |
+| Navegador bloqueado por CORS | Registrar el origen exacto acordado y reiniciar                |
+
+## Documentación
+
+- [Arquitectura](docs/architecture.md)
+- [Configuración local](docs/setup-local.md)
+- [Contrato API](docs/api-contract.md)
+- [Reglas de negocio](docs/business-rules.md)
+- [Decisiones pendientes](docs/pending-decisions.md)
+- [Verificaciones](docs/verification.md)
+- [Avances del equipo Backend](docs/avances/backend.md)
+- [Normas de colaboración del grupo](docs/collaboration.md)

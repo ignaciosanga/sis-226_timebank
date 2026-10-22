@@ -1,0 +1,13 @@
+node_modules
+dist
+coverage
+.npm-cache
+.git
+.agents
+.codex
+.aws
+.env
+.env.*
+!.env.example
+.local
+*.log

@@ -1,0 +1,31 @@
+services:
+  backend:
+    build:
+      context: .
+      target: development
+    init: true
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+    ports:
+      - '127.0.0.1:4000:4000'
+    volumes:
+      - .:/app
+      - backend_node_modules:/app/node_modules
+      - backend_npm_cache:/app/.npm-cache
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+volumes:
+  backend_node_modules:
+  backend_npm_cache:

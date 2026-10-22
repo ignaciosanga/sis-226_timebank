@@ -1,0 +1,10 @@
+// Pendiente de introspeccion del esquema OFICIAL. No se crean modelos supuestos.
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}

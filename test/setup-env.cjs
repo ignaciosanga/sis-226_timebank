@@ -1,0 +1,10 @@
+const { randomBytes } = require('node:crypto');
+process.env.NODE_ENV = 'test';
+process.env.JWT_SECRET = randomBytes(48).toString('hex');
+process.env.DATABASE_ENABLED = 'false';
+process.env.DATABASE_URL = '';
+process.env.PORT = '4000';
+process.env.RATE_LIMIT_MAX = '100';
+process.env.RATE_LIMIT_TTL_MS = '60000';
+process.env.CORS_ORIGINS = 'http://localhost:3000,http://localhost:5173';
+process.env.SWAGGER_ENABLED = 'true';
