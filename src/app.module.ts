@@ -8,6 +8,13 @@ import { SensitiveFieldsInterceptor } from './common/interceptors/sensitive-fiel
 import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { PrismaModule } from './infrastructure/prisma/prisma.module';
+import { CategoriesModule } from './modules/categories/categories.module';
+import { SkillsModule } from './modules/skills/skills.module';
+import { UserSkillsModule } from './modules/user-skills/user-skills.module';
+import { AvailabilityModule } from './modules/availability/availability.module';
+import { ExchangesModule } from './modules/exchanges/exchanges.module';
+import { ReservationsModule } from './modules/reservations/reservations.module';
+import { CreditsModule } from './modules/credits/credits.module';
 
 @Module({
   imports: [
@@ -28,6 +35,13 @@ import { PrismaModule } from './infrastructure/prisma/prisma.module';
     PrismaModule,
     HealthModule,
     AuthModule,
+    CategoriesModule,
+    SkillsModule,
+    UserSkillsModule,
+    AvailabilityModule,
+    ExchangesModule,
+    ReservationsModule,
+    CreditsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

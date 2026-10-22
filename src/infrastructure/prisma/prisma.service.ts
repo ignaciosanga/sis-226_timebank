@@ -8,19 +8,16 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { Environment } from '../../config/environment';
+import type { PrismaClient } from '../../generated/prisma/client';
 
-interface PrismaLifecycle {
-  $connect(): Promise<void>;
-  $disconnect(): Promise<void>;
-}
 interface GeneratedClientModule {
-  PrismaClient: new (options: { adapter: PrismaPg }) => PrismaLifecycle;
+  PrismaClient: new (options: { adapter: PrismaPg }) => PrismaClient;
 }
 
 @Injectable()
 export class PrismaService implements OnModuleDestroy {
-  private client?: PrismaLifecycle;
-  private connecting?: Promise<PrismaLifecycle>;
+  private client?: PrismaClient;
+  private connecting?: Promise<PrismaClient>;
 
   constructor(private readonly config: ConfigService<Environment, true>) {}
 
@@ -28,7 +25,7 @@ export class PrismaService implements OnModuleDestroy {
    * Tras la introspeccion, sustituir este limite de ciclo de vida por el tipo
    * generado en los repositorios oficiales y vincular USERS_REPOSITORY.
    */
-  connect(): Promise<PrismaLifecycle> {
+  connect(): Promise<PrismaClient> {
     if (!this.config.get('DATABASE_ENABLED', { infer: true })) {
       return Promise.reject(
         new ServiceUnavailableException('Integracion PostgreSQL deshabilitada'),
@@ -41,7 +38,7 @@ export class PrismaService implements OnModuleDestroy {
     return this.connecting;
   }
 
-  private async open(): Promise<PrismaLifecycle> {
+  private async open(): Promise<PrismaClient> {
     let generated: GeneratedClientModule;
     try {
       // Carga diferida para compilar sin inventar modelos cuando falta el esquema.

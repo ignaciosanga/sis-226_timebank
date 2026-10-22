@@ -17,12 +17,15 @@ export interface CreateStudent {
 
 export class EmailAlreadyExistsError extends Error {}
 
+export type CreateStudentProfile = Omit<CreateStudent, 'initialCredits'>;
+
 export interface UsersRepository {
+  /** Una fila USUARIOS con rol y saldos integrados; saldo inicial cero. */
+  createStudentProfile(input: CreateStudentProfile): Promise<UserRecord>;
   findByEmail(correo: string): Promise<UserRecord | null>;
   findById(id: string): Promise<UserRecord | null>;
-  /** Una unica transaccion: USUARIOS + USUARIO_ROLES + CUENTAS_CREDITO.
-   * Exigir unicidad de correo en BD y traducir su violacion a EmailAlreadyExistsError.
-   * initialCredits viene de una politica aprobada, nunca de la solicitud HTTP.
+  /** Alias compatible de registro anterior. Ahora solo escribe USUARIOS.
+   * initialCredits es entero de una politica interna; nunca del body HTTP.
    */
   createStudentWithAccount(input: CreateStudent): Promise<UserRecord>;
   /** Comprobar estado activo en la misma operacion de escritura. */

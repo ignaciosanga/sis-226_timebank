@@ -18,8 +18,9 @@ describe('UsersService', () => {
       nombre: 'Ana',
       apellido: 'Perez',
       correo: 'ana@example.test',
-      idCarrera: 'carrera-test',
+      idCarrera: '30000000-0000-4000-8000-000000000001',
       semestre: 3,
+      rol: 'Estudiante',
       roles: ['ESTUDIANTE'],
     });
   });

@@ -10,6 +10,8 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { PasswordService } from './password.service';
 import { REGISTRATION_POLICY } from './registration-policy';
+import { AuthController } from './auth.controller';
+import { UsersController } from '../users/users.controller';
 
 @Module({
   imports: [
@@ -33,13 +35,17 @@ import { REGISTRATION_POLICY } from './registration-policy';
       }),
     }),
   ],
+  controllers: [AuthController, UsersController],
   providers: [
     AuthService,
     PasswordService,
     JwtStrategy,
     JwtAuthGuard,
     RolesGuard,
-    { provide: REGISTRATION_POLICY, useValue: { initialCredits: null } },
+    {
+      provide: REGISTRATION_POLICY,
+      useValue: { initialCredits: null, profileOnly: true },
+    },
   ],
   exports: [
     AuthService,

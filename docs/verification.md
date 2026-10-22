@@ -1,5 +1,7 @@
 # Registro de verificación
 
+> Registro histórico de v0.1. Para el estado actual y las verificaciones de v0.2, consultar [progress-v0.2.md](progress-v0.2.md).
+
 Fecha: 21 de octubre de 2026 (America/La_Paz).
 
 Proyecto creado en el directorio Backend inicialmente vacío. Node 24.21.0 y npm 11.19.0 comprobados. Durante la preparación inicial no se inicializó Git ni se hicieron cambios remotos. Las dependencias se descargaron de npm. Posteriormente el desarrollador autorizó publicar la primera versión en la rama Backend del repositorio del grupo; esta entrega conserva main como base y no integra cambios en otras ramas. No se realizaron despliegues.

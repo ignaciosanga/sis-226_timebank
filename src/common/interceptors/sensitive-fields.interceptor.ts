@@ -5,12 +5,15 @@ import {
   NestInterceptor,
 } from '@nestjs/common';
 import { map, Observable } from 'rxjs';
+import { isDate } from 'node:util/types';
 
 const blocked = new Set(['password', 'password_hash', 'passwordHash']);
 
 export function redactSensitiveFields(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(redactSensitiveFields);
-  if (value && typeof value === 'object' && !(value instanceof Date)) {
+  // isDate tambien reconoce fechas clonadas desde otro contexto (structuredClone/Jest).
+  if (isDate(value)) return value.toISOString();
+  if (value && typeof value === 'object') {
     return Object.fromEntries(
       Object.entries(value)
         .filter(([key]) => !blocked.has(key))

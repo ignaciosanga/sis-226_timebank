@@ -15,6 +15,9 @@ export class Environment {
   @IsIn(['development', 'test', 'production'])
   NODE_ENV = 'development';
 
+  @IsIn(['memory', 'prisma'])
+  PERSISTENCE_MODE = 'memory';
+
   @IsInt()
   @Min(1)
   @Max(65535)
@@ -82,6 +85,17 @@ export function validateEnvironment(
   if (errors.length)
     throw new Error(
       `Configuracion invalida: ${errors.map((e) => e.property).join(', ')}`,
+    );
+  if (config.NODE_ENV === 'production' && config.PERSISTENCE_MODE === 'memory')
+    throw new Error(
+      'Configuracion invalida: PERSISTENCE_MODE memory solo admite desarrollo y pruebas',
+    );
+  if (
+    config.PERSISTENCE_MODE === 'prisma' &&
+    (!config.DATABASE_ENABLED || !config.DATABASE_URL)
+  )
+    throw new Error(
+      'Configuracion invalida: prisma requiere DATABASE_ENABLED y DATABASE_URL',
     );
   const origins = config.CORS_ORIGINS.split(',').map((value) => value.trim());
   if (

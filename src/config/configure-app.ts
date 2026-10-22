@@ -1,4 +1,4 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+﻿import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
@@ -12,8 +12,8 @@ export function configureApp(app: INestApplication): void {
       .get('CORS_ORIGINS', { infer: true })
       .split(',')
       .map((origin) => origin.trim()),
-    methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Authorization', 'Content-Type'],
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key'],
     credentials: false,
   });
   app.useGlobalPipes(
@@ -32,9 +32,9 @@ export function configureApp(app: INestApplication): void {
       new DocumentBuilder()
         .setTitle('Banco de Tiempo Universitario')
         .setDescription(
-          'Fase 0: health operativo. Autenticacion y usuarios pendientes del esquema oficial.',
+          'v0.4: autenticaciÃ³n, catÃ¡logos, disponibilidad, solicitudes, reservas y crÃ©ditos de tiempo transaccionales en memoria. Reglas provisionales; integraciÃ³n PostgreSQL pendiente.',
         )
-        .setVersion('0.1.0')
+        .setVersion('0.4.0')
         .addBearerAuth()
         .build(),
     );

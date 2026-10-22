@@ -1,6 +1,7 @@
 import {
   Inject,
   Injectable,
+  NotFoundException,
   Optional,
   ServiceUnavailableException,
   UnauthorizedException,
@@ -8,6 +9,7 @@ import {
 import { USERS_REPOSITORY, UsersRepository } from './users.repository';
 import { PublicUser, UserRecord, toPublicUser } from './user.types';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { Role } from '../../common/enums/role.enum';
 
 @Injectable()
 export class UsersService {
@@ -34,6 +36,12 @@ export class UsersService {
 
   async me(authenticatedId: string): Promise<PublicUser> {
     return toPublicUser(await this.requireActive(authenticatedId));
+  }
+
+  async requirePublishedStudent(id: string): Promise<void> {
+    const user = await this.repository.findById(id);
+    if (!user?.active || !user.roles.includes(Role.ESTUDIANTE))
+      throw new NotFoundException('Estudiante activo no encontrado');
   }
 
   async updateMe(

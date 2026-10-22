@@ -26,7 +26,10 @@ export class AuthService {
 
   async register(input: RegisterDto) {
     const initialCredits = this.policy.initialCredits;
-    if (initialCredits === null || !/^\d+(\.\d+)?$/.test(initialCredits)) {
+    if (
+      !this.policy.profileOnly &&
+      (initialCredits === null || !/^\d+$/.test(initialCredits))
+    ) {
       throw new ServiceUnavailableException(
         'Politica de creditos iniciales pendiente',
       );
@@ -37,16 +40,21 @@ export class AuthService {
       throw new ConflictException('Correo no disponible');
     const passwordHash = await this.passwords.hash(input.password);
     try {
-      const user = await repository.createStudentWithAccount({
+      const profile = {
         nombre: input.nombre,
         apellido: input.apellido,
         correo,
         passwordHash,
         idCarrera: input.idCarrera,
         semestre: input.semestre,
-        role: Role.ESTUDIANTE,
-        initialCredits,
-      });
+        role: Role.ESTUDIANTE as const,
+      };
+      const user = this.policy.profileOnly
+        ? await repository.createStudentProfile(profile)
+        : await repository.createStudentWithAccount({
+            ...profile,
+            initialCredits: initialCredits!,
+          });
       return toPublicUser(user);
     } catch (error) {
       if (error instanceof EmailAlreadyExistsError)
@@ -66,10 +74,11 @@ export class AuthService {
     );
     if (!valid || !user?.active)
       throw new UnauthorizedException('Credenciales invalidas');
+    const access_token = await this.jwt.signAsync({ sub: user.id });
     if (!(await repository.recordActiveLogin(user.id, new Date())))
       throw new UnauthorizedException('Credenciales invalidas');
     return {
-      access_token: await this.jwt.signAsync({ sub: user.id }),
+      access_token,
       token_type: 'Bearer' as const,
       user: toPublicUser(user),
     };

@@ -40,7 +40,7 @@ describe('AuthService (repositorio aislado, Argon2id y JWT reales)', () => {
     apellido: 'Perez',
     correo: 'Ana@EXAMPLE.test',
     password: 'clave-segura-de-prueba',
-    idCarrera: 'carrera-test',
+    idCarrera: '30000000-0000-4000-8000-000000000001',
     semestre: 3,
   };
 
@@ -51,7 +51,7 @@ describe('AuthService (repositorio aislado, Argon2id y JWT reales)', () => {
     repository = repositoryMock();
     // Valor exclusivo del test, no constituye una politica del producto.
     service = new AuthService(new UsersService(repository), passwords, jwt, {
-      initialCredits: '2.50',
+      initialCredits: '10',
     });
   });
 
@@ -102,6 +102,21 @@ describe('AuthService (repositorio aislado, Argon2id y JWT reales)', () => {
     await expect(service.login(input)).rejects.toThrow(UnauthorizedException);
   });
 
+  it('no registra ultimo_acceso si falla la firma del JWT', async () => {
+    repository.findByEmail.mockResolvedValue(
+      userFixture({ passwordHash: hash }),
+    );
+    repository.recordActiveLogin.mockResolvedValue(true);
+    const failure = new Error('Firma JWT no disponible');
+    const sign = jest.spyOn(jwt, 'signAsync').mockRejectedValueOnce(failure);
+    try {
+      await expect(service.login(input)).rejects.toBe(failure);
+      expect(repository.recordActiveLogin).not.toHaveBeenCalled();
+    } finally {
+      sign.mockRestore();
+    }
+  });
+
   it('bloquea registro hasta aprobar la politica inicial', async () => {
     const pending = new AuthService(
       new UsersService(repository),
@@ -113,6 +128,27 @@ describe('AuthService (repositorio aislado, Argon2id y JWT reales)', () => {
       ServiceUnavailableException,
     );
     expect(repository.findByEmail).not.toHaveBeenCalled();
+  });
+
+  it('registra solo el perfil en modo memoria sin aprobar ni crear creditos', async () => {
+    const local = new AuthService(
+      new UsersService(repository),
+      passwords,
+      jwt,
+      { initialCredits: null, profileOnly: true },
+    );
+    repository.findByEmail.mockResolvedValue(null);
+    repository.createStudentProfile.mockResolvedValue(
+      userFixture({ passwordHash: hash }),
+    );
+    expect((await local.register(input)).roles).toEqual([Role.ESTUDIANTE]);
+    expect(repository.createStudentProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ role: Role.ESTUDIANTE }),
+    );
+    expect(
+      repository.createStudentProfile.mock.calls[0]![0],
+    ).not.toHaveProperty('initialCredits');
+    expect(repository.createStudentWithAccount).not.toHaveBeenCalled();
   });
 
   it('bloquea acceso si no hay adaptador oficial', async () => {
@@ -135,7 +171,7 @@ describe('AuthService (repositorio aislado, Argon2id y JWT reales)', () => {
     expect(repository.createStudentWithAccount).toHaveBeenCalledTimes(1);
     const created = repository.createStudentWithAccount.mock.calls[0]![0];
     expect(created.role).toBe(Role.ESTUDIANTE);
-    expect(created.initialCredits).toBe('2.50');
+    expect(created.initialCredits).toBe('10');
     expect(created.correo).toBe('ana@example.test');
     expect(created).not.toHaveProperty('saldo');
     expect(created.passwordHash).not.toBe(input.password);

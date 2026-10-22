@@ -1,40 +1,27 @@
-# Pendientes y dependencias
+﻿# Pendientes y dependencias — v0.3 local
 
-## Equipo de BD — bloquea persistencia real
+## Equipo de BD
 
-No se encontró SQL, DBML, .env previo ni DATABASE_URL configurada. No se efectuó introspección ni se generó un cliente contra las tablas oficiales. No se aplicaron migraciones ni se ejecutaron consultas a una BD compartida.
+La aplicación funciona en memoria. No se recibió el SQL/DBML completo ni se consultó una base compartida; no se aplicaron migraciones ni se generó un cliente de las tablas oficiales.
 
-Se necesita:
+Se conservan los campos oficiales conocidos de v0.2 y el inventario de tablas posteriores. Los contratos de solicitudes, reservas, cuentas y movimientos son un adaptador provisional de aplicación, no una copia certificada del esquema PostgreSQL. Ver [database-compatibility.md](database-compatibility.md).
 
-- SQL/DBML definitivo y acceso autorizado de desarrollo; confirmar esquema y uso de identificadores en mayúsculas.
-- Tipos, nulabilidad, PK/FK, secuencias, defaults, catálogos, índices y nombres exactos.
-- Estados oficiales de USUARIOS y su equivalencia con active.
-- Catálogo de ROLES y cómo se vinculan ESTUDIANTE/ADMIN.
-- Unicidad de correo con la normalización acordada; tratar correctamente la carrera de registros simultáneos.
-- Precisión/unidad de saldo y creditos_retenidos; restricciones de cuentas por usuario.
-- Implementar USERS_REPOSITORY con el cliente introspectado y una transacción usuario–rol–cuenta. Probar rollback y duplicados contra una BD aislada autorizada.
-- Actualización de ultimo_acceso y perfil condicionada al estado activo en la escritura.
+Se necesita confirmar nombres, tipos, nulabilidad, claves, índices, estados, catálogos, precisión de créditos, versiones y restricciones. Luego implementar los puertos sobre el cliente oficial, con transacciones e idempotencia duradera, y verificar concurrencia con conexiones/procesos independientes.
 
-Inventario recibido: CARRERAS, CATEGORIAS, USUARIOS, ROLES, USUARIO_ROLES, HABILIDADES, USUARIO_HABILIDADES, DISPONIBILIDADES, SOLICITUDES_INTERCAMBIO, RESERVAS, CONFIRMACIONES, CANCELACIONES, CUENTAS_CREDITO, MOVIMIENTOS_CREDITO, TRANSFERENCIAS_CREDITO, CALIFICACIONES, NOTIFICACIONES y AUDITORIA. No se infieren modelos a partir de sus nombres.
+## PO y reglas provisionales
 
-## PO — bloquea registro
+Por autorización del usuario se implementaron reglas locales coherentes: saldo inicial cero, 1 hora=1.00 crédito, reservas en múltiplos de 15 minutos hasta 8 horas, retención al aceptar, liquidación con dos confirmaciones después del fin y cancelación según rol/momento. Cargas de prueba exclusivamente ADMIN en desarrollo/test.
 
-Confirmar saldo inicial mediante una política explícita. REGISTRATION_POLICY.initialCredits permanece null. Valores usados en mocks son datos de prueba y no configuran una política.
+Estas reglas permiten demostrar el flujo, pero requieren validación con PO/BD antes de producción. No se aprueban por inferencia los valores oficiales de estados ni se migran nuevas columnas.
 
-Ver más reglas pendientes en business-rules.md.
+## APIs y Frontend
 
-## Equipo de APIs y Frontend
+El contrato actual está publicado en Swagger y docs/api-contract.md. Los nuevos POST de solicitudes/reservas/créditos requieren Idempotency-Key; el cliente debe conservar esa clave al repetir la misma operación. Un replay recupera el resultado original y GET permite consultar el estado actual.
 
-Revisar y aprobar el contrato previsto: nombres de campos, IDs opacos, límites de entrada, normalización de correo, errores, estado de usuario y edición de perfil. Definir orígenes CORS reales de desarrollo. Después de integrar BD, agregar controladores finos y sus decoradores Swagger, con guards y límites más estrictos de autenticación.
+No se desarrolla Frontend ni API Gateway. Confirmar orígenes CORS y contratos definitivos con esos equipos.
 
-No se implementa API Gateway ni Frontend.
+## Operación y funciones posteriores
 
-## Entorno
+Memoria no sobrevive reinicios ni coordina procesos. NODE_ENV=production permanece bloqueado. La auditoría de esta instancia no certifica datos de una BD externa. Docker no se ejecutó durante esta actualización.
 
-Docker CLI y Compose están presentes; el motor no está activo. No se pudo verificar una imagen ni ejecutar contenedores. Los archivos no arrancan otra BD ni importan datos.
-
-La base de seguridad usa rate limiting en memoria. Para varias instancias futuras se necesitará almacenamiento compartido y política de proxies. Refresh tokens, recuperación de contraseña, verificación de correo y administración de roles quedan fuera de esta primera etapa.
-
-## Próxima etapa recomendada
-
-Completar Users/Auth sobre el esquema oficial y su política inicial. Publicar sus endpoints solo tras pruebas de integración reales. Luego continuar con Skills y Availability antes de intercambios, reservas, confirmaciones y créditos.
+Continúan pendientes integración real de PostgreSQL, recuperación/verificación de correo, refresh tokens, logout remoto, gestión persistente de ADMIN, notificaciones, calificaciones y auditoría histórica duradera. No se deben introducir servicios externos o migraciones sin el entorno y autorización correspondientes.

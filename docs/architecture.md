@@ -1,37 +1,51 @@
-# Arquitectura
+﻿# Arquitectura v0.3 local
 
-Monolito modular con separación simplificada de HTTP, casos de uso y persistencia. El directorio abierto es la raíz del backend; no se necesita otra carpeta anidada ni un Frontend/API Gateway.
+Monolito NestJS existente con controladores, DTO, casos de uso y puertos de repositorio. Se conservan autenticación, catálogos y perfiles. No hay Frontend ni API Gateway.
 
-## Dependencias
+## Composición y almacenamiento compartido
 
-- AppModule compone Config, Throttler, Prisma, Health y Auth.
-- Health solo atiende HTTP y no depende de PostgreSQL.
-- AuthModule importa UsersModule e inyecta UsersService, PasswordService y JwtService.
-- UsersService consume el puerto USERS_REPOSITORY. No existe un proveedor de persistencia por falta de esquema; acceder al puerto falla explícitamente con 503.
-- PrismaModule prepara el adaptador PostgreSQL y el ciclo de vida. No hace introspección, consultas ni cambios de esquema al arrancar.
+AppModule registra Auth, Users (mediante Auth), Health, Categories, Skills, UserSkills, Availability, Exchanges, Reservations y Credits, además de configuración, throttling e infraestructura Prisma anterior.
 
-No se registran controladores de Auth/Users mientras no haya adaptador real. Los escenarios de HTTP de seguridad viven exclusivamente en test/security.e2e-spec.ts.
+ExchangePersistenceModule proporciona una única instancia de EXCHANGE_REPOSITORY. AvailabilityModule, UserSkillsModule y ExchangesModule importan ese mismo módulo; Nest comparte el proveedor. Así las disponibilidades, ofertas publicadas, solicitudes, reservas, cuentas, retenciones, movimientos, transferencias, confirmaciones, cancelaciones e idempotencia participan del mismo almacenamiento.
 
-## Seguridad
+MemoryAvailabilityRepository y MemoryUserSkillsRepository implementan sus puertos sobre ese almacén. Los constructores sin argumentos de sus pruebas aisladas crean un almacén propio; la aplicación inyecta explícitamente el singleton compartido. Users y los catálogos siguen en sus adaptadores previos y se consultan antes de aceptar operaciones. No hay endpoints de suspensión ni desactivación del catálogo en esta entrega.
 
-Argon2id usa memoryCost=19456 KiB, timeCost=2 y parallelism=1, con sal automática. Usuarios inexistentes consumen una verificación ficticia de hash real; el mensaje de credenciales es el mismo para ausencia, contraseña incorrecta y suspensión.
+ExchangesService implementa los casos de uso de solicitudes y coordina las operaciones de reservas/créditos; los controladores de esos módulos delegan a ese caso de uso compartido. No se crean repositorios financieros independientes que puedan confirmar saldos y reservas por separado.
 
-JWT usa HS256, emisor, audiencia y expiración configurable. Passport verifica firma y expiración. JwtStrategy vuelve a consultar al usuario activo y toma los roles actuales del repositorio; no confía en roles enviados en el token ni en IDs de un body/query. RolesGuard se aplica después de JwtAuthGuard; Roles define los roles aceptados y CurrentUser entrega el principal validado.
+## Atomicidad y rechazo de errores
 
-Registro fuerza Role.ESTUDIANTE, hashea la contraseña y llama a una sola operación de repositorio para crear usuario, relación de rol y cuenta. Esa operación no está implementada hasta recibir BD; las pruebas verifican el contrato, no una transacción PostgreSQL. La política de créditos es null y bloquea registro.
+MemoryExchangeRepository serializa las transacciones mediante una cola por instancia. Toma el snapshot después de adquirir el turno; ejecuta el caso de uso contra un borrador; clona el resultado y el estado para evitar referencias escapadas; sustituye la referencia del estado confirmado solo cuando todo termina correctamente. Cualquier excepción anterior a ese punto descarta el borrador completo. Un finally libera el turno tras éxito o error.
 
-La actualización de perfil utiliza una lista explícita de campos. PublicUser proyecta datos permitidos sin hash. Un interceptor global elimina password, passwordHash y password_hash de JSON como defensa adicional. El filtro global oculta detalles 5xx y no registra cuerpos, cabeceras, URL, objetos de error ni secretos.
+Las lecturas reciben snapshots del estado confirmado, nunca el borrador de otra transacción. Los servicios no ejecutan una segunda transacción anidada desde un callback: acceden al mismo borrador para evitar bloqueos y lecturas obsoletas.
 
-## Prisma 7 y CommonJS
+Antes de confirmar operaciones de negocio, inspectIntegrity comprueba coherencia de cuentas, ledger, reservas, retenciones, transferencias y participantes. La auditoría ADMIN reutiliza ese inspector sobre una lectura sin modificar datos. No se restaura un snapshot antiguo sobre el estado de otra operación ya confirmada.
 
-package.json y TypeScript son CommonJS; el generador prisma-client declara moduleFormat=cjs. Prisma 7.10.1, @prisma/client y @prisma/adapter-pg coinciden exactamente. La configuración CLI está en prisma.config.ts; el esquema solo declara proveedor PostgreSQL y generador.
+## Concurrencia de disponibilidad
 
-El cliente se cargará de src/generated/prisma/client en desarrollo o dist/generated/prisma/client tras compilar. La carga es diferida para que el proyecto compile antes de recibir modelos oficiales. PrismaService evita conexiones simultáneas duplicadas, permite reintentar tras fallo y cierra el cliente al destruir el módulo. El pool tiene máximo 10 conexiones y timeout de conexión de 5 segundos. La adaptación tipada para consultas se completará tras introspección.
+PATCH pasa únicamente los extremos presentes. El adaptador lee el registro vigente, combina los campos, valida el intervalo y sus solapamientos y escribe dentro de una sola transacción. Dos ediciones compatibles conservan ambos cambios; si juntas producen un intervalo inválido se rechaza la segunda sin borrar el cambio válido.
 
-No se inventan modelos a partir de la descripción resumida. Las 18 tablas recibidas son inventario, no fuente suficiente para inferir claves, tipos o relaciones.
+La edición/desactivación comparte la misma transacción que la aceptación de reservas. Un horario con reservas CONFIRMADA no puede desactivarse ni recortarse de forma que deje alguna fuera de cobertura; se permiten ampliaciones que preservan todas las reservas. Despublicar una habilidad impide nuevas aceptaciones pero no elimina reservas aceptadas.
 
-## Organización de módulos pendientes
+## Reservas, créditos y reintentos
 
-Cada directorio futuro tiene un README que declara su alcance. Roles reutiliza los enums, decorators y guards comunes; su administración persistente sigue pendiente. Skills, Availability, Exchanges, Reservations, Confirmations, Credits, Notifications, Ratings y Audit no tienen endpoints ni reglas implementadas.
+Al aceptar se comprueban nuevamente ambos estudiantes, la habilidad/categoría activa, la oferta publicada, la disponibilidad vigente, el futuro del intervalo y los conflictos de cualquiera de los participantes en ambos roles. Una reserva y su retención se confirman juntas.
 
-Las reglas posteriores deberán vivir en servicios con dependencias explícitas, y las operaciones concurrentes en repositorios transaccionales. No se crean clases vacías para simular avances.
+El saldo inicial es cero; las cuentas se crean sin saldo al consultarse o participar en una aceptación. Una carga de desarrollo requiere ADMIN actual, motivo e idempotencia; solo se admite en desarrollo/pruebas. Los importes internos son enteros bigint en centésimas de crédito y los públicos son strings decimales. Una hora equivale provisionalmente a 1.00 crédito; las reservas duran múltiplos de 15 minutos, como máximo 8 horas.
+
+Dos confirmaciones únicas, después del fin, producen una única transferencia con débito, abono, consumo de retención y movimientos. Los participantes pueden cancelar antes del inicio; ADMIN puede resolver una cancelación antes de completarse. La liberación es única y no borra el historial.
+
+Idempotency-Key se guarda en el mismo commit que sus efectos, con ámbito usuario/operación y fingerprint del contenido. Repetir la clave devuelve el resultado original; otro contenido recibe 409. La identidad de la solicitud/reserva protege además contra efectos duplicados con claves diferentes. Si falla la respuesta después del commit, el reintento recupera ese resultado; no se deshace el negocio por un error de transporte.
+
+## Seguridad y límites
+
+Se reutilizan Argon2id, JWT HS256, emisor/audiencia/expiración, estado y roles actuales, JwtAuthGuard, RolesGuard y CurrentUser. La firma JWT ocurre antes de escribir ultimo_acceso para que un fallo de firma no deje un acceso registrado. La escritura conserva su comprobación de usuario activo.
+
+DTO y pipes rechazan campos adicionales, importes del cliente en reservas, IDs de actor arbitrarios y cuerpos no admitidos. Los públicos no exponen bigint, hashes ni contraseñas. CORS incluye DELETE e Idempotency-Key.
+
+La cola cubre solo un proceso. La memoria se pierde al reiniciar, incluidas las claves de idempotencia. No hay garantías entre instancias, durabilidad ni tolerancia a caídas del proceso. NODE_ENV=production sigue bloqueado mientras no haya persistencia real.
+
+## PostgreSQL y compatibilidad
+
+PrismaService conserva su ciclo de vida diferido anterior y no se usa para estas operaciones. prisma/schema.prisma no se modifica ni se inventan modelos SQL. No se ejecutan migraciones ni comandos sobre BD.
+
+Los nombres oficiales conocidos de v0.2 se conservan. Para las tablas posteriores solo existe un inventario de nombres: sus columnas, estados y restricciones del adaptador local son provisionales y requieren mapeo contra la fuente oficial. Ver [compatibilidad de base de datos](database-compatibility.md), [contrato API](api-contract.md) y [reporte v0.3](progress-v0.3.md).

@@ -1,8 +1,8 @@
 {
   "name": "banco-tiempo-backend",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "private": true,
-  "description": "Backend local del Banco de Tiempo Universitario, fases 0 y base de seguridad",
+  "description": "Backend v0.3 del Banco de Tiempo Universitario: reservas y creditos transaccionales en memoria",
   "license": "UNLICENSED",
   "type": "commonjs",
   "engines": {
@@ -10,10 +10,12 @@
     "npm": ">=11 <12"
   },
   "scripts": {
+    "postinstall": "prisma generate",
     "setup:env": "node scripts/setup-env.cjs",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
     "start:dev": "ts-node-dev --respawn --transpile-only src/main.ts",
+    "start:memory-admin": "node scripts/start-memory-admin.cjs",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

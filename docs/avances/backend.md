@@ -1,5 +1,13 @@
 # Avances — Equipo Backend
 
+## Versión local v0.3.0 — 22 de octubre de 2026
+
+Corregida la concurrencia de disponibilidad e implementados solicitudes, reservas, confirmaciones, créditos exactos, retenciones, cancelaciones, idempotencia y auditoría sobre memoria transaccional compartida. Se conservan los campos oficiales conocidos y se documenta el modelo provisional de entidades posteriores. 173 pruebas unitarias y 108 HTTP aprobadas; build, lint y formato correctos. Servidor compilado probado. Sin commit, push, PR ni cambios PostgreSQL. Ver [reporte v0.3](../progress-v0.3.md).
+
+## Versión local v0.2.0 — 22 de octubre de 2026
+
+Catálogos, habilidades de estudiantes y disponibilidad implementados con memoria, JWT y permisos. Auth/Users publicados reutilizando sus servicios anteriores. La política de créditos y PostgreSQL siguen pendientes. Entrega exclusivamente local, sin commit, push, PR ni cambios remotos. Consultar [reporte y verificaciones](../progress-v0.2.md).
+
 ## Primera versión del backend — v0.1.0
 
 - **Fecha:** 2026-10-21 (America/La_Paz).

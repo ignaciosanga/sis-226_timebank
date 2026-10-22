@@ -31,6 +31,8 @@ describe('Validacion de entorno', () => {
     { DATABASE_URL: 'https://example.test/db' },
     { CORS_ORIGINS: '*' },
     { CORS_ORIGINS: 'https://example.test/path' },
+    { PERSISTENCE_MODE: 'prisma' },
+    { NODE_ENV: 'production', PERSISTENCE_MODE: 'memory' },
   ])('rechaza configuracion invalida %j', (values) => {
     expect(() =>
       validateEnvironment({ JWT_SECRET: secret, ...values }),

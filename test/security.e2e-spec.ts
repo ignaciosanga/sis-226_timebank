@@ -24,6 +24,7 @@ import { AuthService } from '../src/modules/auth/auth.service';
 import { PasswordService } from '../src/modules/auth/password.service';
 import { LoginDto } from '../src/modules/auth/dto/login.dto';
 import { RegisterDto } from '../src/modules/auth/dto/register.dto';
+import { REGISTRATION_POLICY } from '../src/modules/auth/registration-policy';
 import { UsersService } from '../src/modules/users/users.service';
 import { PublicUser } from '../src/modules/users/user.types';
 import { UpdateProfileDto } from '../src/modules/users/dto/update-profile.dto';
@@ -100,7 +101,7 @@ describe('Seguridad HTTP con repositorio simulado (no es integracion de BD)', ()
     apellido: 'Perez',
     correo: 'ana@example.test',
     password: 'clave-segura-de-prueba',
-    idCarrera: 'carrera-test',
+    idCarrera: '30000000-0000-4000-8000-000000000001',
     semestre: 3,
   };
 
@@ -112,6 +113,8 @@ describe('Seguridad HTTP con repositorio simulado (no es integracion de BD)', ()
     })
       .overrideProvider(UsersService)
       .useValue(new UsersService(repository))
+      .overrideProvider(REGISTRATION_POLICY)
+      .useValue({ initialCredits: null })
       .compile();
     app = module.createNestApplication({ logger: false });
     configureApp(app);
@@ -166,6 +169,7 @@ describe('Seguridad HTTP con repositorio simulado (no es integracion de BD)', ()
 
   it.each([
     { roles: ['ADMIN'] },
+    { rol: 'Administrador' },
     { saldo: 100 },
     { id: 'otro' },
     { password_hash: 'unsafe' },
@@ -270,9 +274,14 @@ describe('Seguridad HTTP con repositorio simulado (no es integracion de BD)', ()
 
   it.each([
     { saldo: 999 },
+    { creditos_retenidos: 1 },
+    { rol: 'Administrador' },
     { roles: ['ADMIN'] },
     { id: 'otro' },
     { nombre: null },
+    { idCarrera: null },
+    { idCarrera: 'sin-uuid' },
+    { semestre: 13 },
   ])('rechaza modificacion de perfil invalida %j', async (patch) => {
     await request(app.getHttpServer())
       .patch('/__test__/me')

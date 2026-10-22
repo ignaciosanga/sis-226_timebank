@@ -6,3 +6,4 @@ package-lock.json
 src/generated
 .env
 .local
+sis-226_timebank/
