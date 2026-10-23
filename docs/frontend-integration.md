@@ -4,6 +4,10 @@ El frontend consume la API HTTP de NestJS. No necesita credenciales ni una conex
 
 ## Entorno local
 
+Revisión estática del 22 de octubre de 2026: no están disponibles las referencias locales `equipo/frontend` ni `equipo/BD`. No se ejecutaron fetch ni peticiones HTTP; la compatibilidad entre equipos sigue pendiente. Ver en el README la diferencia entre las 12 tablas implementadas y las 13 anunciadas por BD.
+
+Los pasos siguientes son para ejecución posterior: Compose aplica migraciones y semillas. Usarlos solo en una instancia local compatible con el modelo de 12 tablas, no sobre modelos de 13/18 tablas sin un plan acordado con BD.
+
 Con Docker Desktop activo, desde la raíz del backend:
 
 ```powershell
@@ -87,6 +91,8 @@ Solicitudes: `Solicitada`, `Aceptada`, `Rechazada`, `Cancelada`. Reservas: `Conf
 
 ## Créditos y reintentos
 
+La paginación de catálogos comienza en `page=1`, con `limit=20` por defecto y máximo 100. Las carreras exponen `id_carrera`, `nombre`, `facultad` y `estado`. Crear solicitudes devuelve 201; aceptar/rechazar/cancelar y confirmar devuelven 200. Aceptar devuelve una reserva: conservar `id_reserva` para sus acciones. Una solicitud aceptada se cancela mediante la reserva, no mediante `/exchanges/:id/cancel`.
+
 **Un crédito equivale a 15 minutos; una hora cuesta 4 créditos.** Cuenta: `saldo`, `creditos_retenidos` y `disponibles` son strings de enteros. Reserva: `creditos` es número entero. `saldo` incluye los retenidos; `disponibles = saldo - creditos_retenidos`. No enviar decimales ni dinero.
 
 Los POST de `/exchanges`, sus acciones, confirmación/cancelación de `/reservations` y `/credits/grants` requieren `Idempotency-Key`. Generar una clave por acción con `crypto.randomUUID()` y **reutilizar la misma clave y cuerpo al reintentar por un fallo de red**. Una nueva acción lleva otra clave. Se admiten 16–128 caracteres alfanuméricos o `. _ : -`. El resultado persiste en PostgreSQL. Reutilizar una clave con otro contenido devuelve 409.
@@ -104,6 +110,8 @@ Guardar la contraseña aleatoria impresa por el comando y autenticar con `/auth/
 ADMIN puede cargar saldo mediante `POST /credits/grants`, con JWT e `Idempotency-Key`, cuerpo `{ "userId": "UUID-del-solicitante", "amount": "8", "reason": "Desarrollo frontend" }`. Esta carga es exclusiva de desarrollo/pruebas. `GET /exchanges/integrity` permite a ADMIN consultar coherencia del estado.
 
 ## Errores y alcance
+
+Ante 429 (límite de solicitudes), evitar reintentos inmediatos. Si se reintenta una acción sensible tras un fallo temporal, conservar clave y cuerpo. Swagger/OpenAPI requieren `SWAGGER_ENABLED=true`; readiness comprueba presencia de tablas, no equivalencia de columnas o restricciones del modelo de otro equipo.
 
 Formato de error: `{ "statusCode": 400, "message": "texto o array de validaciones", "timestamp": "ISO-8601" }`. Tratar 400 como validación, 401 como sesión inválida/vencida, 403 como falta de permiso, 404 como recurso ausente, 409 como conflicto y 503 como servicio no disponible. DELETE puede devolver 204 sin cuerpo. El backend rechaza campos ajenos al DTO.
 

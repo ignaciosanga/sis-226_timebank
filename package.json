@@ -6,7 +6,7 @@
   "license": "UNLICENSED",
   "type": "commonjs",
   "engines": {
-    "node": ">=24 <25",
+    "node": "26.8.2",
     "npm": ">=11 <12"
   },
   "scripts": {

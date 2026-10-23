@@ -2,6 +2,8 @@
 
 Fecha: 22 de octubre de 2026. Esta entrega mantiene persistencia exclusivamente en memoria. **No se dispone del SQL/DBML completo de reservas y créditos; no se afirma compatibilidad verificada con columnas que no fueron entregadas.**
 
+> Documento histórico anterior a v0.4: las referencias a memoria exclusiva y créditos decimales no describen la implementación actual. Consultar el [README](../README.md), Prisma y la [guía HTTP](frontend-integration.md) para las 12 tablas, créditos enteros y comparación pendiente con BD v0.4 de 13 tablas.
+
 ## Fuente recibida y conservada
 
 Se conservan exactamente los nombres conocidos de CATEGORIAS (id_categoria, nombre, estado), HABILIDADES (id_habilidad, nombre, id_categoria, estado), USUARIO_HABILIDADES (id_usuario, id_habilidad, nivel), DISPONIBILIDADES (id_disponibilidad, id_usuario, fecha_inicio, fecha_fin, estado) y USUARIOS (id_usuario, nombre, apellido, correo, password_hash, id_carrera, semestre, fecha_registro, ultimo_acceso, estado).

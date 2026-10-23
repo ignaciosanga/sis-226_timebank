@@ -1,10 +1,26 @@
 ﻿# Banco de Tiempo Universitario — Backend v0.4.0
 
-Backend NestJS adaptado al **modelo optimizado de 12 tablas**, elegido por el usuario y definido en [la documentación de BD](documentaci_n_de_la_base_de_datos.md). El SQL/JSON anterior de 18 tablas es legado y no se aplica automáticamente.
+Backend NestJS para intercambiar tutorías y habilidades entre estudiantes mediante créditos de tiempo. Implementa el **modelo optimizado de 12 tablas** definido en [la documentación local de BD](documentaci_n_de_la_base_de_datos.md). Su compatibilidad con `BancoTiempo_DB_v0.4` de 13 tablas está pendiente de comparación con el equipo BD; no se presupone que sean 12 tablas más una técnica.
+
+## Estado y organización de esta entrega
+
+Revisión inicial estática del 22 de octubre de 2026 sobre la rama `Backend`, commit base `a628817`, inicialmente sin cambios locales. Solo existe la referencia remota local `origin/Backend`; no están disponibles `equipo/BD` ni `equipo/frontend`. Esa primera revisión no ejecutó instalaciones ni verificaciones. La estabilización posterior con Node 26.8.2 se registra al final de este README. La integración entre equipos no está verificada en ejecución.
+
+- `src/modules`: controladores HTTP, DTO, servicios y contratos de repositorio por dominio.
+- `src/infrastructure/prisma`: adaptadores PostgreSQL; los repositorios de memoria permiten desarrollo efímero.
+- `src/common` y `src/config`: permisos, validación, errores, protección de campos, CORS y entorno.
+- `prisma/schema.prisma` y `prisma/migrations`: contrato persistente y migraciones versionadas.
+- `docs/frontend-integration.md`: contrato de consumo HTTP. Los reportes de avances describen entregas anteriores.
+
+Tecnologías: NestJS 11, TypeScript, Prisma 7, PostgreSQL 16, JWT, Swagger y Docker Compose. Se conserva la implementación existente de autenticación, catálogos, disponibilidad, intercambios y créditos; la lectura estática no sustituye una comprobación de funcionamiento.
 
 ## Levantar con Docker Desktop
 
-Requisitos: Docker Desktop con motor Linux activo, Node.js 24 y npm 11.
+Requisitos: Docker Desktop con motor Linux activo, **Node.js 26.8.2 y npm 11.19.1** (rango admitido npm 11). `package.json` y el lockfile fijan Node 26.8.2; Docker usa `node:26.8.2-bookworm-slim`, etiqueta exacta confirmada en Docker Hub. La etiqueta fija la versión Node, no un digest inmutable ni la versión exacta de npm incluida en la imagen.
+
+Prisma se conserva en 7.10.1, junto con NestJS 11 y TypeScript 5.9. Su rango `engines` registrado admite `>=24.0`, pero la [documentación oficial de Prisma 7](https://www.prisma.io/docs/orm/v7/reference/system-requirements) consultada enumera Node 20/22/24 y prioriza versiones LTS. No se afirma soporte oficial de Node 26 ni compatibilidad de producción únicamente por ese rango. Se mantiene CommonJS y `@types/node` 24, sin introducir APIs exclusivas de Node 26.
+
+Los siguientes comandos son instrucciones para una ejecución posterior, no pasos realizados en esta revisión. El arranque completo ejecuta migraciones y una semilla: usar únicamente una instancia local destinada al modelo de 12 tablas, después de resolver cualquier esquema previo incompatible. No aplicar sobre una BD compartida o el modelo de 13/18 tablas sin un plan acordado con BD.
 
 ```powershell
 npm.cmd ci
@@ -35,6 +51,12 @@ Para trabajar en Node contra la BD de Compose: levantar solo `postgres`, ejecuta
 
 Ver [la guía del frontend](docs/frontend-integration.md) para URL, CORS, sesión y flujo de intercambio.
 
+### Configuración de entorno
+
+`.env.example` es la plantilla pública; `.env` contiene los valores locales privados. `setup:docker` toma la plantilla si falta `.env`, genera secretos y conserva los existentes. Revisar el destino de `DATABASE_URL` antes de cualquier comando de BD: una URL previa se conserva. Para Node con PostgreSQL se requieren `PERSISTENCE_MODE=prisma` y `DATABASE_ENABLED=true`; la plantilla por sí sola usa memoria.
+
+Configurar `CORS_ORIGINS=http://localhost:3000,http://localhost:5173`, `PORT=4000` y `SWAGGER_ENABLED=true` para la integración local. El frontend solo recibe la URL HTTP (`VITE_API_URL=http://localhost:4000` si usa Vite); nunca `DATABASE_URL`, `POSTGRES_PASSWORD` ni `JWT_SECRET`. El acceso es mediante `Authorization: Bearer <token>`. Swagger/OpenAPI no se publican cuando `SWAGGER_ENABLED=false`.
+
 ## Modelo y funcionalidades
 
 USUARIOS integra un solo `rol`, `saldo` y `creditos_retenidos`. RESERVAS integra las dos confirmaciones, cancelación, motivo y fechas. MOVIMIENTOS_CREDITO se relaciona con `id_usuario` y guarda cantidad y snapshots anteriores/posteriores. No se mantienen tablas separadas de roles, cuentas, confirmaciones, cancelaciones ni transferencias.
@@ -54,7 +76,7 @@ Roles almacenados: Estudiante, Profesor, Administrador. `roles` en JWT/perfil es
 
 Los importes persistidos son **INTEGER PostgreSQL**, sin decimales ni centavos. Regla local explícita: **1 crédito = 15 minutos**, 4 créditos por hora. Duración de reserva: múltiplos de 15 minutos hasta 8 horas. El saldo inicial es cero; una carga ADMIN de prueba usa `amount: "8"`, no `"8.00"`.
 
-POST de `/exchanges`, sus acciones, confirmación/cancelación de `/reservations` y `/credits/grants` requieren `Idempotency-Key` de 16–128 caracteres alfanuméricos o `. _ : -`. Repetir la misma clave/contenido recupera el resultado; contenido distinto recibe409. El estado de negocio también evita repetir efectos con claves diferentes.
+POST de `/exchanges`, sus acciones, confirmación/cancelación de `/reservations` y `/credits/grants` requieren `Idempotency-Key` de 16–128 caracteres alfanuméricos o `. _ : -`. Repetir la misma clave/contenido recupera el resultado; contenido distinto recibe 409. El estado de negocio también evita repetir efectos con claves diferentes.
 
 Memoria usa borradores y commit único; una excepción descarta los cambios previos al commit. Una respuesta perdida después del commit se recupera repitiendo la misma clave. No se cancela una operación válida por un fallo de transporte.
 
@@ -65,31 +87,65 @@ Memoria usa borradores y commit único; una excepción descarta los cambios prev
 3. El ofertante publica una habilidad y un horario futuro.
 4. ADMIN carga al solicitante: POST `/credits/grants`, `{ "userId": "UUID", "amount": "8", "reason": "Prueba local" }`.
 5. El solicitante crea POST `/exchanges` con providerId, skillId, availabilityId, fechaInicio, fechaFin y descripcion opcional. Usar una hora.
-6. El ofertante acepta en POST `/exchanges/:id/accept`; se retienen4 créditos. Consultar `/credits/me` y `/reservations/me`.
+6. El ofertante acepta en POST `/exchanges/:id/accept`; se retienen 4 créditos. Consultar `/credits/me` y `/reservations/me`.
 7. Antes del inicio, un participante puede cancelar con motivo. Después requiere ADMIN hasta antes de completarse.
-8. Después del fin, cada participante confirma en `/reservations/:id/confirm`; se debitan4 y se acreditan4 una vez.
+8. Después del fin, cada participante confirma en `/reservations/:id/confirm`; se debitan 4 y se acreditan 4 una vez.
 9. ADMIN consulta `/exchanges/integrity` para el snapshot actual.
 
 ## Persistencia PostgreSQL
 
 `prisma/schema.prisma` define las 12 tablas con UUID, timestamptz, INTEGER, JSONB, claves y relaciones. Los adaptadores se seleccionan con `PERSISTENCE_MODE=prisma`, `DATABASE_ENABLED=true` y `DATABASE_URL`. Compose fija estos valores para su propia BD local. `prisma/migrations` contiene la creación del modelo y restricciones de saldos, retenciones, intervalos, participantes, semestre y puntuaciones. Se aplican con `prisma migrate deploy`, conservando las tablas al reiniciar. No aplicar contra el modelo legado de 18 tablas sin un plan de migración de sus datos.
 
-El adaptador coordina escrituras con transacción y bloqueo asesor común entre instancias del backend; idempotencia y metadata de API se guardan en AUDITORIA dentro del mismo commit. Escritores externos deben respetar el protocolo. Antes de detener las pruebas se verificaron PostgreSQL real, dos instancias concurrentes, cobro único, rollback e idempotencia después de reiniciar en una BD temporal independiente. No se modificó una BD compartida.
+El adaptador coordina escrituras con transacción y bloqueo asesor común entre instancias del backend; idempotencia y metadata de API se guardan en AUDITORIA dentro del mismo commit. Escritores externos deben respetar el protocolo. Los reportes previos registran pruebas sobre una BD temporal; esta revisión no las repitió ni certifica concurrencia o integridad en una instancia real. `/health/ready` comprueba conexión y presencia de tablas, no equivalencia de columnas, restricciones ni migraciones.
 
-Variables restantes: PORT4000; CORS_ORIGINS; RATE_LIMIT_TTL_MS60000; RATE_LIMIT_MAX100; JWT_SECRET obligatoria >=32 caracteres; JWT_EXPIRES_IN_SECONDS900; JWT_ISSUER; JWT_AUDIENCE; SWAGGER_ENABLED=true. Ver `.env.example`. Producción con memoria se rechaza. Nunca publicar `.env`.
+Variables restantes: `RATE_LIMIT_TTL_MS=60000`, `RATE_LIMIT_MAX=100`, `JWT_EXPIRES_IN_SECONDS=900`, `JWT_ISSUER` y `JWT_AUDIENCE`. `JWT_SECRET` es obligatoria y debe tener al menos 32 caracteres. Ver `.env.example`. Producción con memoria se rechaza. Nunca publicar `.env`.
 
-## Verificar
+## Compatibilidad BD y pendientes de otros equipos
+
+| Versión                        | Evidencia disponible y decisión pendiente                                                                                                                                                                                                                                                                                  |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 12 tablas                      | Documento local v0.3.1 optimizado, 12 modelos Prisma y 12 `CREATE TABLE` en la migración inicial. Incluye CARRERAS, CATEGORIAS, USUARIOS, HABILIDADES, USUARIO_HABILIDADES, DISPONIBILIDADES, SOLICITUDES_INTERCAMBIO, RESERVAS, MOVIMIENTOS_CREDITO, CALIFICACIONES, NOTIFICACIONES y AUDITORIA.                          |
+| 18 tablas históricas           | El documento local describe la eliminación de ROLES, USUARIO_ROLES, CUENTAS_CREDITO, CONFIRMACIONES, CANCELACIONES y TRANSFERENCIAS_CREDITO; roles/saldos pasan a USUARIOS y confirmaciones/cancelación a RESERVAS. El SQL histórico citado en reportes no está disponible en este checkout para verificarlo directamente. |
+| 13 tablas, BancoTiempo_DB_v0.4 | No hay DDL ni referencia local de `equipo/BD` para identificar su inventario y diferencias de columnas. BD debe proporcionar la versión acordada y decidir con Backend cualquier adaptación. `_prisma_migrations` es técnica, pero no demuestra el origen de esas 13 tablas.                                               |
+
+Frontend debe contrastar sus DTO con HTTP/OpenAPI, conservar UUID y fechas con zona, distinguir catálogos `{data, meta}` de arrays propios y solicitar login al vencer JWT (no hay refresh token). APIs debe reutilizar los endpoints y acordar cualquier consumo adicional; Dashboard debe definir sus necesidades de agregación y permisos, sin escribir saldos ni reservas directamente en BD. No se crearon interfaces, endpoints de reportes ni nuevas tablas.
+
+Notificaciones y calificaciones tienen tablas, pero no endpoints implementados. Tampoco hay recuperación de contraseña ni búsqueda global de ofertantes: el consumidor necesita conocer el ID del ofertante. Su desarrollo requiere priorización del equipo. Antes de producción, comprobar concurrencia, cobro único, cancelaciones e idempotencia sobre el entorno acordado; no se certifican aquí.
+
+## Instalación y diagnóstico de errores locales
+
+El lockfile corregido restaura `multer → type-is@1.6.18 → media-typer@0.3.0`. La entrada anterior apuntaba a un tarball 0.4.0 inexistente, conservando la integridad de 0.3.0. Se corrigieron versión, URL y dependencia del padre, sin regenerar el lockfile ni actualizar dependencias principales. Fuente: [manifiesto original de type-is](https://raw.githubusercontent.com/jshttp/type-is/1.6.18/package.json).
+
+La primera instalación también encontró tarballs inexistentes de `dynamic-dedupe@0.4.0`, `@tokenizer/token@0.4.0` y `@sinonjs/fake-timers@10.4.0`. Se restauraron respectivamente 0.3.0, 0.3.0 y 10.3.0, contrastando metadatos e integridades con npm oficial, junto con los rangos afectados de `ts-node-dev`, `strtok3` y `token-types`. No fue necesario borrar la caché ni usar overrides o `--force`.
+
+Si npm informa `UNABLE_TO_VERIFY_LEAF_SIGNATURE` y el certificado de confianza está instalado en Windows, usar en esa sesión PowerShell `$env:NODE_OPTIONS = "$env:NODE_OPTIONS --use-system-ca".Trim()` antes de `npm.cmd ci`. No desactivar `strict-ssl` ni TLS. Si persiste, revisar la CA del entorno con su administrador.
+
+Los comandos ausentes (`tsc`, Prisma, ESLint, Jest, Prettier) y `Cannot find module 'dotenv'` son consecuencias de la instalación incompleta: primero terminar `npm.cmd ci`, después `npm.cmd run setup:docker`. Este último genera `.env` local y resuelve la falta de `POSTGRES_PASSWORD`; `.env` está excluido de Git. No se generan credenciales durante esta revisión.
+
+El error `dockerDesktopLinuxEngine` corresponde al motor Docker: abrir Docker Desktop, activar el motor WSL 2/Linux y esperar a que esté iniciado. Si está en contenedores Windows, seleccionar contenedores Linux. No se corrige modificando NestJS. Compose conserva `postgres`, `db-init` y `backend`; no ejecutar el arranque completo hasta resolver el esquema de la instancia destino con BD.
+
+## Verificación controlada
+
+Con dependencias y cliente Prisma preparados, ejecutar desde PowerShell. Las pruebas unitarias/e2e utilizan memoria; el setup fija ese modo y deshabilita BD, incluso si el entorno del usuario seleccionaba Prisma. E2e usa HTTP local de prueba, sin servicios de otros equipos. No ejecutar `test:postgres` sin autorización independiente.
 
 ```powershell
 npm.cmd run build
+npm.cmd run prisma:validate
 npm.cmd run lint
+npm.cmd run format:check
 npm.cmd test
 npm.cmd run test:e2e
-npm.cmd run format:check
-npm.cmd run prisma:validate
 ```
 
-Antes de la última instrucción aprobaron 157 pruebas unitarias, 132 HTTP y el escenario real de PostgreSQL. No se ejecutaron nuevas pruebas después. La construcción completa de Docker quedó detenida durante la descarga de su imagen base; el despliegue completo y los ajustes finales quedan sin nueva verificación. Notificaciones, calificaciones y recuperación de contraseña no tienen endpoints implementados.
+Resultado de esta estabilización en Windows, Node 26.8.2 / npm 11.19.1:
+
+- `npm ci`: primera ejecución falló por las otras tres entradas del lockfile; el único reintento pasó y generó Prisma Client 7.10.1.
+- `build`, `prisma:validate` y `lint`: pasaron, una ejecución de cada uno.
+- `format:check`: falló con avisos en 156 archivos, incluidos archivos ajenos a esta entrega. Se normalizó únicamente el formato de los archivos modificados; no se hizo una reformateación global ni se repitió una comprobación que seguiría fallando por los restantes.
+- Unitarias y e2e: no ejecutadas, porque la autorización exige que pasen las verificaciones previas. No se iniciaron servidores persistentes, contenedores, migraciones ni conexiones de prueba a PostgreSQL.
+- npm reportó 33 vulnerabilidades (2 moderadas y 31 altas). Queda pendiente evaluar su alcance y las actualizaciones puntuales necesarias; no se aplicó `npm audit fix` ni actualizaciones principales automáticas.
+
+Después de iniciar voluntariamente el entorno local compatible con BD, revisar en `/docs-json` que `GET /careers` documente `data` y `meta`, y `GET /careers/{id}` los campos de carrera. OpenAPI en ejecución, Docker y el flujo HTTP completo siguen pendientes. Los resultados de pruebas de los reportes históricos no son resultados de esta estabilización.
 
 ## Documentación
 

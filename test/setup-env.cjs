@@ -1,5 +1,6 @@
 const { randomBytes } = require('node:crypto');
 process.env.NODE_ENV = 'test';
+process.env.PERSISTENCE_MODE = 'memory';
 process.env.JWT_SECRET = randomBytes(48).toString('hex');
 process.env.DATABASE_ENABLED = 'false';
 process.env.DATABASE_URL = '';
