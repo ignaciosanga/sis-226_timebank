@@ -226,7 +226,7 @@ Para autenticarte, lo más fácil es GitHub CLI. Instálala en Mac con `brew ins
 cd ~/Desktop
 git clone https://github.com/<usuario-u-org>/<repo>.git
 cd <repo>
-git checkout -b bd/v0.31plus-docker          # rama del equipo de BD
+git checkout -b equipo/base-de-datos         # rama del equipo (normas del repo)
 
 # copia la carpeta dentro del repo (por ejemplo, en database/)
 mkdir -p database
@@ -235,7 +235,7 @@ cp -R ~/Desktop/basede_datos/BancoTiempo_BD_v0.31plus/. database/
 git add database
 git status                                    # .env NO debe aparecer
 git commit -m "BD v0.31+: Docker con encriptación y vistas v2 adaptadas"
-git push -u origin bd/v0.31plus-docker
+git push -u origin equipo/base-de-datos
 ```
 
 Luego, en GitHub, aparece el botón **Compare & pull request** para pedir que se una a `main` (o a la rama que usen). Si ya tienes el repo clonado, en lugar de `git clone` usa `cd <repo>` y `git pull`.
