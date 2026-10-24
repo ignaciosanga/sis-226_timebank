@@ -26,5 +26,7 @@ export function repositoryMock(): jest.Mocked<UsersRepository> {
     createStudentWithAccount: jest.fn(),
     updateActiveProfile: jest.fn(),
     recordActiveLogin: jest.fn(),
+    listForAdmin: jest.fn(),
+    setStatusByAdmin: jest.fn(),
   };
 }

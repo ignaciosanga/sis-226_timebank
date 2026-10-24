@@ -69,6 +69,7 @@ USUARIOS integra un solo `rol`, `saldo` y `creditos_retenidos`. RESERVAS integra
 - Reservas sin superposición por ambos participantes, incluyendo roles cruzados.
 - Dos confirmaciones después del fin liquidan una vez mediante movimientos de consumo y transferencia.
 - Cancelación libera una vez; auditoría ADMIN de integridad.
+- Gestión administrativa de usuarios (solo ADMIN, JWT + RolesGuard): `GET /admin/users` (búsqueda y filtros por estado, rol y carrera, paginado), `POST /admin/users` (alta de estudiantes reutilizando el registro: Argon2id, créditos iniciales por política, sin asignación de roles desde el cliente) y `PATCH /admin/users/:id/status` (baja lógica a `Inactivo` o reactivación a `Activo`). La baja no elimina filas ni toca saldos; se rechaza con 409 la propia cuenta, el último ADMIN activo, reservas confirmadas o créditos retenidos pendientes. Los `Suspendido` no se reactivan por esta vía. Cada acción se registra en `AUDITORIA` (`ADMIN_USER_CREATE`, `ADMIN_USER_DEACTIVATE`, `ADMIN_USER_REACTIVATE`) con el ADMIN ejecutor, el usuario afectado y el estado anterior/posterior, en la misma transacción y sin secretos. Detalle y ejemplos en `docs/frontend-integration.md`.
 
 Roles almacenados: Estudiante, Profesor, Administrador. `roles` en JWT/perfil es una proyección de capacidades compatible con la API anterior; no representa relaciones M:N. El registro público solo crea Estudiante. Niveles: Basico, Intermedio, Avanzado, Experto. Disponibilidad: disponible, reservado, cancelado.
 

@@ -1,5 +1,6 @@
 ﻿import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   NotFoundException,
@@ -20,13 +21,33 @@ import {
   ExchangeRepository,
 } from '../exchanges/exchange.repository';
 import { MemoryExchangeRepository } from '../exchanges/memory-exchange.repository';
+import {
+  AdminAuditEntry,
+  ExchangeState,
+  ReservationStatus,
+} from '../exchanges/exchange.types';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import {
+  AdminUsersFilter,
+  AdminUserStatus,
   CreateStudent,
   CreateStudentProfile,
   EmailAlreadyExistsError,
   UsersRepository,
 } from './users.repository';
+
+function recordAdminAudit(
+  state: ExchangeState,
+  entry: Omit<AdminAuditEntry, 'id_auditoria' | 'entidad' | 'created_at'>,
+): void {
+  const id_auditoria = randomUUID();
+  state.adminAudit.set(id_auditoria, {
+    id_auditoria,
+    entidad: 'USUARIOS',
+    created_at: new Date(),
+    ...entry,
+  });
+}
 import { adaptStoredUser, StoredUser, UserRecord } from './user.types';
 
 @Injectable()
@@ -113,6 +134,102 @@ export class MemoryUsersRepository implements UsersRepository {
         };
         state.movements.set(movement.id_movimiento, movement);
       }
+      if (input.createdBy)
+        recordAdminAudit(state, {
+          id_usuario: input.createdBy,
+          accion: 'ADMIN_USER_CREATE',
+          entidad_id: row.id_usuario,
+          datos_anteriores: null,
+          datos_nuevos: {
+            correo: row.correo,
+            rol: row.rol,
+            estado: row.estado,
+            saldo_inicial: initial,
+          },
+        });
+      return adaptStoredUser(row);
+    });
+  }
+  async listForAdmin(filter: AdminUsersFilter): Promise<UserRecord[]> {
+    const search = filter.search?.trim().toLowerCase();
+    return this.persistence.read((state) =>
+      [...state.users.values()]
+        .filter(
+          (row) =>
+            (!filter.estado || row.estado === filter.estado) &&
+            (!filter.rol || row.rol === filter.rol) &&
+            (!filter.idCarrera || row.id_carrera === filter.idCarrera) &&
+            (!search ||
+              `${row.nombre} ${row.apellido} ${row.correo}`
+                .toLowerCase()
+                .includes(search)),
+        )
+        .sort((a, b) => b.fecha_registro.getTime() - a.fecha_registro.getTime())
+        .map(adaptStoredUser),
+    );
+  }
+  setStatusByAdmin(
+    adminId: string,
+    userId: string,
+    estado: AdminUserStatus,
+    motivo?: string,
+  ): Promise<UserRecord> {
+    return this.persistence.transaction((state) => {
+      const row = state.users.get(userId);
+      if (!row) throw new NotFoundException('Usuario no encontrado');
+      const previous = row.estado;
+      if (previous === estado)
+        throw new ConflictException(`El usuario ya se encuentra ${estado}`);
+      if (estado === UserStatus.INACTIVO) {
+        if (userId === adminId)
+          throw new ConflictException(
+            'Un administrador no puede desactivar su propia cuenta',
+          );
+        if (previous !== UserStatus.ACTIVO)
+          throw new ConflictException(
+            'Solo se pueden desactivar usuarios en estado Activo',
+          );
+        if (
+          row.rol === DatabaseRole.ADMIN &&
+          ![...state.users.values()].some(
+            (user) =>
+              user.id_usuario !== userId &&
+              user.rol === DatabaseRole.ADMIN &&
+              user.estado === UserStatus.ACTIVO,
+          )
+        )
+          throw new ConflictException(
+            'No se puede desactivar al ultimo administrador activo',
+          );
+        const activeReservations = [...state.reservations.values()].filter(
+          (reservation) =>
+            reservation.estado === ReservationStatus.CONFIRMADA &&
+            (reservation.id_solicitante === userId ||
+              reservation.id_ofertante === userId),
+        ).length;
+        if (activeReservations > 0)
+          throw new ConflictException(
+            `El usuario tiene ${activeReservations} reserva(s) confirmada(s) pendientes de resolucion`,
+          );
+        if (row.creditos_retenidos > 0)
+          throw new ConflictException(
+            'El usuario tiene creditos retenidos pendientes de liberacion',
+          );
+      } else if (previous !== UserStatus.INACTIVO)
+        throw new ConflictException(
+          'Solo se pueden reactivar usuarios en estado Inactivo; las suspensiones requieren autorizacion especial',
+        );
+      row.estado = estado;
+      recordAdminAudit(state, {
+        id_usuario: adminId,
+        accion:
+          estado === UserStatus.INACTIVO
+            ? 'ADMIN_USER_DEACTIVATE'
+            : 'ADMIN_USER_REACTIVATE',
+        entidad_id: userId,
+        datos_anteriores: { estado: previous },
+        datos_nuevos: { estado, ...(motivo ? { motivo } : {}) },
+      });
       return adaptStoredUser(row);
     });
   }

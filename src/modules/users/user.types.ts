@@ -1,6 +1,7 @@
 import { DatabaseRole, Role } from '../../common/enums/role.enum';
 import { UserStatus } from '../../common/enums/record-status.enum';
 import { ApiProperty } from '@nestjs/swagger';
+import { PaginationMeta } from '../../common/dto/list-query.dto';
 
 // Contrato de aplicacion. Los IDs son opacos; no implica tipos SQL ni nombres Prisma.
 export class PublicUser {
@@ -22,9 +23,29 @@ export class PublicUser {
   roles!: Role[];
 }
 
+export class AdminUsersPage {
+  @ApiProperty({ type: () => AdminUser, isArray: true })
+  data!: AdminUser[];
+  @ApiProperty({ type: PaginationMeta })
+  meta!: PaginationMeta;
+}
+
 export interface UserRecord extends PublicUser {
   passwordHash: string;
   active: boolean;
+  estado?: UserStatus;
+  fechaRegistro?: Date;
+  ultimoAcceso?: Date | null;
+}
+
+/** Proyeccion administrativa: estado y fechas sin saldos ni secretos. */
+export class AdminUser extends PublicUser {
+  @ApiProperty({ enum: UserStatus })
+  estado!: UserStatus;
+  @ApiProperty({ type: String, format: 'date-time' })
+  fechaRegistro!: Date;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  ultimoAcceso!: Date | null;
 }
 
 /** Una fila de USUARIOS del modelo optimizado: sin tablas de roles/cuentas. */
@@ -59,6 +80,19 @@ export function adaptStoredUser(user: StoredUser): UserRecord {
     roles,
     passwordHash: user.password_hash,
     active: user.estado === UserStatus.ACTIVO,
+    estado: user.estado,
+    fechaRegistro: user.fecha_registro,
+    ultimoAcceso: user.ultimo_acceso,
+  };
+}
+
+export function toAdminUser(user: UserRecord): AdminUser {
+  return {
+    ...toPublicUser(user),
+    estado:
+      user.estado ?? (user.active ? UserStatus.ACTIVO : UserStatus.INACTIVO),
+    fechaRegistro: user.fechaRegistro ?? new Date(0),
+    ultimoAcceso: user.ultimoAcceso ?? null,
   };
 }
 

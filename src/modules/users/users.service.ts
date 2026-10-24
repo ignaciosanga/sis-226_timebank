@@ -7,9 +7,18 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { USERS_REPOSITORY, UsersRepository } from './users.repository';
-import { PublicUser, UserRecord, toPublicUser } from './user.types';
+import {
+  AdminUser,
+  PublicUser,
+  UserRecord,
+  toAdminUser,
+  toPublicUser,
+} from './user.types';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { AdminUsersQueryDto } from './dto/admin-users-query.dto';
+import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { Role } from '../../common/enums/role.enum';
+import { Page, paginate } from '../../common/dto/list-query.dto';
 
 @Injectable()
 export class UsersService {
@@ -62,5 +71,30 @@ export class UsersService {
     if (!user?.active)
       throw new UnauthorizedException('Autenticacion invalida');
     return toPublicUser(user);
+  }
+
+  async listForAdmin(query: AdminUsersQueryDto): Promise<Page<AdminUser>> {
+    const users = await this.repository.listForAdmin({
+      search: query.search,
+      estado: query.estado,
+      rol: query.rol,
+      idCarrera: query.idCarrera,
+    });
+    return paginate(users.map(toAdminUser), query);
+  }
+
+  async setStatusByAdmin(
+    adminId: string,
+    userId: string,
+    input: UpdateUserStatusDto,
+  ): Promise<AdminUser> {
+    return toAdminUser(
+      await this.repository.setStatusByAdmin(
+        adminId,
+        userId,
+        input.estado,
+        input.motivo,
+      ),
+    );
   }
 }

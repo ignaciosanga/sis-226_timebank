@@ -15,6 +15,7 @@ export class MemoryExchangeRepository implements ExchangeRepository {
     requestMetadata: new Map(),
     reservationMetadata: new Map(),
     idempotency: new Map(),
+    adminAudit: new Map(),
   };
 
   private queue: Promise<void> = Promise.resolve();

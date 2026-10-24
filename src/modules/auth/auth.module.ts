@@ -12,6 +12,7 @@ import { PasswordService } from './password.service';
 import { REGISTRATION_POLICY } from './registration-policy';
 import { AuthController } from './auth.controller';
 import { UsersController } from '../users/users.controller';
+import { AdminUsersController } from '../users/admin-users.controller';
 
 @Module({
   imports: [
@@ -35,7 +36,7 @@ import { UsersController } from '../users/users.controller';
       }),
     }),
   ],
-  controllers: [AuthController, UsersController],
+  controllers: [AuthController, UsersController, AdminUsersController],
   providers: [
     AuthService,
     PasswordService,

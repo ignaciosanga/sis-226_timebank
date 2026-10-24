@@ -77,6 +77,7 @@ export class PrismaExchangeRepository implements ExchangeRepository {
       requestMetadata: new Map(),
       reservationMetadata: new Map(),
       idempotency: new Map(),
+      adminAudit: new Map(),
     };
     for (const row of users) {
       if (
@@ -311,6 +312,22 @@ export class PrismaExchangeRepository implements ExchangeRepository {
           },
         });
       }
+    for (const [id, entry] of after.adminAudit)
+      if (!before.adminAudit.has(id))
+        await tx.auditoria.create({
+          data: {
+            id_auditoria: entry.id_auditoria,
+            id_usuario: entry.id_usuario,
+            accion: entry.accion,
+            entidad: entry.entidad,
+            entidad_id: entry.entidad_id,
+            ...(entry.datos_anteriores
+              ? { datos_anteriores: json(entry.datos_anteriores) }
+              : {}),
+            datos_nuevos: json(entry.datos_nuevos),
+            created_at: entry.created_at,
+          },
+        });
     // Historial seguro del cambio de entidades: no registrar password_hash.
     const auditRows = async <T>(
       entity: string,

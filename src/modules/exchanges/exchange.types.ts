@@ -77,6 +77,21 @@ export interface IdempotencyRecord {
   result: unknown;
 }
 
+/** Fila AUDITORIA de una accion administrativa; nunca incluye secretos. */
+export interface AdminAuditEntry {
+  id_auditoria: string;
+  id_usuario: string;
+  accion:
+    | 'ADMIN_USER_CREATE'
+    | 'ADMIN_USER_DEACTIVATE'
+    | 'ADMIN_USER_REACTIVATE';
+  entidad: 'USUARIOS';
+  entidad_id: string;
+  datos_anteriores: Record<string, unknown> | null;
+  datos_nuevos: Record<string, unknown>;
+  created_at: Date;
+}
+
 /** Las entidades centrales reflejan las 12 tablas oficiales optimizadas. */
 export interface ExchangeState {
   users: Map<string, StoredUser>;
@@ -92,4 +107,6 @@ export interface ExchangeState {
     { availabilityId: string; administrativa: boolean }
   >;
   idempotency: Map<string, IdempotencyRecord>;
+  /** Solo escritura: acciones ADMIN sobre usuarios registradas en AUDITORIA. */
+  adminAudit: Map<string, AdminAuditEntry>;
 }

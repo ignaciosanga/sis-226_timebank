@@ -109,6 +109,16 @@ Guardar la contraseña aleatoria impresa por el comando y autenticar con `/auth/
 
 ADMIN puede cargar saldo mediante `POST /credits/grants`, con JWT e `Idempotency-Key`, cuerpo `{ "userId": "UUID-del-solicitante", "amount": "8", "reason": "Desarrollo frontend" }`. Esta carga es exclusiva de desarrollo/pruebas. `GET /exchanges/integrity` permite a ADMIN consultar coherencia del estado.
 
+## Gestión administrativa de usuarios (ADMIN)
+
+Rutas bajo `/admin/users`, con `Authorization: Bearer <token>` de un usuario `Administrador`; otro rol recibe 403 y un usuario inactivo 401.
+
+- `GET /admin/users?search=ana&estado=Activo&rol=Estudiante&idCarrera=<uuid>&page=1&limit=20`: respuesta `{ data: AdminUser[], meta }`. `AdminUser` = perfil público más `estado` (`Activo`, `Inactivo`, `Suspendido`), `fechaRegistro` y `ultimoAcceso`; nunca saldos ni hashes. Todos los filtros son opcionales.
+- `POST /admin/users`: mismo cuerpo que `/auth/register` (`nombre`, `apellido`, `correo`, `password` ≥ 12, `idCarrera`, `semestre` 1–12). Crea siempre un Estudiante activo con la política de créditos vigente; no admite `rol`. 201 con `PublicUser`; 409 si el correo existe.
+- `PATCH /admin/users/:id/status` con `{ "estado": "Inactivo", "motivo": "opcional" }` (baja lógica) o `{ "estado": "Activo" }` (reactivación). 200 con `AdminUser`; 404 si no existe; 409 si el estado ya es el solicitado, si el ADMIN intenta desactivarse, si es el último ADMIN activo, si el usuario tiene reservas confirmadas o créditos retenidos, o si se intenta reactivar un `Suspendido`.
+
+La baja no borra datos ni modifica saldos, reservas ni movimientos; el usuario inactivo pierde acceso a todas las rutas protegidas en su siguiente petición. Cada alta, baja y reactivación queda en `AUDITORIA` con el ADMIN ejecutor, el usuario afectado y el estado anterior/posterior.
+
 ## Errores y alcance
 
 Ante 429 (límite de solicitudes), evitar reintentos inmediatos. Si se reintenta una acción sensible tras un fallo temporal, conservar clave y cuerpo. Swagger/OpenAPI requieren `SWAGGER_ENABLED=true`; readiness comprueba presencia de tablas, no equivalencia de columnas o restricciones del modelo de otro equipo.

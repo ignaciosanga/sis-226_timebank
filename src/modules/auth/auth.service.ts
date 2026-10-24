@@ -24,7 +24,8 @@ export class AuthService {
     @Inject(REGISTRATION_POLICY) private readonly policy: RegistrationPolicy,
   ) {}
 
-  async register(input: RegisterDto) {
+  /** createdBy: ADMIN que da de alta desde /admin/users; nunca viene del body. */
+  async register(input: RegisterDto, createdBy?: string) {
     const initialCredits = this.policy.initialCredits;
     if (
       !this.policy.profileOnly &&
@@ -48,6 +49,7 @@ export class AuthService {
         idCarrera: input.idCarrera,
         semestre: input.semestre,
         role: Role.ESTUDIANTE as const,
+        ...(createdBy ? { createdBy } : {}),
       };
       const user = this.policy.profileOnly
         ? await repository.createStudentProfile(profile)
