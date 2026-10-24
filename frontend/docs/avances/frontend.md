@@ -1,5 +1,36 @@
 # Avances Equipo Frontend
 
+## Pantallas del banco de tiempo y registro
+
+- **Fecha:** 2026-10-24
+- **Estado:** Implementado localmente para revisión; conexión real pendiente de APIs.
+- **Responsable:** Equipo Frontend.
+
+Se adaptaron las pantallas al modelo de habilidades, disponibilidad, solicitudes,
+reservas y créditos conservando Red universitaria. Se agregó registro con
+validación de contraseña de 12–128 caracteres, confirmación, carrera por UUID y
+semestre de 1–12. Administración ahora valida la contraseña sin persistirla,
+permite reactivar Inactivos y separa Suspendidos. Se conservaron los datos
+administrativos guardados previamente y la corrección del logo.
+
+Los flujos de intercambio tienen una simulación de presentación aislada para
+revisar retención/liberación de créditos y dos confirmaciones. No se presenta
+como autenticación, cuentas o reservas reales. El registro no inicia sesión.
+La nota de demostración es visible en las pantallas.
+
+Se reemplazaron las vistas antiguas de cursos/puntos y sus datos; los enlaces
+anteriores redirigen a Intercambios y Créditos. Se documentaron la estructura
+visual y los contratos de entrega en `docs/pantallas-timebank.md`.
+
+Validaciones: `npm test` (26 pruebas) y compilación de producción. Renderizado en
+servidor de siete rutas y de la pestaña de Reservas. Revisión visual real pendiente
+por el bloqueo previo del navegador automatizado. La conexión real a la API,
+carga de carreras y descubrimiento de ofertantes quedan a cargo de APIs e
+Implementación; no se modificó `src/services`, Backend ni Base de Datos.
+
+Trabajo local sobre `main` actualizado. Sin commits, push ni publicaciones,
+según instrucción del usuario.
+
 ## Administración de usuarios: alta y baja demostrativas
 
 - **Fecha:** 2026-10-23

@@ -1,13 +1,17 @@
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
-import { ArrowLeft, ChevronLeft, ChevronRight, Info, Search, UserMinus, UserPlus, UsersRound, X } from '@lucide/vue'
+import { ArrowLeft, ChevronLeft, ChevronRight, Info, Search, UserCheck, UserMinus, UserPlus, UsersRound, X } from '@lucide/vue'
 import AdminDialog from '../features/admin/AdminDialog.vue'
+import AccountFields from '../features/auth/AccountFields.vue'
+import { emptyAccountForm } from '../features/auth/account-validation'
+import { useAppStore } from '../stores/app'
 import {
-  CAREERS, DEMO_ADMIN_ID, AdminUserError, addAdminUser, deactivateAdminUser,
+  DEMO_ADMIN_ID, AdminUserError, addAdminUser, deactivateAdminUser, reactivateAdminUser,
   filterAdminUsers, loadAdminUsers, saveAdminUsers,
 } from '../features/admin/user-management'
 import '../styles/admin.css'
 
+const store = useAppStore()
 const users = ref([])
 const ready = ref(false)
 const storageError = ref('')
@@ -22,7 +26,7 @@ const errors = ref({})
 const operationError = ref('')
 const reason = ref('')
 const createForm = ref(null)
-const form = reactive({ nombre: '', apellido: '', correo: '', carrera: '', semestre: '' })
+const form = reactive(emptyAccountForm())
 const filtered = computed(() => filterAdminUsers(users.value, query.value, status.value))
 const pageCount = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize)))
 const pageUsers = computed(() => filtered.value.slice((page.value - 1) * pageSize, page.value * pageSize))
@@ -31,6 +35,7 @@ const tabs = computed(() => [
   { value: 'Todos', label: 'Todos', count: users.value.length },
   { value: 'Activo', label: 'Activos', count: users.value.filter((user) => user.estado === 'Activo').length },
   { value: 'Inactivo', label: 'Inactivos', count: users.value.filter((user) => user.estado === 'Inactivo').length },
+  { value: 'Suspendido', label: 'Suspendidos', count: users.value.filter((user) => user.estado === 'Suspendido').length },
 ])
 const dateFormatter = new Intl.DateTimeFormat('es-BO', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'America/La_Paz' })
 const formatDate = (value) => dateFormatter.format(new Date(value))
@@ -60,24 +65,26 @@ function closeDialog() {
   selectedId.value = null
   errors.value = {}
   operationError.value = ''
+  form.password = ''
+  form.confirmPassword = ''
 }
 function openCreate() {
-  Object.assign(form, { nombre: '', apellido: '', correo: '', carrera: '', semestre: '' })
+  Object.assign(form, emptyAccountForm())
   errors.value = {}
   operationError.value = ''
   dialogMode.value = 'create'
 }
-function openDeactivate(user) {
+function openDeactivate(user, mode = 'deactivate') {
   selectedId.value = user.id
   reason.value = ''
   operationError.value = ''
-  dialogMode.value = 'deactivate'
+  dialogMode.value = mode
 }
 async function submitCreate() {
   operationError.value = ''
   try {
     const snapshot = loadAdminUsers(window.localStorage)
-    const result = addAdminUser(snapshot, form)
+    const result = addAdminUser(snapshot, form, { careers: store.careers })
     if (result.errors) {
       errors.value = result.errors
       await nextTick()
@@ -97,11 +104,12 @@ function confirmDeactivate() {
   operationError.value = ''
   try {
     const snapshot = loadAdminUsers(window.localStorage)
-    const result = deactivateAdminUser(snapshot, selectedId.value, reason.value)
+    const reactivating = dialogMode.value === 'reactivate'
+    const result = reactivating ? reactivateAdminUser(snapshot, selectedId.value) : deactivateAdminUser(snapshot, selectedId.value, reason.value)
     saveAdminUsers(window.localStorage, result.users)
     users.value = result.users
     closeDialog()
-    feedback.value = `${result.user.nombre} ${result.user.apellido} pasó a Inactivo. Sus datos se conservaron en esta demostración.`
+    feedback.value = `${result.user.nombre} ${result.user.apellido} pasó a ${reactivating ? 'Activo' : 'Inactivo'}. Sus datos se conservaron en esta demostración.`
   } catch (error) {
     operationError.value = error instanceof AdminUserError ? error.message
       : 'No se pudo guardar la baja en este navegador. Revisa el almacenamiento y vuelve a intentarlo.'
@@ -147,9 +155,9 @@ function confirmDeactivate() {
               <tr v-for="user in pageUsers" :key="user.id">
                 <th scope="row" class="admin-user-cell"><div class="admin-user-identity"><span class="avatar admin-user-avatar" :class="{ 'admin-avatar-inactive': user.estado === 'Inactivo' }" aria-hidden="true">{{ initials(user) }}</span><span><strong>{{ user.nombre }} {{ user.apellido }}</strong><span class="admin-user-email">{{ user.correo }}</span><small v-if="user.rol === 'Administrador'" class="admin-role-label">Administrador de demostración</small></span></div></th>
                 <td class="admin-academic-cell"><template v-if="user.rol === 'Estudiante'"><span>{{ user.carrera }}</span><small>{{ user.semestre }}.º semestre</small><small v-if="user.estado === 'Inactivo' && user.motivoBaja" class="admin-deactivation-reason">Motivo de baja: {{ user.motivoBaja }}</small></template><span v-else>Administración de la plataforma</span></td>
-                <td class="admin-status-cell"><span class="admin-user-state" :class="user.estado === 'Activo' ? 'is-active' : 'is-inactive'"><i aria-hidden="true"></i>{{ user.estado }}</span><small v-if="user.fechaBaja">Baja: {{ formatDate(user.fechaBaja) }}</small></td>
+                <td class="admin-status-cell"><span class="admin-user-state" :class="user.estado === 'Activo' ? 'is-active' : 'is-inactive'"><i aria-hidden="true"></i>{{ user.estado }}</span><small v-if="user.estado === 'Inactivo' && user.fechaBaja">Baja: {{ formatDate(user.fechaBaja) }}</small></td>
                 <td class="admin-date-cell"><span class="admin-mobile-label">Registro</span><time :datetime="user.fechaRegistro">{{ formatDate(user.fechaRegistro) }}</time></td>
-                <td class="admin-action-cell"><button v-if="user.estado === 'Activo' && user.id !== DEMO_ADMIN_ID && user.rol !== 'Administrador'" class="admin-deactivate-button" type="button" :aria-label="`Dar de baja a ${user.nombre} ${user.apellido}`" @click="openDeactivate(user)"><UserMinus :size="16" aria-hidden="true" />Dar de baja</button><span v-else class="admin-action-note">{{ user.rol === 'Administrador' ? 'Cuenta protegida' : 'Baja registrada' }}</span></td>
+                <td class="admin-action-cell"><button v-if="user.estado === 'Activo' && user.id !== DEMO_ADMIN_ID && user.rol !== 'Administrador'" class="admin-deactivate-button" type="button" :aria-label="`Dar de baja a ${user.nombre} ${user.apellido}`" @click="openDeactivate(user)"><UserMinus :size="16" aria-hidden="true" />Dar de baja</button><button v-else-if="user.estado === 'Inactivo'" class="admin-reactivate-button" type="button" :aria-label="`Reactivar a ${user.nombre} ${user.apellido}`" @click="openDeactivate(user, 'reactivate')"><UserCheck :size="16" aria-hidden="true" />Reactivar</button><span v-else class="admin-action-note">{{ user.rol === 'Administrador' ? 'Cuenta protegida' : 'Requiere revisión' }}</span></td>
               </tr>
             </tbody>
           </table>
@@ -166,27 +174,22 @@ function confirmDeactivate() {
         <h2 id="admin-dialog-title">Agregar usuario</h2>
         <p id="admin-dialog-description" class="admin-dialog-description">Registra un estudiante en esta demostración. Todos los campos son obligatorios.</p>
         <form ref="createForm" class="admin-user-form" novalidate @submit.prevent="submitCreate">
-          <div class="admin-form-pair">
-            <div class="admin-form-field"><label for="admin-first-name">Nombre</label><input id="admin-first-name" v-model="form.nombre" data-autofocus name="nombre" autocomplete="given-name" maxlength="80" required :aria-invalid="!!errors.nombre" :aria-describedby="errors.nombre ? 'admin-first-name-error' : undefined" /><small v-if="errors.nombre" id="admin-first-name-error" class="admin-field-error">{{ errors.nombre }}</small></div>
-            <div class="admin-form-field"><label for="admin-last-name">Apellido</label><input id="admin-last-name" v-model="form.apellido" name="apellido" autocomplete="family-name" maxlength="80" required :aria-invalid="!!errors.apellido" :aria-describedby="errors.apellido ? 'admin-last-name-error' : undefined" /><small v-if="errors.apellido" id="admin-last-name-error" class="admin-field-error">{{ errors.apellido }}</small></div>
-          </div>
-          <div class="admin-form-field"><label for="admin-email">Correo electrónico</label><input id="admin-email" v-model="form.correo" name="correo" type="email" autocomplete="email" placeholder="nombre@ucb.edu.bo" maxlength="254" required :aria-invalid="!!errors.correo" :aria-describedby="errors.correo ? 'admin-email-error' : undefined" /><small v-if="errors.correo" id="admin-email-error" class="admin-field-error">{{ errors.correo }}</small></div>
-          <div class="admin-form-field"><label for="admin-career">Carrera</label><select id="admin-career" v-model="form.carrera" name="carrera" required :aria-invalid="!!errors.carrera" :aria-describedby="errors.carrera ? 'admin-career-error' : undefined"><option disabled value="">Selecciona una carrera</option><option v-for="career in CAREERS" :key="career" :value="career">{{ career }}</option></select><small v-if="errors.carrera" id="admin-career-error" class="admin-field-error">{{ errors.carrera }}</small></div>
-          <div class="admin-form-field"><label for="admin-semester">Semestre</label><select id="admin-semester" v-model="form.semestre" name="semestre" required :aria-invalid="!!errors.semestre" :aria-describedby="errors.semestre ? 'admin-semester-error' : undefined"><option disabled value="">Selecciona un semestre</option><option v-for="semester in 12" :key="semester" :value="semester">{{ semester }}.º semestre</option></select><small v-if="errors.semestre" id="admin-semester-error" class="admin-field-error">{{ errors.semestre }}</small></div>
+          <AccountFields :form="form" :errors="errors" :careers="store.careers" :catalog-state="store.catalogState" prefix="admin-create" confirmation @retry="store.reloadDemoCareers" />
+          <p class="field-hint">La contraseña se valida y se descarta en esta demostración. No se guarda en el navegador.</p>
           <p v-if="Object.keys(errors).length" class="admin-field-error" role="alert">Revisa los campos indicados antes de guardar.</p>
           <p v-if="operationError" class="admin-operation-error" role="alert">{{ operationError }}</p>
-          <footer class="admin-dialog-actions"><button class="button button-outline" type="button" @click="closeDialog">Cancelar</button><button class="button button-primary" type="submit">Agregar usuario</button></footer>
+          <footer class="admin-dialog-actions"><button class="button button-outline" type="button" @click="closeDialog">Cancelar</button><button class="button button-primary" type="submit" :disabled="store.catalogState !== 'ready' || !store.careers.length">Agregar usuario</button></footer>
         </form>
       </template>
-      <template v-else-if="dialogMode === 'deactivate' && selectedUser">
+      <template v-else-if="(dialogMode === 'deactivate' || dialogMode === 'reactivate') && selectedUser">
         <div class="admin-dialog-symbol admin-dialog-symbol-danger"><UserMinus :size="24" aria-hidden="true" /></div>
-        <h2 id="admin-dialog-title">Dar de baja a este usuario</h2>
-        <p id="admin-dialog-description" class="admin-dialog-description">Pasará al estado Inactivo y seguirá apareciendo en el listado. Sus datos se conservarán en esta demostración.</p>
+        <h2 id="admin-dialog-title">{{ dialogMode === 'reactivate' ? 'Reactivar usuario' : 'Dar de baja a este usuario' }}</h2>
+        <p id="admin-dialog-description" class="admin-dialog-description">{{ dialogMode === 'reactivate' ? 'El usuario volverá al estado Activo en esta demostración.' : 'Pasará al estado Inactivo y seguirá apareciendo en el listado. Sus datos se conservarán.' }}</p>
         <div class="admin-selected-user"><span class="avatar" aria-hidden="true">{{ initials(selectedUser) }}</span><div><strong>{{ selectedUser.nombre }} {{ selectedUser.apellido }}</strong><span>{{ selectedUser.correo }}</span></div></div>
         <form class="admin-user-form" @submit.prevent="confirmDeactivate">
-          <div class="admin-form-field"><label for="admin-deactivation-reason">Motivo <span class="admin-optional">(opcional)</span></label><textarea id="admin-deactivation-reason" v-model="reason" name="motivo" rows="3" maxlength="300" aria-describedby="admin-reason-hint"></textarea><small id="admin-reason-hint" class="admin-field-hint">Hasta 300 caracteres. Se conservará junto a la baja.</small></div>
+          <div v-if="dialogMode === 'deactivate'" class="admin-form-field"><label for="admin-deactivation-reason">Motivo <span class="admin-optional">(opcional)</span></label><textarea id="admin-deactivation-reason" v-model="reason" name="motivo" rows="3" maxlength="255" aria-describedby="admin-reason-hint"></textarea><small id="admin-reason-hint" class="admin-field-hint">Hasta 255 caracteres. Se conservará junto a la baja.</small></div>
           <p v-if="operationError" class="admin-operation-error" role="alert">{{ operationError }}</p>
-          <footer class="admin-dialog-actions"><button class="button button-outline" type="button" data-autofocus @click="closeDialog">Cancelar</button><button class="button admin-button-danger" type="submit">Confirmar baja</button></footer>
+          <footer class="admin-dialog-actions"><button class="button button-outline" type="button" data-autofocus @click="closeDialog">Cancelar</button><button class="button" :class="dialogMode === 'reactivate' ? 'button-primary' : 'admin-button-danger'" type="submit">{{ dialogMode === 'reactivate' ? 'Confirmar reactivación' : 'Confirmar baja' }}</button></footer>
         </form>
       </template>
     </AdminDialog>

@@ -1,75 +1,47 @@
-# Nexo U Mockup
+# Nexo U: frontend del banco de tiempo
 
-Mockup funcional de una plataforma de aprendizaje entre pares para estudiantes de la Universidad Católica Boliviana, sede La Paz. La interfaz toma como referencia la organización de LinkedIn y aplica identidad visual institucional de la UCB.
+Pantallas universitarias para intercambiar habilidades por tiempo, con el diseño
+Red universitaria y la identidad UCB.
 
-## Funcionalidades
-
-- Catálogo con búsqueda y filtros por modalidad y categoría.
-- Inicio de sesión demostrativo al intentar inscribirse.
-- Inscripción local y actualización inmediata de la agenda.
-- Calendario de cursos elegidos.
-- Perfil con carrera, intereses, reputación, puntos y cursos impartidos.
-- Analíticas personales de aprendizaje y contribución.
-- Diseño adaptable y navegación accesible.
-
-## Tecnologías
-
-- Vue 3 con Composition API.
-- Vite.
-- Vue Router.
-- Pinia.
-- Lucide Vue.
-- CSS sin framework visual.
-
-## Ejecución
+## Ejecutar desde esta carpeta
 
 ```bash
 npm install
 npm run dev
 ```
 
-Abrir la dirección indicada por Vite, normalmente `http://localhost:5173`.
+## Pantallas
 
-## Compilación
+- Habilidades: `/`.
+- Registro de estudiantes con validaciones: `/registro`.
+- Disponibilidad: `/disponibilidad`.
+- Solicitudes: `/intercambios`.
+- Reservas: `/intercambios?tab=reservas` (o `/reservas`).
+- Créditos y movimientos: `/creditos`.
+- Perfil y habilidades propias: `/perfil`.
+- Alta, baja y reactivación de usuarios: `/administracion`.
+
+## Comprobar
 
 ```bash
+npm test
 npm run build
 ```
 
-## Publicar en GitHub Pages
+## Alcance actual
 
-El proyecto incluye `.github/workflows/deploy.yml`, que compila y publica el sitio
-cuando se suben cambios a `main`. GitHub instala pnpm automáticamente; en tu
-computador puedes seguir usando `npm run dev`.
+Las pantallas tienen un flujo demostrativo explícito. Los intercambios se
+reinician al recargar; las altas/bajas administrativas se conservan solo en el
+navegador. No se guardan contraseñas. El registro no crea cuentas ni inicia sesión
+real. Para explorar las acciones privadas, usa **Ingresar → Explorar como Valeria**.
 
-1. En GitHub, abre **Settings → Pages** del repositorio.
-2. En **Build and deployment → Source**, selecciona **GitHub Actions**.
-3. Sube los cambios a la rama `main`:
+Un crédito equivale a 15 minutos. Aceptar una solicitud genera una reserva y
+retiene créditos; cancelar antes del inicio los libera. La segunda confirmación,
+después del fin, completa el intercambio y transfiere los créditos una sola vez.
 
-   ```bash
-   git add .github/workflows/deploy.yml vite.config.js src/router/index.js src/components/ui/UcbLogo.vue README.md
-   git commit -m "Configurar publicacion en GitHub Pages"
-   git push origin main
-   ```
+El equipo de APIs e Implementación es responsable de `src/services`. Esta entrega
+no modifica esa carpeta ni implementa conexiones a Backend o PostgreSQL.
+El contrato vigente está en `../backend/docs/frontend-integration.md`.
 
-4. En la pestaña **Actions**, espera a que **Publicar en GitHub Pages** termine
-   correctamente. Si los cambios ya estaban subidos antes de activar Pages,
-   ejecuta el flujo con **Run workflow**.
-
-La dirección será:
-https://migusaper1530.github.io/front_end_decisiones_gerenciales/
-
-La navegación utiliza `#` (por ejemplo, `/#/perfil`) para permitir abrir enlaces
-y recargar las páginas internas en GitHub Pages.
-
-## Acceso demostrativo
-
-El correo aparece precargado y cualquier contraseña permite continuar. No existe autenticación real ni se envían credenciales.
-
-## Integración futura
-
-Los datos de prueba se encuentran en `src/data/mockData.js`. El estado demostrativo está en `src/stores/app.js` y el cliente HTTP base en `src/services/api.js`. Consulta `docs/integracion-api.md` para los contratos propuestos.
-
-## Alcance
-
-Este proyecto es un mockup de Frontend. No implementa autenticación, persistencia, cálculos analíticos del servidor ni base de datos.
+Consulta [Pantallas y entrega a APIs](docs/pantallas-timebank.md) para los estados,
+campos, límites y puntos de integración pendientes.

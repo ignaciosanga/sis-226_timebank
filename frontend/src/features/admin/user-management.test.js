@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {
   ADMIN_USERS_STORAGE_KEY, CAREERS, DEMO_ADMIN_ID, AdminUserError,
   addAdminUser, deactivateAdminUser, filterAdminUsers,
-  loadAdminUsers, saveAdminUsers, seedAdminUsers, validateNewUser,
+  loadAdminUsers, saveAdminUsers, seedAdminUsers, validateNewUser, reactivateAdminUser,
 } from './user-management.js'
 
 function memoryStorage(initial = null) {
@@ -13,7 +13,7 @@ function memoryStorage(initial = null) {
     setItem(key, next) { assert.equal(key, ADMIN_USERS_STORAGE_KEY); value = next },
   }
 }
-const validInput = () => ({ nombre: '  Lucía  ', apellido: ' Fernández ', correo: '  LUCIA.FERNANDEZ@UCB.EDU.BO  ', carrera: CAREERS[0], semestre: '4' })
+const validInput = () => ({ nombre: '  Lucía  ', apellido: ' Fernández ', correo: '  LUCIA.FERNANDEZ@UCB.EDU.BO  ', idCarrera: '30000000-0000-4000-8000-000000000001', semestre: '4', password: 'clave-demostrativa', confirmPassword: 'clave-demostrativa' })
 const options = { id: 'new-student', now: '2026-10-23T17:00:00.000Z' }
 
 test('an empty browser starts with independent demonstration data without writing storage', () => {
@@ -43,12 +43,21 @@ test('alta normalizes input and creates an active student without modifying exis
 
 test('required fields, email syntax and semester ranges are validated', () => {
   const errors = validateNewUser({ nombre: '  ', apellido: '', correo: 'not-an-email', carrera: 'Unknown', semestre: '3.5' }, [])
-  assert.deepEqual(Object.keys(errors).sort(), ['apellido', 'carrera', 'correo', 'nombre', 'semestre'])
+  assert.deepEqual(Object.keys(errors).sort(), ['apellido', 'correo', 'idCarrera', 'nombre', 'password', 'semestre'])
   for (const semester of ['', '0', '-1', '13', 'NaN']) {
     assert.ok(validateNewUser({ ...validInput(), semestre: semester }, []).semestre)
   }
-  assert.ok(validateNewUser({ ...validInput(), nombre: 'a'.repeat(81) }, []).nombre)
-  assert.ok(validateNewUser({ ...validInput(), apellido: 'a'.repeat(81) }, []).apellido)
+  assert.ok(validateNewUser({ ...validInput(), nombre: 'a'.repeat(101) }, []).nombre)
+  assert.ok(validateNewUser({ ...validInput(), apellido: 'a'.repeat(101) }, []).apellido)
+})
+
+test('administrative creation rejects noninstitutional emails without adding a user', () => {
+  const users = seedAdminUsers()
+  const original = structuredClone(users)
+  const result = addAdminUser(users, { ...validInput(), correo: 'lucia@gmail.com' }, options)
+  assert.ok(result.errors.correo.includes('@ucb.edu.bo'))
+  assert.equal(result.users, undefined)
+  assert.deepEqual(users, original)
 })
 
 test('duplicates are rejected regardless of whitespace, case or inactive status', () => {
@@ -77,7 +86,7 @@ test('baja preserves identity, academic data and record count while recording it
 test('an omitted reason is permitted but oversized reasons are rejected', () => {
   const users = seedAdminUsers()
   assert.equal(deactivateAdminUser(users, users[0].id).user.motivoBaja, null)
-  assert.throws(() => deactivateAdminUser(users, users[0].id, 'a'.repeat(301)), AdminUserError)
+  assert.throws(() => deactivateAdminUser(users, users[0].id, 'a'.repeat(256)), AdminUserError)
 })
 
 test('the administrative demonstration account, inactive users and missing users cannot be deactivated', () => {
@@ -141,4 +150,36 @@ test('storage failures propagate without mutating the original users or overwrit
   assert.equal(storage.getItem(ADMIN_USERS_STORAGE_KEY), saved)
   assert.equal(users.length, 10)
   assert.equal(users.some((user) => user.id === options.id), false)
+})
+
+
+test('password validation matches the 12–128 contract and credentials never enter saved records', () => {
+  const users = seedAdminUsers()
+  for (const password of ['short', 'a'.repeat(129)]) {
+    assert.ok(validateNewUser({ ...validInput(), password, confirmPassword: password }, users).password)
+  }
+  assert.ok(validateNewUser({ ...validInput(), confirmPassword: 'different' }, users).confirmPassword)
+  const { users: next } = addAdminUser(users, validInput(), options)
+  const storage = memoryStorage()
+  saveAdminUsers(storage, next)
+  assert.equal(next[0].idCarrera, validInput().idCarrera)
+  assert.equal(next[0].carrera, CAREERS[0])
+  assert.equal('password' in next[0], false)
+  assert.equal('confirmPassword' in next[0], false)
+  assert.equal(storage.getItem(ADMIN_USERS_STORAGE_KEY).includes(validInput().password), false)
+})
+
+test('inactive users can be reactivated while suspended users require review', () => {
+  const users = seedAdminUsers()
+  const inactive = users.find((user) => user.estado === 'Inactivo')
+  const suspended = users.find((user) => user.estado === 'Suspendido')
+  const result = reactivateAdminUser(users, inactive.id, options.now)
+  assert.equal(result.user.estado, 'Activo')
+  assert.equal(result.user.fechaReactivacion, options.now)
+  assert.equal(result.user.fechaBaja, inactive.fechaBaja)
+  assert.equal(result.user.id, inactive.id)
+  assert.equal(result.users.length, users.length)
+  assert.equal(users.find((user) => user.id === inactive.id).estado, 'Inactivo')
+  assert.throws(() => reactivateAdminUser(users, suspended.id), AdminUserError)
+  assert.throws(() => reactivateAdminUser(result.users, inactive.id), AdminUserError)
 })

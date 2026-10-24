@@ -1,94 +1,35 @@
 <script setup>
-import { computed, ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { BarChart3, Bell, BookOpenCheck, Home, Menu, Search, UserRound, UsersRound, X } from '@lucide/vue'
+import { computed, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { ArrowLeftRight, CalendarDays, Coins, GraduationCap, Info, LogOut, Menu, UserRound, UsersRound, X } from '@lucide/vue'
 import { useAppStore } from '../../stores/app'
+import { initials } from '../../features/timebank/format'
 import UcbLogo from '../ui/UcbLogo.vue'
-
 const route = useRoute()
-const router = useRouter()
 const store = useAppStore()
 const mobileMenuOpen = ref(false)
-const search = ref('')
-
 const navItems = [
-  { label: 'Inicio', to: '/', icon: Home },
-  { label: 'Mis cursos', to: '/mis-cursos', icon: BookOpenCheck, badge: true },
+  { label: 'Habilidades', to: '/', icon: GraduationCap },
+  { label: 'Intercambios', to: '/intercambios', icon: ArrowLeftRight, badge: true },
+  { label: 'Disponibilidad', to: '/disponibilidad', icon: CalendarDays },
+  { label: 'Créditos', to: '/creditos', icon: Coins },
   { label: 'Perfil', to: '/perfil', icon: UserRound },
-  { label: 'Analíticas', to: '/analiticas', icon: BarChart3 },
   { label: 'Admin', to: '/administracion', icon: UsersRound, demo: true },
 ]
-
-const pageLabel = computed(() => route.meta.title || 'Inicio')
-
-function submitSearch() {
-  const value = search.value.trim()
-  if (!value) return
-  mobileMenuOpen.value = false
-  router.push({ name: 'home', query: { q: value } })
-}
+const pageLabel = computed(() => route.meta.title || 'Nexo U')
+watch(() => route.fullPath, () => { mobileMenuOpen.value = false })
 </script>
 
 <template>
   <div class="app-shell">
-    <header class="topbar">
-      <div class="topbar-inner" :class="{ 'topbar-home': route.name === 'home' || route.meta.adminDemo }">
-        <RouterLink class="brand" to="/" aria-label="Nexo U, inicio" @click="mobileMenuOpen = false">
-          <UcbLogo />
-          <span class="brand-divider" aria-hidden="true"></span>
-          <span class="product-name">Nexo U</span>
-        </RouterLink>
-
-        <form v-if="route.name !== 'home' && !route.meta.adminDemo" class="global-search" role="search" @submit.prevent="submitSearch">
-          <Search :size="18" aria-hidden="true" />
-          <input v-model="search" type="search" placeholder="Buscar cursos, temas o tutores" aria-label="Buscar cursos" />
-        </form>
-
-        <nav class="desktop-nav" aria-label="Navegación principal">
-          <RouterLink v-for="item in navItems" :key="item.to" :to="item.to" class="top-nav-link" :aria-label="item.demo ? 'Administración de usuarios, demostración' : undefined">
-            <span class="nav-icon-wrap">
-              <component :is="item.icon" :size="21" :stroke-width="1.9" />
-              <span v-if="item.badge && store.enrollmentIds.length" class="nav-count">{{ store.enrollmentIds.length }}</span>
-            </span>
-            <span>{{ item.label }}<small v-if="item.demo" class="nav-demo" aria-hidden="true">Demo</small></span>
-          </RouterLink>
-        </nav>
-
-        <div class="account-actions">
-          <button class="icon-button notifications" type="button" aria-label="Notificaciones">
-            <Bell :size="20" />
-            <span class="notification-dot"></span>
-          </button>
-          <button v-if="!store.authenticated" class="button button-primary login-button" type="button" @click="store.requestLogin()">
-            Ingresar
-          </button>
-          <RouterLink v-else class="avatar avatar-sm" to="/perfil" aria-label="Abrir perfil">{{ store.user.initials }}</RouterLink>
-          <button class="icon-button menu-button" type="button" :aria-expanded="mobileMenuOpen" aria-controls="mobile-navigation" :aria-label="mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'" @click="mobileMenuOpen = !mobileMenuOpen">
-            <X v-if="mobileMenuOpen" :size="22" />
-            <Menu v-else :size="22" />
-          </button>
-        </div>
-      </div>
-    </header>
-
-    <nav v-if="mobileMenuOpen" id="mobile-navigation" class="mobile-panel" aria-label="Navegación móvil" @keydown.esc="mobileMenuOpen = false">
-      <p class="mobile-caption">{{ pageLabel }}</p>
-      <RouterLink v-for="item in navItems" :key="item.to" :to="item.to" :aria-label="item.demo ? 'Administración de usuarios, demostración' : undefined" @click="mobileMenuOpen = false">
-        <component :is="item.icon" :size="20" />
-        {{ item.label }}
-        <small v-if="item.demo" class="nav-demo" aria-hidden="true">Demo</small>
-      </RouterLink>
-    </nav>
-
-    <main class="main-content">
-      <slot />
-    </main>
-
-    <Transition name="toast">
-      <div v-if="store.toast" class="toast" :class="`toast-${store.toast.type}`" role="status">
-        <span class="toast-dot"></span>
-        {{ store.toast.message }}
-      </div>
-    </Transition>
+    <a class="skip-link" href="#main-content">Saltar al contenido</a>
+    <header class="topbar"><div class="topbar-inner topbar-home">
+      <RouterLink class="brand" to="/" aria-label="Nexo U, inicio"><UcbLogo /><span class="brand-divider" aria-hidden="true"></span><span class="product-name">Nexo U</span></RouterLink>
+      <nav class="desktop-nav" aria-label="Navegación principal"><RouterLink v-for="item in navItems" :key="item.to" :to="item.to" class="top-nav-link" :aria-label="item.demo ? 'Administración de usuarios, demostración' : undefined"><span class="nav-icon-wrap"><component :is="item.icon" :size="21" :stroke-width="1.9" /><span v-if="item.badge && store.pendingCount" class="nav-count">{{ store.pendingCount }}</span></span><span>{{ item.label }}<small v-if="item.demo" class="nav-demo" aria-hidden="true">Demo</small></span></RouterLink></nav>
+      <div class="account-actions"><template v-if="!store.authenticated"><RouterLink v-if="route.name !== 'register'" class="register-link" to="/registro">Crear cuenta</RouterLink><button class="button button-primary login-button" type="button" @click="store.requestLogin">Ingresar</button></template><template v-else><RouterLink class="avatar avatar-sm" to="/perfil" aria-label="Perfil de Valeria, demostración">{{ initials(store.user) }}</RouterLink><button class="icon-button" type="button" aria-label="Salir de la demostración" @click="store.leaveDemo"><LogOut :size="18" /></button></template><button class="icon-button menu-button" type="button" :aria-expanded="mobileMenuOpen" aria-controls="mobile-navigation" :aria-label="mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'" @click="mobileMenuOpen = !mobileMenuOpen"><X v-if="mobileMenuOpen" :size="22" /><Menu v-else :size="22" /></button></div>
+    </div></header>
+    <nav v-if="mobileMenuOpen" id="mobile-navigation" class="mobile-panel" aria-label="Navegación móvil" @keydown.esc="mobileMenuOpen = false"><p class="mobile-caption">{{ pageLabel }}</p><RouterLink v-for="item in navItems" :key="item.to" :to="item.to"><component :is="item.icon" :size="20" />{{ item.label }}<small v-if="item.demo" class="nav-demo">Demo</small></RouterLink><RouterLink v-if="!store.authenticated" to="/registro">Crear cuenta</RouterLink></nav>
+    <main id="main-content" class="main-content" tabindex="-1"><div v-if="!route.meta.adminDemo" class="demo-context"><Info :size="16" aria-hidden="true" /><span>Demostración de Nexo U. El registro y los intercambios no afectan cuentas reales.</span></div><slot /></main>
+    <Transition name="toast"><div v-if="store.toast" class="toast" :class="`toast-${store.toast.type}`" role="status"><span class="toast-dot"></span>{{ store.toast.message }}</div></Transition>
   </div>
 </template>
