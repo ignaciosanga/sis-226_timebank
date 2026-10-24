@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: timebank-backend
+    runtime: docker
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health/ready
+    envVars:
+      - key: PERSISTENCE_MODE
+        value: prisma
+      - key: DATABASE_ENABLED
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        sync: false
+      - key: SWAGGER_ENABLED
+        value: "true"
+
+  - type: web
+    name: timebank-frontend
+    runtime: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    buildFilter:
+      paths:
+        - frontend/**
+    envVars:
+      - key: VITE_API_URL
+        sync: false
