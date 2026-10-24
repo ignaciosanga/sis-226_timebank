@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:admin": "node --test src/features/admin/user-management.test.js"
   },
   "dependencies": {
     "@lucide/vue": "^1.55.0",

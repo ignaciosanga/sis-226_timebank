@@ -1,10 +1,12 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { ArrowRight, Award, BookOpen, CalendarCheck2, ChevronRight, GraduationCap, Search, Sparkles } from '@lucide/vue'
+import { computed, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { ArrowRight, Award, CalendarCheck2, ChevronRight, GraduationCap, Search } from '@lucide/vue'
 import CourseCard from '../features/courses/CourseCard.vue'
 import { useAppStore } from '../stores/app'
 
 const store = useAppStore()
+const route = useRoute()
 const query = ref('')
 const format = ref('Todos')
 const category = ref('Todas')
@@ -20,19 +22,16 @@ const visibleCourses = computed(() => {
   })
 })
 
-function externalSearch(event) {
-  query.value = event.detail
-}
-
-onMounted(() => window.addEventListener('nexo-search', externalSearch))
-onBeforeUnmount(() => window.removeEventListener('nexo-search', externalSearch))
+watch(() => route.query.q, (value) => {
+  query.value = typeof value === 'string' ? value : ''
+}, { immediate: true })
 </script>
 
 <template>
   <div class="linkedin-grid home-layout">
     <aside class="left-rail">
       <section class="panel mini-profile">
-        <div class="profile-cover"></div>
+        <div class="profile-cover" aria-hidden="true"><span>Nexo U</span></div>
         <span class="avatar avatar-lg">{{ store.user.initials }}</span>
         <div class="mini-profile-copy">
           <h2>{{ store.user.name }}</h2>
@@ -47,7 +46,7 @@ onBeforeUnmount(() => window.removeEventListener('nexo-search', externalSearch))
       </section>
 
       <section class="panel quick-links">
-        <p class="panel-label">TU ACTIVIDAD</p>
+        <p class="panel-label">Tu actividad</p>
         <RouterLink to="/mis-cursos"><CalendarCheck2 :size="18" /> Próximas sesiones</RouterLink>
         <RouterLink to="/perfil"><Award :size="18" /> Cursos impartidos</RouterLink>
         <RouterLink to="/analiticas"><GraduationCap :size="18" /> Mi progreso</RouterLink>
@@ -55,39 +54,36 @@ onBeforeUnmount(() => window.removeEventListener('nexo-search', externalSearch))
     </aside>
 
     <section class="feed-column">
-      <div class="welcome-card">
-        <div>
-          <p class="eyebrow"><Sparkles :size="15" /> APRENDIZAJE ENTRE PARES</p>
-          <h1>¿Qué quieres aprender hoy?</h1>
-          <p>Encuentra estudiantes de la UCB que pueden ayudarte a avanzar.</p>
+      <section class="discover-card" aria-labelledby="discover-title">
+        <div class="discover-heading">
+          <h1 id="discover-title">¿Qué quieres aprender hoy?</h1>
+          <p>Hay alguien en tu universidad que puede ayudarte.</p>
         </div>
-        <div class="welcome-mark"><BookOpen :size="34" /></div>
-      </div>
-
-      <section class="panel filters-panel" aria-label="Filtros de cursos">
-        <label class="catalog-search">
-          <Search :size="19" />
-          <input v-model="query" type="search" placeholder="Busca por curso, tema o tutor" />
-        </label>
+        <div class="discover-search-row">
+          <label class="catalog-search">
+            <Search :size="19" aria-hidden="true" />
+            <input v-model="query" type="search" placeholder="Busca un curso, tema o tutor" aria-label="Buscar cursos por curso, tema o tutor" />
+          </label>
+        </div>
         <div class="filter-row">
-          <div class="segmented" aria-label="Modalidad">
-            <button v-for="item in ['Todos', 'Presencial', 'Virtual']" :key="item" type="button" :class="{ active: format === item }" @click="format = item">{{ item }}</button>
+          <div class="segmented" role="group" aria-label="Modalidad">
+            <button v-for="item in ['Todos', 'Presencial', 'Virtual']" :key="item" type="button" :class="{ active: format === item }" :aria-pressed="format === item" @click="format = item">{{ item }}</button>
           </div>
           <label class="select-wrap">
             <span class="sr-only">Categoría</span>
             <select v-model="category">
-              <option v-for="item in categories" :key="item">{{ item }}</option>
+              <option v-for="item in categories" :key="item" :value="item">{{ item === 'Todas' ? 'Todas las áreas' : item }}</option>
             </select>
           </label>
         </div>
       </section>
 
-      <div class="section-heading">
+      <div class="section-heading feed-heading">
         <div>
-          <h2>Cursos disponibles</h2>
-          <p>{{ visibleCourses.length }} oportunidades para aprender esta semana</p>
+          <h2>Estudiantes que comparten</h2>
+          <p role="status" aria-live="polite">{{ visibleCourses.length }} {{ visibleCourses.length === 1 ? 'sesión disponible' : 'sesiones disponibles' }}</p>
         </div>
-        <span class="live-label"><span></span> Actualizado</span>
+        <span class="feed-community"><GraduationCap :size="16" aria-hidden="true" /> Comunidad UCB</span>
       </div>
 
       <div v-if="visibleCourses.length" class="course-list">
@@ -102,29 +98,29 @@ onBeforeUnmount(() => window.removeEventListener('nexo-search', externalSearch))
     </section>
 
     <aside class="right-rail">
-      <section class="panel agenda-card">
+      <section class="agenda-card">
         <div class="panel-title-row">
           <div>
-            <p class="panel-label">PRÓXIMAMENTE</p>
             <h2>Tu agenda</h2>
+            <p class="agenda-caption">Un espacio para aprender juntos.</p>
           </div>
-          <span class="date-tile"><strong>15</strong><small>OCT</small></span>
+          <CalendarCheck2 :size="22" aria-hidden="true" />
         </div>
-        <div v-for="course in store.enrolledCourses.slice(0, 2)" :key="course.id" class="agenda-item">
+        <RouterLink v-for="course in store.enrolledCourses.slice(0, 2)" :key="course.id" to="/mis-cursos" class="agenda-item">
           <span class="agenda-line"></span>
-          <div><strong>{{ course.subject }}</strong><small>{{ course.dateLabel }} · {{ course.time }}</small></div>
+          <div><strong>{{ course.subject }}</strong><small>Con {{ course.tutor }}</small><small>{{ course.dateLabel }} · {{ course.time }}</small></div>
           <ChevronRight :size="17" />
-        </div>
+        </RouterLink>
+        <p v-if="!store.enrolledCourses.length" class="agenda-empty">Tus sesiones aparecerán aquí cuando te inscribas.</p>
         <RouterLink class="text-link" to="/mis-cursos">Ver agenda completa <ArrowRight :size="16" /></RouterLink>
       </section>
 
-      <section class="panel how-card">
-        <p class="panel-label">NEXO U</p>
-        <h2>Aprende y comparte</h2>
+      <section class="how-card">
+        <h2>Lo que sabes también cuenta</h2>
         <ol>
           <li><span>1</span><div><strong>Encuentra</strong><small>El curso que necesitas.</small></div></li>
           <li><span>2</span><div><strong>Participa</strong><small>Reserva con tus puntos.</small></div></li>
-          <li><span>3</span><div><strong>Comparte</strong><small>Enseña y recupera puntos.</small></div></li>
+          <li><span>3</span><div><strong>Comparte</strong><small>Enseña y gana puntos.</small></div></li>
         </ol>
       </section>
 
