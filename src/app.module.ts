@@ -15,6 +15,7 @@ import { AvailabilityModule } from './modules/availability/availability.module';
 import { ExchangesModule } from './modules/exchanges/exchanges.module';
 import { ReservationsModule } from './modules/reservations/reservations.module';
 import { CreditsModule } from './modules/credits/credits.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { CreditsModule } from './modules/credits/credits.module';
     ExchangesModule,
     ReservationsModule,
     CreditsModule,
+    AnalyticsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
