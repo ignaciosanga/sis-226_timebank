@@ -1,0 +1,44 @@
+# =====================================================================
+#  Banco de Tiempo Universitario · BD v0.31+ con encriptación y vistas v2
+#
+#  Levantar:          docker compose up -d
+#  Reiniciar de cero: docker compose down -v && docker compose up -d
+#
+#  Orden de carga (el de cambios.txt), solo la primera vez:
+#    01 esquema v0.31+ · 02 datos demo · 03 encriptación · 04 vistas
+#
+#  Nombre, contenedor, volumen y puerto (15434) propios: convive con las
+#  otras versiones (v0.31 en 15431, v0.4 en 15433).
+# =====================================================================
+name: banco-tiempo-v031plus
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: banco_tiempo_v031plus_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-banco_tiempo}
+      POSTGRES_USER: ${POSTGRES_USER:-banco_owner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Copia .env.example a .env y define POSTGRES_PASSWORD}
+      # Clave de cifrado: solo para cargar la base y correr las pruebas.
+      # En producción va en un gestor de secretos, nunca en el repositorio.
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:?Define APP_ENCRYPTION_KEY en .env (32+ caracteres)}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+      TZ: America/La_Paz
+      PGTZ: America/La_Paz
+    ports:
+      # 127.0.0.1 = solo esta computadora
+      - "${DB_BIND:-127.0.0.1}:${DB_PORT:-15434}:5432"
+    volumes:
+      - pgdata_v031plus:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+      - ./db/tests:/tests:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata_v031plus:
