@@ -1,0 +1,230 @@
+// Fuente objetivo: documentaci_n_de_la_base_de_datos.md (v0.3.1, 12 tablas).
+// El SQL/JSON de sis-226_timebank describe el modelo legado de 18 tablas.
+// Compose aplica las migraciones versionadas a su PostgreSQL local independiente.
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Carrera {
+  id_carrera String    @id @default(uuid()) @db.Uuid
+  nombre     String    @db.VarChar
+  facultad   String    @db.VarChar
+  estado     String    @db.VarChar
+  usuarios   Usuario[]
+
+  @@index([estado])
+  @@map("CARRERAS")
+}
+
+model Categoria {
+  id_categoria String      @id @default(uuid()) @db.Uuid
+  nombre       String      @unique @db.VarChar
+  estado       String      @db.VarChar
+  habilidades  Habilidad[]
+
+  @@index([estado])
+  @@map("CATEGORIAS")
+}
+
+model Usuario {
+  id_usuario         String    @id @default(uuid()) @db.Uuid
+  nombre             String    @db.VarChar
+  apellido           String    @db.VarChar
+  correo             String    @unique @db.VarChar
+  password_hash      String    @db.VarChar
+  rol                String    @db.VarChar
+  id_carrera         String?   @db.Uuid
+  semestre           Int?
+  saldo              Int       @default(0)
+  creditos_retenidos Int       @default(0)
+  fecha_registro     DateTime  @default(now()) @db.Timestamptz(6)
+  ultimo_acceso      DateTime? @db.Timestamptz(6)
+  estado             String    @db.VarChar
+
+  carrera                 Carrera?               @relation(fields: [id_carrera], references: [id_carrera], onDelete: Restrict)
+  habilidades             UsuarioHabilidad[]
+  disponibilidades        Disponibilidad[]
+  solicitudesEnviadas     SolicitudIntercambio[] @relation("SolicitudSolicitante")
+  solicitudesRecibidas    SolicitudIntercambio[] @relation("SolicitudOfertante")
+  reservasSolicitadas     Reserva[]              @relation("ReservaSolicitante")
+  reservasOfertadas       Reserva[]              @relation("ReservaOfertante")
+  reservasCanceladas      Reserva[]              @relation("ReservaCanceladaPor")
+  movimientos             MovimientoCredito[]
+  calificacionesEmitidas  Calificacion[]         @relation("CalificacionEvaluador")
+  calificacionesRecibidas Calificacion[]         @relation("CalificacionEvaluado")
+  notificaciones          Notificacion[]
+  auditorias              Auditoria[]
+
+  @@index([id_carrera])
+  @@index([estado])
+  @@map("USUARIOS")
+}
+
+model Habilidad {
+  id_habilidad String                 @id @default(uuid()) @db.Uuid
+  nombre       String                 @unique @db.VarChar
+  id_categoria String                 @db.Uuid
+  estado       String                 @db.VarChar
+  categoria    Categoria              @relation(fields: [id_categoria], references: [id_categoria], onDelete: Restrict)
+  usuarios     UsuarioHabilidad[]
+  solicitudes  SolicitudIntercambio[]
+  reservas     Reserva[]
+
+  @@index([id_categoria, estado])
+  @@map("HABILIDADES")
+}
+
+model UsuarioHabilidad {
+  id_usuario   String    @db.Uuid
+  id_habilidad String    @db.Uuid
+  nivel        String    @db.VarChar
+  usuario      Usuario   @relation(fields: [id_usuario], references: [id_usuario], onDelete: Restrict)
+  habilidad    Habilidad @relation(fields: [id_habilidad], references: [id_habilidad], onDelete: Restrict)
+
+  @@id([id_usuario, id_habilidad])
+  @@index([id_habilidad])
+  @@map("USUARIO_HABILIDADES")
+}
+
+model Disponibilidad {
+  id_disponibilidad String   @id @default(uuid()) @db.Uuid
+  id_usuario        String   @db.Uuid
+  fecha_inicio      DateTime @db.Timestamptz(6)
+  fecha_fin         DateTime @db.Timestamptz(6)
+  estado            String   @db.VarChar
+  usuario           Usuario  @relation(fields: [id_usuario], references: [id_usuario], onDelete: Restrict)
+
+  @@index([id_usuario, estado, fecha_inicio, fecha_fin])
+  @@map("DISPONIBILIDADES")
+}
+
+model SolicitudIntercambio {
+  id_solicitud           String    @id @default(uuid()) @db.Uuid
+  id_solicitante         String    @db.Uuid
+  id_ofertante           String    @db.Uuid
+  id_habilidad           String    @db.Uuid
+  fecha_inicio_propuesta DateTime  @db.Timestamptz(6)
+  fecha_fin_propuesta    DateTime  @db.Timestamptz(6)
+  creditos_requeridos    Int
+  estado                 String    @db.VarChar
+  created_at             DateTime  @default(now()) @db.Timestamptz(6)
+  respondida_at          DateTime? @db.Timestamptz(6)
+  solicitante            Usuario   @relation("SolicitudSolicitante", fields: [id_solicitante], references: [id_usuario], onDelete: Restrict)
+  ofertante              Usuario   @relation("SolicitudOfertante", fields: [id_ofertante], references: [id_usuario], onDelete: Restrict)
+  habilidad              Habilidad @relation(fields: [id_habilidad], references: [id_habilidad], onDelete: Restrict)
+  reserva                Reserva?
+
+  @@index([id_solicitante, estado, created_at])
+  @@index([id_ofertante, estado, created_at])
+  @@index([id_habilidad])
+  @@map("SOLICITUDES_INTERCAMBIO")
+}
+
+model Reserva {
+  id_reserva                     String                @id @default(uuid()) @db.Uuid
+  id_solicitud                   String?               @unique @db.Uuid
+  id_solicitante                 String                @db.Uuid
+  id_ofertante                   String                @db.Uuid
+  id_habilidad                   String                @db.Uuid
+  fecha_inicio                   DateTime              @db.Timestamptz(6)
+  fecha_fin                      DateTime              @db.Timestamptz(6)
+  creditos                       Int
+  modalidad                      String                @db.VarChar
+  lugar                          String                @db.VarChar
+  estado                         String                @db.VarChar
+  confirmacion_solicitante_at    DateTime?             @db.Timestamptz(6)
+  confirmacion_ofertante_at      DateTime?             @db.Timestamptz(6)
+  cancelado_por                  String?               @db.Uuid
+  motivo_cancelacion             String?               @db.VarChar
+  horas_anticipacion_cancelacion Int?
+  created_at                     DateTime              @default(now()) @db.Timestamptz(6)
+  completed_at                   DateTime?             @db.Timestamptz(6)
+  cancelled_at                   DateTime?             @db.Timestamptz(6)
+  solicitud                      SolicitudIntercambio? @relation(fields: [id_solicitud], references: [id_solicitud], onDelete: Restrict)
+  solicitante                    Usuario               @relation("ReservaSolicitante", fields: [id_solicitante], references: [id_usuario], onDelete: Restrict)
+  ofertante                      Usuario               @relation("ReservaOfertante", fields: [id_ofertante], references: [id_usuario], onDelete: Restrict)
+  canceladaPor                   Usuario?              @relation("ReservaCanceladaPor", fields: [cancelado_por], references: [id_usuario], onDelete: Restrict)
+  habilidad                      Habilidad             @relation(fields: [id_habilidad], references: [id_habilidad], onDelete: Restrict)
+  movimientos                    MovimientoCredito[]
+  calificaciones                 Calificacion[]
+
+  @@index([id_solicitante, estado, fecha_inicio, fecha_fin])
+  @@index([id_ofertante, estado, fecha_inicio, fecha_fin])
+  @@index([id_habilidad])
+  @@index([cancelado_por])
+  @@map("RESERVAS")
+}
+
+model MovimientoCredito {
+  id_movimiento       String   @id @default(uuid()) @db.Uuid
+  id_usuario          String   @db.Uuid
+  id_reserva          String?  @db.Uuid
+  tipo                String   @db.VarChar
+  cantidad            Int
+  saldo_anterior      Int
+  saldo_posterior     Int
+  retenidos_anterior  Int
+  retenidos_posterior Int
+  created_at          DateTime @default(now()) @db.Timestamptz(6)
+  descripcion         String?  @db.VarChar
+  usuario             Usuario  @relation(fields: [id_usuario], references: [id_usuario], onDelete: Restrict)
+  reserva             Reserva? @relation(fields: [id_reserva], references: [id_reserva], onDelete: Restrict)
+
+  @@index([id_usuario, created_at])
+  @@index([id_reserva])
+  @@map("MOVIMIENTOS_CREDITO")
+}
+
+model Calificacion {
+  id_calificacion String   @id @default(uuid()) @db.Uuid
+  id_reserva      String   @db.Uuid
+  id_evaluador    String   @db.Uuid
+  id_evaluado     String   @db.Uuid
+  puntuacion      Int
+  comentario      String?  @db.VarChar
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  reserva         Reserva  @relation(fields: [id_reserva], references: [id_reserva], onDelete: Restrict)
+  evaluador       Usuario  @relation("CalificacionEvaluador", fields: [id_evaluador], references: [id_usuario], onDelete: Restrict)
+  evaluado        Usuario  @relation("CalificacionEvaluado", fields: [id_evaluado], references: [id_usuario], onDelete: Restrict)
+
+  @@unique([id_reserva, id_evaluador])
+  @@index([id_evaluado, created_at])
+  @@map("CALIFICACIONES")
+}
+
+model Notificacion {
+  id_notificacion String   @id @default(uuid()) @db.Uuid
+  id_usuario      String   @db.Uuid
+  tipo            String   @db.VarChar
+  titulo          String   @db.VarChar
+  mensaje         String   @db.Text
+  leida           Boolean  @default(false)
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  usuario         Usuario  @relation(fields: [id_usuario], references: [id_usuario], onDelete: Restrict)
+
+  @@index([id_usuario, leida, created_at])
+  @@map("NOTIFICACIONES")
+}
+
+model Auditoria {
+  id_auditoria     String   @id @default(uuid()) @db.Uuid
+  id_usuario       String?  @db.Uuid
+  accion           String   @db.VarChar
+  entidad          String   @db.VarChar
+  entidad_id       String   @db.Uuid
+  datos_anteriores Json?    @db.JsonB
+  datos_nuevos     Json?    @db.JsonB
+  ip               String?  @db.VarChar
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+  usuario          Usuario? @relation(fields: [id_usuario], references: [id_usuario], onDelete: Restrict)
+
+  @@index([id_usuario, created_at])
+  @@index([entidad, entidad_id])
+  @@map("AUDITORIA")
+}
