@@ -33,7 +33,7 @@ export class AuthController {
   @ApiCreatedResponse({
     type: PublicUser,
     description:
-      'Usuario Estudiante con saldo inicial cero en el almacenamiento configurado',
+      'Estudiante @ucb.edu.bo con bono configurable (demo: 8 creditos); usuario y movimiento atomicos',
   })
   @ApiConflictResponse({ description: 'Correo no disponible' })
   register(@Body() input: RegisterDto) {

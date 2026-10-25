@@ -19,6 +19,11 @@ export class Environment {
   PERSISTENCE_MODE = 'memory';
 
   @IsInt()
+  @Min(0)
+  @Max(2147483647)
+  REGISTRATION_INITIAL_CREDITS = 8;
+
+  @IsInt()
   @Min(1)
   @Max(65535)
   PORT = 4000;
@@ -71,6 +76,7 @@ export function validateEnvironment(
     'RATE_LIMIT_TTL_MS',
     'RATE_LIMIT_MAX',
     'JWT_EXPIRES_IN_SECONDS',
+    'REGISTRATION_INITIAL_CREDITS',
   ]) {
     if (input[key] !== undefined) parsed[key] = Number(input[key]);
   }
