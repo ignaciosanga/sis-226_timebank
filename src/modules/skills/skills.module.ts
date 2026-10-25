@@ -9,12 +9,20 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaModule } from '../../infrastructure/prisma/prisma.module';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { PrismaSkillsRepository } from '../../infrastructure/prisma/prisma-catalogs.repositories';
+import { ExchangePersistenceModule } from '../exchanges/exchange-persistence.module';
+import { SkillProvidersService } from './skill-providers.service';
 
 @Module({
-  imports: [AuthModule, CategoriesModule, PrismaModule],
+  imports: [
+    AuthModule,
+    CategoriesModule,
+    PrismaModule,
+    ExchangePersistenceModule,
+  ],
   controllers: [SkillsController],
   providers: [
     SkillsService,
+    SkillProvidersService,
     {
       provide: SKILLS_REPOSITORY,
       inject: [ConfigService, PrismaService],
