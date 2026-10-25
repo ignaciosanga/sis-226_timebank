@@ -1,19 +1,20 @@
-# Dashboards Power BI — Vista del Administrador
+# Módulos Administrador — Looker Studio
 
-Aquí se desarrollan los dashboards de Power BI para la vista del administrador, conectados directamente a la base de datos PostgreSQL.
+Especificación y diseño de los dashboards de control gerencial para la administración del Banco de Tiempo Universitario.
 
-## Dashboards planificados
+## Responsables
+- **Dev 2** (13 Story Points): HU04 y HU06.
+- **Dev Lead / Gus** (16 Story Points): HU05 y HU07.
 
-| Dashboard | HU | Descripción |
-|-----------|-----|-------------|
-| Dashboard general | HU04 | KPIs principales + actividad por periodo + intercambios por estado |
-| Intercambios y reservas | HU05 | Tendencias + tasas de aceptación/rechazo + motivos de cancelación |
-| Usuarios y comunidad | HU06 | Usuarios por carrera, semestre, estado + crecimiento temporal |
-| Habilidades y demanda | HU07 | Oferta vs demanda + distribución por categoría |
+## Dashboards y componentes planificados
 
-## Conexión a la base de datos
+| HU | Título | Tipo de visualización | Responsable |
+|----|--------|-----------------------|:-----------:|
+| **HU04** (8 pts) | Dashboard general de la plataforma | Tarjetas KPI maestras (Usuarios registrados, Horas en circulación, Intercambios completados) + Gráficos de distribución | Dev 2 |
+| **HU05** (8 pts) | Análisis de intercambio de horas | Gráfico de líneas temporal (evolución mensual/semanal) + Matriz de flujo de intercambio entre facultades/carreras | Dev Lead |
+| **HU06** (5 pts) | Reporte de usuarios y participación | Tabla de clasificación (ranking de usuarios más activos) + Filtros por Carrera, Facultad y Semestre + Alerta de cuentas inactivas | Dev 2 |
+| **HU07** (8 pts) | Análisis de habilidades y demanda | Gráfico de barras horizontales (Top habilidades solicitadas vs ofertadas) + Identificación de brecha / déficit | Dev Lead |
 
-- **Host:** `127.0.0.1`
-- **Puerto:** `55432`
-- **Base de datos:** `timebank_local`
-- **Credenciales:** ver archivo `.env` del Backend
+## Conexión y Fuentes de Datos
+- **Entorno de producción:** Conexión directa desde Looker Studio a la base de datos PostgreSQL (`timebank`).
+- **Entorno de desarrollo/pruebas:** Dataset semilla de prueba en Google Sheets / CSV para maquetación ágil de los componentes.
