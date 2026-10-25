@@ -29,7 +29,7 @@ Compose crea el esquema y los catálogos locales antes de iniciar la API. `db-in
 
 Si otra instancia ocupa 4000, detenerla o definir `BACKEND_PORT=4001` en `.env` y cambiar la URL del frontend. La respuesta de readiness con BD disponible es `{"status":"ok","persistence":"postgresql"}`; si falla devuelve 503. En memoria indica `persistence: "memory"`.
 
-En Vite, definir `VITE_API_URL=http://localhost:4000`. El backend permite por defecto los orígenes `http://localhost:3000` y `http://localhost:5173`. Para otro origen, editar `CORS_ORIGINS` en `.env`, separado por comas y sin barra final, y recrear con `docker compose up -d backend`. Enviar JWT por cabecera; no se usan cookies. Compose publica puertos solo en la máquina local: cada compañero puede levantar su copia.
+En Vite, definir `VITE_API_URL=http://localhost:4000`. El backend permite por defecto los orígenes `http://localhost:3000`, `http://localhost:5173` y `http://127.0.0.1:5173`. Para otro origen, editar `CORS_ORIGINS` en `.env`, separado por comas y sin barra final, y recrear con `docker compose up -d backend`. Enviar JWT por cabecera; no se usan cookies. Compose publica puertos solo en la máquina local: cada compañero puede levantar su copia.
 
 ## Registro y sesión
 

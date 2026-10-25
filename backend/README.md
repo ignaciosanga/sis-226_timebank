@@ -55,7 +55,7 @@ Ver [la guía del frontend](docs/frontend-integration.md) para URL, CORS, sesió
 
 `.env.example` es la plantilla pública; `.env` contiene los valores locales privados. `setup:docker` toma la plantilla si falta `.env`, genera secretos y conserva los existentes. Revisar el destino de `DATABASE_URL` antes de cualquier comando de BD: una URL previa se conserva. Para Node con PostgreSQL se requieren `PERSISTENCE_MODE=prisma` y `DATABASE_ENABLED=true`; la plantilla por sí sola usa memoria.
 
-Configurar `CORS_ORIGINS=http://localhost:3000,http://localhost:5173`, `PORT=4000` y `SWAGGER_ENABLED=true` para la integración local. El frontend solo recibe la URL HTTP (`VITE_API_URL=http://localhost:4000` si usa Vite); nunca `DATABASE_URL`, `POSTGRES_PASSWORD` ni `JWT_SECRET`. El acceso es mediante `Authorization: Bearer <token>`. Swagger/OpenAPI no se publican cuando `SWAGGER_ENABLED=false`.
+Configurar `CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173`, `PORT=4000` y `SWAGGER_ENABLED=true` para la integración local. El frontend solo recibe la URL HTTP (`VITE_API_URL=http://localhost:4000` si usa Vite); nunca `DATABASE_URL`, `POSTGRES_PASSWORD` ni `JWT_SECRET`. El acceso es mediante `Authorization: Bearer <token>`. Swagger/OpenAPI no se publican cuando `SWAGGER_ENABLED=false`.
 
 ## Modelo y funcionalidades
 

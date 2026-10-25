@@ -7,6 +7,9 @@ describe('Validacion de entorno', () => {
     const config = validateEnvironment({ JWT_SECRET: secret });
     expect(config.PORT).toBe(4000);
     expect(config.DATABASE_ENABLED).toBe(false);
+    expect(config.CORS_ORIGINS.split(',')).toContain(
+      'http://127.0.0.1:5173',
+    );
   });
 
   it('convierte numeros y booleanos de forma estricta', () => {
