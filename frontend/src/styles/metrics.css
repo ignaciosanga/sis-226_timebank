@@ -57,3 +57,26 @@
   .report-placeholder .button { width: 100%; }
   .report-panel-heading { padding-inline: 16px; }
 }
+/* RF-18: resumen numérico del admin (GET /analytics/overview) */
+.overview-panel { margin-bottom: 24px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.overview-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; padding: 18px 28px; border-bottom: 1px solid var(--line-soft); }
+.overview-heading > div:first-child { display: flex; align-items: center; gap: 10px; color: var(--ucb-blue); }
+.overview-heading h2 { margin: 0; color: var(--ink); font-family: "Sora", sans-serif; font-size: 1rem; line-height: 1.5; letter-spacing: -.025em; }
+.overview-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 20px; }
+.overview-periods { display: flex; gap: 4px; }
+.overview-periods button { min-height: 40px; border: 1px solid transparent; border-radius: 8px; padding: 6px 12px; background: transparent; color: var(--muted); font: inherit; font-size: .875rem; font-weight: 600; }
+.overview-periods button.is-selected { border-color: #c4d7e4; background: #e1ecf4; color: var(--ucb-blue-dark); }
+.overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0; margin: 0; }
+.overview-card { padding: 20px 28px; border-right: 1px solid var(--line-soft); }
+.overview-card:last-child { border-right: 0; }
+.overview-card dt { color: var(--muted); font-size: .875rem; }
+.overview-card dd { margin: 0; }
+.overview-card dd:not(.overview-hint) { margin-top: 6px; color: var(--ucb-blue); font-family: "Sora", sans-serif; font-size: 1.75rem; letter-spacing: -.04em; overflow-wrap: anywhere; }
+.overview-hint { margin-top: 4px; color: var(--muted); font-size: .8125rem; }
+.overview-state { margin: 0; padding: 20px 28px; color: var(--muted); }
+.overview-error { color: #8a2a1f; }
+@media (max-width: 720px) {
+  .overview-heading { padding: 16px 20px; }
+  .overview-card { padding: 16px 20px; border-right: 0; border-bottom: 1px solid var(--line-soft); }
+  .overview-card:last-child { border-bottom: 0; }
+}
