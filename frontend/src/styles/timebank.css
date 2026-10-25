@@ -101,6 +101,7 @@
 .record-details strong { margin-left: auto; color: var(--ucb-blue); font-size: .9375rem; }
 .record-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--line-soft); }
 .record-actions .button:disabled { cursor: not-allowed; opacity: .55; }
+.record-actions .record-calendar { margin-right: auto; }
 .exchange-record > .field-hint { margin-top: 16px; }
 .reservation-confirmations { display: grid; gap: 8px; margin-top: 22px; }
 .reservation-confirmations span { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .875rem; }
