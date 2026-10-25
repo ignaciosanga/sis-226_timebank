@@ -1,3 +1,9 @@
+# Contrato histórico — no usar como referencia
+
+Este archivo corresponde a v0.3 y puede contradecir la API actual. La referencia única vigente está en [`../../docs/api-contract.md`](../../docs/api-contract.md), respaldada por `/docs-json`.
+
+---
+
 # Contrato API v0.3.0
 
 Implementación local con memoria. Swagger UI: `/docs`; OpenAPI: `/docs-json`. No hay prefijo global. Los contratos nuevos de reservas y créditos usan reglas provisionales autorizadas para el adaptador; no describen un esquema SQL confirmado.
