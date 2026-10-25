@@ -45,7 +45,13 @@ import { AdminUsersController } from '../users/admin-users.controller';
     RolesGuard,
     {
       provide: REGISTRATION_POLICY,
-      useValue: { initialCredits: null, profileOnly: true },
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<Environment, true>) => ({
+        initialCredits: String(
+          config.get('REGISTRATION_INITIAL_CREDITS', { infer: true }),
+        ),
+        profileOnly: false,
+      }),
     },
   ],
   exports: [

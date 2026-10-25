@@ -76,7 +76,7 @@ Roles almacenados: Estudiante, Profesor, Administrador. `roles` en JWT/perfil es
 
 ## Créditos y reintentos
 
-Los importes persistidos son **INTEGER PostgreSQL**, sin decimales ni centavos. Regla local explícita: **1 crédito = 15 minutos**, 4 créditos por hora. Duración de reserva: múltiplos de 15 minutos hasta 8 horas. El saldo inicial es cero; una carga ADMIN de prueba usa `amount: "8"`, no `"8.00"`.
+Los importes persistidos son **INTEGER PostgreSQL**, sin decimales ni centavos. Regla local explícita: **1 crédito = 15 minutos**, 4 créditos por hora. Duración de reserva: múltiplos de 15 minutos hasta 8 horas. El saldo inicial propuesto para la demo es 8 (configurable mediante REGISTRATION_INITIAL_CREDITS, pendiente del PO); una carga ADMIN de prueba usa `amount: "8"`, no `"8.00"`.
 
 POST de `/exchanges`, sus acciones, confirmación/cancelación de `/reservations` y `/credits/grants` requieren `Idempotency-Key` de 16–128 caracteres alfanuméricos o `. _ : -`. Repetir la misma clave/contenido recupera el resultado; contenido distinto recibe 409. El estado de negocio también evita repetir efectos con claves diferentes.
 
@@ -159,3 +159,10 @@ Después de iniciar voluntariamente el entorno local compatible con BD, revisar 
 - [Contrato de la entrega previa v0.3](docs/api-contract.md): histórico; para tipos/unidad actuales usar Swagger y este README.
 - [Reporte histórico v0.3](docs/progress-v0.3.md)
 - [Reporte histórico v0.2](docs/progress-v0.2.md)
+
+## Issue #9 — Presentacion
+
+- Altas en `POST /auth/register` y `POST /admin/users`: dominio exacto `@ucb.edu.bo`, normalizado antes de validar.
+- `REGISTRATION_INITIAL_CREDITS=8` configura el bono de nuevos estudiantes (propuesta demo: 2 horas; aprobacion definitiva del PO pendiente). Se reutiliza la transaccion existente de usuario + `BonoInicial`; no se actualizan saldos existentes ni se repite el bono al reintentar un correo registrado. `0` desactiva el bono.
+- Endpoint publico `GET /skills/:id/providers`: UUID de habilidad; filtros `search` (nombre del ofertante), `nivel` (`Basico`, `Intermedio`, `Avanzado`, `Experto`), `page` (1), `limit` (20, maximo 100). Devuelve `{ data, meta }` con `id_usuario`, `nombre` completo, `id_habilidad`, `habilidad`, `nivel`. Solo estudiantes activos y habilidad/categoria activas; sin correo, hashes ni creditos. El UUID se puede obtener con `GET /skills?search=...`.
+- Prisma: se aplica solo `importFileExtension = ""` del PR #7 para CommonJS; sin merge de otras ramas.
