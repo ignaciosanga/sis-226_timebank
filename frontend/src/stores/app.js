@@ -97,6 +97,10 @@ export const useAppStore = defineStore('app', {
       this.showToast(`Hola, ${this.profile.nombre}. Sesión iniciada.`)
     },
     register(payload) { return auth.register(payload) },
+    async updateProfile(changes) {
+      this.profile = await auth.updateProfile(changes)
+      this.showToast('Perfil actualizado.')
+    },
     resetSession() { Object.assign(this, { authenticated: false, profile: null, ...sessionData() }) },
     logout() {
       auth.logout()

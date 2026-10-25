@@ -10,4 +10,7 @@ export const register = (payload) => apiRequest('/auth/register', { method: 'POS
 
 export const getProfile = () => apiRequest('/users/me')
 
+// changes: cualquiera de { nombre, apellido, idCarrera, semestre }.
+export const updateProfile = (changes) => apiRequest('/users/me', { method: 'PATCH', body: changes })
+
 export function logout() { setToken(null) }
