@@ -170,7 +170,10 @@ export function validateEnvironment(
     if (!value) continue;
     try {
       const url = new URL(value);
-      if (!['http:', 'https:'].includes(url.protocol) || url.origin !== value)
+      if (
+        !['http:', 'https:'].includes(url.protocol) ||
+        (key === 'FRONTEND_URL' && url.origin !== value)
+      )
         throw new Error();
     } catch {
       throw new Error(`Configuracion invalida: ${key}`);
