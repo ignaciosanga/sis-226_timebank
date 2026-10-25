@@ -1,5 +1,61 @@
 # Avances Equipo Frontend
 
+## Integración de métricas con el frontend conectado a la API
+
+- **Fecha:** 2026-10-25
+- **Estado:** Integrado localmente sobre `main` en `ec38403`.
+
+Se guardó un respaldo local de las pestañas y contenedores antes de actualizar
+la rama. Se combinaron Perfil y Administración conservando la edición real del
+perfil y la gestión real de usuarios/carga de créditos del PR #14, además de
+Mi resumen y Métricas generales. Se retira la etiqueta Demo de Administración.
+
+Los archivos de `src/services` y `stores/app.js` se conservan idénticos a `main`.
+No se modifica Backend ni Base de Datos. La comprobación de integración usa
+respuestas HTTP simuladas para evitar escrituras en el sistema desplegado.
+Pasaron las 32 pruebas y la compilación. Se verificaron las nueve rutas y,
+sin red, login, registro, edición de perfil, consultas de créditos, listado/alta
+de usuarios, baja/reactivación y carga de créditos con clave de idempotencia.
+Se comprobó que la lógica de acciones de Perfil y Administración se conserva
+idéntica a la entrega de APIs. La revisión visual y con informes reales sigue
+pendiente.
+Los informes de Looker Studio siguen pendientes de sus enlaces y permisos.
+Sin commit, push ni despliegue; el respaldo local anterior se conserva.
+
+## Mi resumen como pestaña interna del perfil
+
+- **Fecha:** 2026-10-25
+- **Estado:** Implementado localmente.
+
+Se retira Mi resumen del menú principal de escritorio/móvil y del acceso de
+Inicio. Perfil incorpora las pestañas Mi perfil y Mi resumen; ambas conservan
+la cabecera del usuario. El informe ocupa el ancho disponible al seleccionar
+Mi resumen y Perfil continúa resaltado en la navegación principal. Se conserva
+la ruta `/perfil/resumen`, la redirección `/analiticas` y la configuración de Looker.
+Sin modificaciones de servicios, Backend ni Base de Datos; sin publicación.
+
+## Contenedores de resumen personal y métricas generales
+
+- **Fecha:** 2026-10-24
+- **Estado:** Implementación local de Frontend; pendientes enlaces de Looker Studio.
+- **Responsable:** Equipo Frontend.
+
+Se incorporan `/perfil/resumen` y `/administracion/metricas`, con accesos desde
+Inicio, Perfil y Administración. `/analiticas` vuelve a dirigir al resumen.
+Ambas vistas conservan el diseño Red universitaria y contienen espacios
+adaptables para los iframe que entregará el equipo de Dashboards. Se muestra
+«En preparación» sin inventar métricas mientras no haya enlaces.
+
+La configuración se documenta en `docs/integracion-dashboards.md` y `.env.example`.
+Con un informe configurado, la interfaz requiere sesión para el resumen y rol
+administrador para las métricas globales. La privacidad efectiva de cada informe
+debe configurarse en Looker Studio. La demo administrativa no concede ese acceso.
+
+Se añaden pruebas de URL y acceso, compilación y renderizado de los estados del
+contenedor. Pendiente la revisión visual y la comprobación con informes reales.
+No se modifica `src/services`, el store, Backend ni Base de Datos. Sin commit,
+push ni despliegue.
+
 ## Pantallas del banco de tiempo y registro
 
 - **Fecha:** 2026-10-24

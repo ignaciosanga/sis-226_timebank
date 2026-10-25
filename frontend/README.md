@@ -19,7 +19,13 @@ npm run dev
 - Reservas: `/intercambios?tab=reservas` (o `/reservas`).
 - Créditos y movimientos: `/creditos`.
 - Perfil y habilidades propias: `/perfil`.
+- Pestaña Mi resumen dentro de Perfil (contenedor Looker Studio): `/perfil/resumen`.
 - Alta, baja y reactivación de usuarios: `/administracion`.
+- Métricas generales (contenedor Looker Studio): `/administracion/metricas`.
+
+Los informes muestran «En preparación» hasta que el equipo de Dashboards entregue
+sus enlaces. Ver [Integración de dashboards](docs/integracion-dashboards.md) para
+configurar los iframe, accesos y requisitos de privacidad.
 
 ## Comprobar
 
@@ -30,17 +36,20 @@ npm run build
 
 ## Alcance actual
 
-Las pantallas tienen un flujo demostrativo explícito. Los intercambios se
-reinician al recargar; las altas/bajas administrativas se conservan solo en el
-navegador. No se guardan contraseñas. El registro no crea cuentas ni inicia sesión
-real. Para explorar las acciones privadas, usa **Ingresar → Explorar como Valeria**.
+El registro, login y las operaciones de estudiante están conectados al backend
+mediante `src/services`, a cargo de APIs e Implementación. Configurar
+`VITE_API_URL` en `.env.local` como se indica en `.env.example`.
+La edición del perfil y la administración de usuarios también usan la API:
+listado, alta, baja, reactivación y carga de créditos. Administración requiere
+una cuenta con rol ADMIN; los cambios afectan los datos del backend. Los informes
+Looker Studio se configuran de forma independiente y aún no tienen URL real.
 
 Un crédito equivale a 15 minutos. Aceptar una solicitud genera una reserva y
 retiene créditos; cancelar antes del inicio los libera. La segunda confirmación,
 después del fin, completa el intercambio y transfiere los créditos una sola vez.
 
-El equipo de APIs e Implementación es responsable de `src/services`. Esta entrega
-no modifica esa carpeta ni implementa conexiones a Backend o PostgreSQL.
+El equipo de APIs e Implementación es responsable de `src/services`. La entrega
+de contenedores de métricas no modifica esa carpeta ni sus conexiones.
 El contrato vigente está en `../backend/docs/frontend-integration.md`.
 
 Consulta [Pantallas y entrega a APIs](docs/pantallas-timebank.md) para los estados,

@@ -6,6 +6,7 @@ import ExchangesView from '../views/ExchangesView.vue'
 import CreditsView from '../views/CreditsView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import AdminUsersView from '../views/AdminUsersView.vue'
+import MetricsView from '../views/MetricsView.vue'
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
   routes: [
@@ -15,10 +16,12 @@ const router = createRouter({
     { path: '/intercambios', name: 'exchanges', component: ExchangesView, meta: { title: 'Mis intercambios' } },
     { path: '/creditos', name: 'credits', component: CreditsView, meta: { title: 'Mis créditos' } },
     { path: '/perfil', name: 'profile', component: ProfileView, meta: { title: 'Mi perfil' } },
-    { path: '/administracion', name: 'admin-users', component: AdminUsersView, meta: { title: 'Administración de usuarios', adminDemo: true } },
+    { path: '/perfil/resumen', name: 'student-metrics', component: ProfileView, meta: { title: 'Mi resumen', reportAudience: 'student' } },
+    { path: '/administracion', name: 'admin-users', component: AdminUsersView, meta: { title: 'Administración de usuarios' } },
+    { path: '/administracion/metricas', name: 'admin-metrics', component: MetricsView, meta: { title: 'Métricas generales', reportAudience: 'admin' } },
     { path: '/reservas', redirect: '/intercambios?tab=reservas' },
     { path: '/mis-cursos', redirect: '/intercambios' },
-    { path: '/analiticas', redirect: '/creditos' },
+    { path: '/analiticas', redirect: '/perfil/resumen' },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
   scrollBehavior: () => ({ top: 0 }),

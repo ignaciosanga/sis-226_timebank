@@ -1,5 +1,10 @@
 # Pantallas Nexo U: modelo de intercambio de tiempo
 
+Este documento registra la entrega anterior a la conexión realizada en el PR #13.
+El estado actual de conexión está en `../README.md`; los nuevos contenedores de
+métricas se describen en [Integración de dashboards](integracion-dashboards.md).
+Actualmente `/analiticas` redirige a `/perfil/resumen`, no a Créditos.
+
 Implementación local de Frontend, 24 de octubre de 2026, basada en `main`.
 Contrato consultado: `backend/docs/frontend-integration.md` y DTOs del backend.
 No se modificaron Backend, Base de Datos ni `frontend/src/services`.

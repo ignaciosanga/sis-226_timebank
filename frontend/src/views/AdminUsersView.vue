@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, reactive, ref, watch } from 'vue'
-import { ArrowLeft, ChevronLeft, ChevronRight, Coins, Search, UserCheck, UserMinus, UserPlus, UsersRound, X } from '@lucide/vue'
+import { ArrowLeft, ChartColumn, ChevronLeft, ChevronRight, Coins, Search, UserCheck, UserMinus, UserPlus, UsersRound, X } from '@lucide/vue'
 import AdminDialog from '../features/admin/AdminDialog.vue'
 import AccountFields from '../features/auth/AccountFields.vue'
 import { emptyAccountForm, toRegisterPayload, validateAccount } from '../features/auth/account-validation'
@@ -158,6 +158,7 @@ async function confirmGrant() {
     <aside class="admin-sidebar" aria-label="Sección de administración">
       <div class="admin-sidebar-title"><UsersRound :size="22" aria-hidden="true" /><span>Administración</span></div>
       <RouterLink class="admin-sidebar-current" to="/administracion" aria-current="page"><UsersRound :size="18" aria-hidden="true" />Usuarios</RouterLink>
+      <RouterLink class="admin-metrics-link" to="/administracion/metricas"><ChartColumn :size="18" aria-hidden="true" />Métricas generales</RouterLink>
       <p class="admin-sidebar-copy">Altas y bajas de quienes forman parte de Nexo U.</p>
       <RouterLink class="admin-back-link" to="/"><ArrowLeft :size="16" aria-hidden="true" />Volver a la comunidad</RouterLink>
     </aside>
