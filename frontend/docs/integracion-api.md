@@ -1,3 +1,9 @@
+# Documento histórico de integración
+
+Los endpoints, reglas y estados vigentes se mantienen únicamente en [`../../docs/api-contract.md`](../../docs/api-contract.md), respaldado por `/docs-json`. Este archivo conserva propuestas anteriores y no debe usarse para implementar consumidores nuevos.
+
+---
+
 # Contratos Propuestos de Integración
 
 Este documento separa el mockup de Frontend de las responsabilidades de Backend, Base de Datos, Dashboards y APIs e Implementación. Los nombres son una propuesta para coordinar mediante Issues antes de desarrollar los servicios reales.
