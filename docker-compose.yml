@@ -1,0 +1,86 @@
+name: timebank
+
+x-database-environment: &database-environment
+  DATABASE_URL: postgresql://${POSTGRES_USER:-timebank}:${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD en el archivo .env}@postgres:5432/${POSTGRES_DB:-timebank_local}
+  DATABASE_ENABLED: "true"
+  PERSISTENCE_MODE: prisma
+
+services:
+  postgres:
+    image: postgres:16.15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-timebank_local}
+      POSTGRES_USER: ${POSTGRES_USER:-timebank}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD en el archivo .env}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  db-init:
+    build:
+      context: ./backend
+      target: build
+    init: true
+    env_file:
+      - .env
+    environment:
+      <<: *database-environment
+      NODE_ENV: development
+      LOCAL_DEVELOPMENT_SEED: "true"
+    command: ["npm", "run", "db:init"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  backend:
+    build:
+      context: ./backend
+      target: runtime
+    init: true
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      <<: *database-environment
+      NODE_ENV: development
+      PORT: 4000
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-4000}:4000"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:4000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      target: runtime
+      args:
+        VITE_API_URL: /api
+        VITE_BASE_PATH: /
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-5173}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
