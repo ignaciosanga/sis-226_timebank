@@ -65,6 +65,24 @@ export class Environment {
 
   @IsBoolean()
   SWAGGER_ENABLED = true;
+
+  @IsBoolean()
+  GOOGLE_CALENDAR_ENABLED = false;
+
+  @IsOptional()
+  @IsString()
+  GOOGLE_CALENDAR_CLIENT_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  GOOGLE_CALENDAR_CLIENT_SECRET?: string;
+
+  @IsOptional()
+  @IsString()
+  GOOGLE_CALENDAR_REDIRECT_URI?: string;
+
+  @IsString()
+  FRONTEND_URL = 'http://localhost:5173';
 }
 
 export function validateEnvironment(
@@ -80,7 +98,11 @@ export function validateEnvironment(
   ]) {
     if (input[key] !== undefined) parsed[key] = Number(input[key]);
   }
-  for (const key of ['DATABASE_ENABLED', 'SWAGGER_ENABLED']) {
+  for (const key of [
+    'DATABASE_ENABLED',
+    'SWAGGER_ENABLED',
+    'GOOGLE_CALENDAR_ENABLED',
+  ]) {
     if (input[key] === 'true') parsed[key] = true;
     else if (input[key] === 'false') parsed[key] = false;
   }
@@ -133,6 +155,27 @@ export function validateEnvironment(
   }
   if (config.DATABASE_ENABLED && !config.DATABASE_URL)
     throw new Error('Configuracion invalida: DATABASE_URL requerida');
+  if (config.GOOGLE_CALENDAR_ENABLED) {
+    if (
+      !config.GOOGLE_CALENDAR_CLIENT_ID ||
+      !config.GOOGLE_CALENDAR_CLIENT_SECRET ||
+      !config.GOOGLE_CALENDAR_REDIRECT_URI
+    )
+      throw new Error('Configuracion invalida: Google Calendar');
+  }
+  for (const [key, value] of [
+    ['FRONTEND_URL', config.FRONTEND_URL],
+    ['GOOGLE_CALENDAR_REDIRECT_URI', config.GOOGLE_CALENDAR_REDIRECT_URI],
+  ] as const) {
+    if (!value) continue;
+    try {
+      const url = new URL(value);
+      if (!['http:', 'https:'].includes(url.protocol) || url.origin !== value)
+        throw new Error();
+    } catch {
+      throw new Error(`Configuracion invalida: ${key}`);
+    }
+  }
   if (/^(change|replace|example|secret|your[_-])/i.test(config.JWT_SECRET))
     throw new Error('Configuracion invalida: JWT_SECRET de ejemplo');
   return config;
