@@ -1,43 +1,46 @@
 # Avances — Equipo Dashboards
 
-## Inicio del Sprint 0 — Definición, Estimación y Preparación
+## Sprint 0 — Definición, Estimación y Primeras Entregas (HU05 & HU07)
 
-- **Fecha:** 2026-10-24
-- **Estado:** En progreso
+- **Fecha:** 2026-10-25
+- **Estado:** En progreso (16 de 42 puntos completados)
 - **Responsables:** Equipo Dashboards (5 integrantes)
 
 ### Descripción
 
-En el marco del Sprint 0 (22 oct – 5 nov), se completó la estimación de las 7 historias de usuario alcanzando **42 puntos de historia** en escala Fibonacci. Se definió la adopción de **Google Looker Studio** como herramienta unificada de reportería y visualización gerencial y de usuario. Se completó la asignación de HUs a los 3 desarrolladores y se coordinó exitosamente con el equipo de Frontend la estrategia de integración mediante componentes embebidos (`<iframe>`).
+En el marco del Sprint 0 (22 oct – 5 nov), se completó la configuración inicial de la plataforma unificada **Google Looker Studio**, la importación de datos semilla del catálogo demo y el desarrollo completo de las dos primeras historias de usuario correspondientes al módulo administrativo de análisis operativo: **SCRUM-8 (HU05)** y **SCRUM-10 (HU07)**. Además, se desarrolló y entregó el componente Vue 3 para la incrustación directa en el frontend web del proyecto.
 
-### Funcionalidades y Estimación
+### Funcionalidades y Estado de Historias
 
-- **Estimación en Jira (42 Story Points totales):**
-  - **SCRUM-1 (HU01):** Panel personal del estudiante — **3 pts** *(Fecha límite: 27 oct)*
-  - **SCRUM-5 (HU02):** Historial de movimientos de horas — **5 pts**
-  - **SCRUM-6 (HU03):** Reporte de servicios realizados y recibidos — **5 pts**
-  - **SCRUM-7 (HU04):** Dashboard general de la plataforma — **8 pts**
-  - **SCRUM-8 (HU05):** Análisis de intercambio de horas — **8 pts**
-  - **SCRUM-9 (HU06):** Reporte de usuarios y participación — **5 pts**
-  - **SCRUM-10 (HU07):** Análisis de habilidades y demanda — **8 pts**
+- **Total de puntos del Sprint 0:** 42 Story Points.
+- **Puntos completados:** 16 Story Points (38% del sprint completado).
 
-- **Distribución del equipo de desarrollo:**
-  - **Dev 1 (13 pts):** Módulo Estudiante / Cliente (`HU01`, `HU02`, `HU03`).
-  - **Dev 2 (13 pts):** Módulo Administrador: Vista General y Usuarios (`HU04`, `HU06`).
-  - **Dev Lead (16 pts):** Módulo Administrador: Intercambios y Habilidades (`HU05`, `HU07`).
+| Código | HU | Estado | Puntos | Entregables |
+|:------:|:---|:------:|:------:|:------------|
+| **SCRUM-8** | **HU05 — Análisis de intercambio de horas** | **Completado (100%)** | 8 pts | • Tarjeta KPI de Total Horas Solicitadas.<br>• Filtro interactivo desplegable por estado.<br>• Serie temporal con desglose multidimensional por estado (`aceptada`, `pendiente`, `rechazada`). |
+| **SCRUM-10** | **HU07 — Análisis de habilidades y demanda** | **Completado (100%)** | 8 pts | • Combinación de datos (JOIN) entre solicitudes y habilidades.<br>• Gráfico de barras horizontales con ranking de habilidades más demandadas y etiquetas numéricas. |
+| SCRUM-1 | HU01 — Panel personal del estudiante | En progreso | 3 pts | En desarrollo por Dev 1 (fecha límite 27 oct). |
+| SCRUM-5 | HU02 — Historial de movimientos | Por hacer | 5 pts | Asignado a Dev 1. |
+| SCRUM-6 | HU03 — Reporte de servicios | Por hacer | 5 pts | Asignado a Dev 1. |
+| SCRUM-7 | HU04 — Dashboard general de la plataforma | En progreso | 8 pts | Asignado a Dev 2. |
+| SCRUM-9 | HU06 — Reporte de usuarios y participación | Por hacer | 5 pts | Asignado a Dev 2. |
 
-- **Selección tecnológica:**
-  - Adopción de **Google Looker Studio** para todos los dashboards.
-  - Integración directa con el sistema web (Vue 3) a través de contenedores responsivos `<iframe>` en el perfil del estudiante y el panel administrativo.
+### Componentes de Código e Integración Web
 
-### Evidencias y pruebas
+- **Componente Vue 3 entregado:** `dashboards/administrador/DashboardAdminIntercambios.vue`
+  - Contenedor responsivo con soporte para desktop y mobile.
+  - Integración mediante `<iframe>` con sandbox de seguridad habilitado.
+- **Enlace oficial del reporte interactivo:**  
+  `https://datastudio.google.com/embed/reporting/1bac8147-8dd5-43b1-9aed-2db46c8e5392/page/p_g27hvlxo8d`
 
-- Historias de usuario y estimaciones registradas en Jira: https://ucb-team-reportesbi.atlassian.net
-- Rama creada y mantenida: `equipo/dashboards`
-- Coordinación con Frontend: confirmada la reserva de espacios/contenedores responsivos (`width: 100%`, `height: 600-750px`) en el frontend web.
-- Pruebas pendientes: validación de fuentes de datos (Google Sheets de prueba / conexión PostgreSQL) y publicación de vistas interactivas.
+### Evidencias y Pruebas
 
-### Dependencias
+- Interfaz funcional y probada en Looker Studio con interacción de filtros en tiempo real.
+- Datos semilla verificados y validados contra el diccionario relacional `v0.31plus`.
+- Coordinación con Frontend: confirmada la compatibilidad del componente entregado.
 
-- **Equipo Base de Datos / Backend:** Diccionario de datos final y carga de datos de prueba en PostgreSQL (o exportación CSV) para alimentar las visualizaciones.
-- **Equipo Frontend:** Inserción del snippet `<iframe>` de Looker Studio en las rutas del estudiante y administrador una vez publicados los informes.
+### Próximos Pasos
+
+- Apoyar a Dev 1 para el cierre de HU01 antes de la fecha límite del 27 de octubre.
+- Apoyar a Dev 2 en la construcción de KPIs globales de HU04.
+- Actualizar el tablero de Jira pasando HU05 y HU07 a estado completado.
