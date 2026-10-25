@@ -9,17 +9,26 @@ const router = useRouter()
 const email = ref('')
 const password = ref('')
 const message = ref('')
+const submitting = ref(false)
 watch(() => store.loginOpen, () => { email.value = ''; password.value = ''; message.value = '' })
-function submit() {
-  password.value = ''
-  message.value = 'El acceso con una cuenta real estará disponible al conectar el servicio de inicio de sesión. Puedes explorar con el perfil de ejemplo.'
+async function submit() {
+  message.value = ''
+  submitting.value = true
+  try {
+    await store.login(email.value.trim().toLowerCase(), password.value)
+  } catch (failure) {
+    message.value = failure.status === 401 ? 'Correo o contraseña incorrectos.' : failure.message
+  } finally {
+    password.value = ''
+    submitting.value = false
+  }
 }
 function register() { store.closeLogin(); router.push('/registro') }
 </script>
 <template>
   <Dialog :open="store.loginOpen" labelledby="login-title" describedby="login-description" @close="store.closeLogin">
     <div class="admin-dialog-symbol"><LogIn :size="24" /></div><h2 id="login-title">Ingresa a Nexo U</h2><p id="login-description" class="admin-dialog-description">Accede a tus habilidades, intercambios y créditos.</p>
-    <form class="flow-form" @submit.prevent="submit"><div class="field"><label for="login-email">Correo electrónico</label><input id="login-email" v-model="email" type="email" autocomplete="username" required maxlength="254" data-autofocus /></div><div class="field"><label for="login-password">Contraseña</label><input id="login-password" v-model="password" type="password" autocomplete="current-password" required maxlength="128" /></div><p v-if="message" class="notice" role="status">{{ message }}</p><button class="button button-primary button-full" type="submit">Ingresar</button></form>
-    <div class="demo-entry"><p>Para revisar las pantallas sin una cuenta real:</p><button class="button button-outline button-full" type="button" @click="store.enterDemo">Explorar como Valeria · Demo</button></div><p class="auth-footer">¿Todavía no tienes cuenta? <button class="inline-action" type="button" @click="register">Regístrate</button></p>
+    <form class="flow-form" @submit.prevent="submit"><div class="field"><label for="login-email">Correo institucional</label><input id="login-email" v-model="email" type="email" autocomplete="username" required maxlength="254" data-autofocus /></div><div class="field"><label for="login-password">Contraseña</label><input id="login-password" v-model="password" type="password" autocomplete="current-password" required maxlength="128" /></div><p v-if="message" class="notice notice-error" role="alert">{{ message }}</p><button class="button button-primary button-full" type="submit" :disabled="submitting">{{ submitting ? 'Ingresando…' : 'Ingresar' }}</button></form>
+    <p class="auth-footer">¿Todavía no tienes cuenta? <button class="inline-action" type="button" @click="register">Regístrate</button></p>
   </Dialog>
 </template>

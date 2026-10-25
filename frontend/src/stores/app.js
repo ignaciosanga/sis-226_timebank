@@ -1,53 +1,149 @@
 import { defineStore } from 'pinia'
-import { createDemoState, CURRENT_USER_ID } from '../features/timebank/demo-state'
-import { DEMO_CAREERS, DEMO_CATEGORIES, DEMO_SKILLS } from '../features/timebank/catalogs'
-import * as demo from '../features/timebank/demo-actions'
+import { getToken, onUnauthorized } from '../services/api'
+import * as auth from '../services/auth'
+import * as catalogs from '../services/catalogs'
+import * as timebank from '../services/timebank'
+import community from '../services/community.json'
+
+const GUEST = { id: '', nombre: 'Invitado', apellido: 'UCB', correo: '', idCarrera: '', semestre: '—', rol: 'Invitado', roles: [] }
+const emptyAccount = () => ({ saldo: '0', creditos_retenidos: '0', disponibles: '0' })
+const sessionData = () => ({ ownSkills: [], ownAvailability: [], requests: [], reservations: [], accountData: emptyAccount(), movements: [], offers: [], communityAvailability: [] })
 
 let toastTimer
 export const useAppStore = defineStore('app', {
   state: () => ({
     authenticated: false,
-    demo: createDemoState(),
-    careers: DEMO_CAREERS.map((row) => ({ ...row })),
-    categories: DEMO_CATEGORIES.map((row) => ({ ...row })),
-    skills: DEMO_SKILLS.map((row) => ({ ...row })),
-    catalogState: 'ready', loginOpen: false, toast: null,
+    profile: null,
+    careers: [],
+    categories: [],
+    skills: [],
+    catalogState: 'loading',
+    community: community.map((user) => ({ ...user })),
+    ...sessionData(),
+    loginOpen: false,
+    toast: null,
   }),
   getters: {
-    user: (state) => state.demo.users.find((user) => user.id === CURRENT_USER_ID),
-    career() { return this.careers.find((row) => row.id_carrera === this.user.idCarrera)?.nombre ?? 'Carrera no disponible' },
-    account(state) {
-      const account = state.demo.accounts[CURRENT_USER_ID]
-      return { saldo: String(account.saldo), creditos_retenidos: String(account.creditos_retenidos), disponibles: String(account.saldo - account.creditos_retenidos) }
+    user: (state) => state.profile ?? GUEST,
+    career() {
+      if (!this.authenticated) return 'Inicia sesión para ver tu perfil'
+      return this.careers.find((row) => row.id_carrera === this.user.idCarrera)?.nombre ?? 'Carrera no disponible'
     },
-    myRequests: (state) => state.demo.requests.filter((row) => row.id_solicitante === CURRENT_USER_ID || row.id_ofertante === CURRENT_USER_ID),
-    myReservations: (state) => state.demo.reservations.filter((row) => row.id_solicitante === CURRENT_USER_ID || row.id_ofertante === CURRENT_USER_ID),
-    myAvailability: (state) => state.demo.availability.filter((row) => row.id_usuario === CURRENT_USER_ID),
-    mySkills: (state) => state.demo.published.filter((row) => row.id_usuario === CURRENT_USER_ID),
-    myMovements: (state) => state.demo.movements.filter((row) => row.id_usuario === CURRENT_USER_ID),
-    pendingCount() { return this.myRequests.filter((row) => row.id_ofertante === CURRENT_USER_ID && row.estado === 'Solicitada').length },
+    account: (state) => state.accountData,
+    myRequests: (state) => state.requests,
+    myReservations: (state) => state.reservations,
+    myAvailability: (state) => state.ownAvailability,
+    mySkills: (state) => state.ownSkills,
+    myMovements: (state) => state.movements,
+    pendingCount() { return this.myRequests.filter((row) => row.id_ofertante === this.user.id && row.estado === 'Solicitada').length },
   },
   actions: {
-    findUser(id) { return this.demo.users.find((user) => user.id === id) },
+    findUser(id) {
+      if (this.profile && id === this.profile.id) return this.profile
+      return this.community.find((user) => user.id === id)
+    },
     findSkill(id) { return this.skills.find((skill) => skill.id_habilidad === id) },
+    async init() {
+      onUnauthorized(() => this.expireSession())
+      await this.loadCatalogs()
+      if (!getToken()) return
+      try {
+        this.profile = await auth.getProfile()
+        this.authenticated = true
+        await this.loadSessionData()
+      } catch {
+        auth.logout()
+        this.resetSession()
+      }
+    },
+    async loadCatalogs() {
+      this.catalogState = 'loading'
+      try {
+        const [careers, categories, skills] = await Promise.all([catalogs.getCareers(), catalogs.getCategories(), catalogs.getSkills()])
+        Object.assign(this, { careers, categories, skills, catalogState: 'ready' })
+      } catch {
+        this.catalogState = 'error'
+      }
+    },
+    reloadDemoCareers() { return this.loadCatalogs() },
+    async loadMine() {
+      const [ownSkills, ownAvailability, requests, reservations, accountData, movements] = await Promise.allSettled([
+        timebank.getMySkills(), timebank.getMyAvailability(), timebank.getMyExchanges(),
+        timebank.getMyReservations(), timebank.getAccount(), timebank.getMovements(),
+      ])
+      const value = (result, fallback) => (result.status === 'fulfilled' ? result.value : fallback)
+      this.ownSkills = value(ownSkills, this.ownSkills)
+      this.ownAvailability = value(ownAvailability, this.ownAvailability)
+      this.requests = value(requests, this.requests)
+      this.reservations = value(reservations, this.reservations)
+      this.accountData = value(accountData, this.accountData)
+      this.movements = value(movements, this.movements)
+    },
+    async loadCommunity() {
+      const others = this.community.filter((user) => user.id !== this.user.id)
+      const results = await Promise.all(others.map(async (user) => {
+        const [skills, slots] = await Promise.allSettled([timebank.getUserSkills(user.id), timebank.getUserAvailability(user.id)])
+        return { skills: skills.status === 'fulfilled' ? skills.value : [], slots: slots.status === 'fulfilled' ? slots.value : [] }
+      }))
+      this.offers = results.flatMap((result) => result.skills.map(({ id_usuario, id_habilidad, nivel }) => ({ id_usuario, id_habilidad, nivel })))
+      this.communityAvailability = results.flatMap((result) => result.slots)
+    },
+    loadSessionData() { return Promise.all([this.loadMine(), this.loadCommunity()]) },
+    async login(correo, password) {
+      this.profile = await auth.login(correo, password)
+      this.authenticated = true
+      this.loginOpen = false
+      await this.loadSessionData()
+      this.showToast(`Hola, ${this.profile.nombre}. Sesión iniciada.`)
+    },
+    register(payload) { return auth.register(payload) },
+    resetSession() { Object.assign(this, { authenticated: false, profile: null, ...sessionData() }) },
+    logout() {
+      auth.logout()
+      this.resetSession()
+      this.showToast('Cerraste sesión.', 'info')
+    },
+    expireSession() {
+      auth.logout()
+      this.resetSession()
+      this.loginOpen = true
+      this.showToast('Tu sesión expiró. Vuelve a ingresar.', 'info')
+    },
     requestLogin() { this.loginOpen = true },
     closeLogin() { this.loginOpen = false },
-    enterDemo() { this.authenticated = true; this.loginOpen = false; this.showToast('Demostración iniciada como Valeria Núñez.') },
-    leaveDemo() { this.authenticated = false; this.showToast('Saliste de la demostración.', 'info') },
-    requireSession() { if (!this.authenticated) { this.requestLogin(); return false } return true },
-    publishSkill(input) { this.demo = demo.publishSkill(this.demo, CURRENT_USER_ID, input, this.skills) },
-    publishAvailability(input) { this.demo = demo.publishAvailability(this.demo, CURRENT_USER_ID, input) },
-    sendExchange(input) { this.demo = demo.sendExchange(this.demo, CURRENT_USER_ID, input) },
-    respondRequest(id, action) { this.demo = demo.respondRequest(this.demo, CURRENT_USER_ID, id, action) },
-    cancelReservation(id, reason) { this.demo = demo.cancelReservation(this.demo, CURRENT_USER_ID, id, reason) },
-    confirmReservation(id) { this.demo = demo.confirmReservation(this.demo, CURRENT_USER_ID, id) },
+    requireSession() {
+      if (!this.authenticated) { this.requestLogin(); return false }
+      return true
+    },
+    async publishSkill(input) {
+      await timebank.publishSkill(input)
+      this.ownSkills = await timebank.getMySkills()
+    },
+    async publishAvailability(input) {
+      await timebank.publishAvailability(input)
+      this.ownAvailability = await timebank.getMyAvailability()
+    },
+    async sendExchange(input) {
+      await timebank.sendExchange(input)
+      await this.loadSessionData()
+    },
+    async respondRequest(id, action) {
+      await timebank.respondExchange(id, action)
+      await this.loadSessionData()
+    },
+    async cancelReservation(id, reason) {
+      await timebank.cancelReservation(id, reason)
+      await this.loadMine()
+    },
+    async confirmReservation(id) {
+      await timebank.confirmReservation(id)
+      await this.loadMine()
+    },
     showToast(message, type = 'success') {
       this.toast = { message, type }
       clearTimeout(toastTimer)
       if (typeof window !== 'undefined') toastTimer = window.setTimeout(() => { this.toast = null }, 5000)
     },
-    // The integration team can supply GET /careers results without changing forms.
-    reloadDemoCareers() { this.careers = DEMO_CAREERS.map((row) => ({ ...row })); this.catalogState = 'ready' },
     setCareers(rows, state = 'ready') { this.careers = rows; this.catalogState = state },
   },
 })

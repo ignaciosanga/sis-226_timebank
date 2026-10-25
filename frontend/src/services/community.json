@@ -1,0 +1,30 @@
+[
+  {
+    "id": "af6e0cec-fa9b-40f8-976a-230c0936d678",
+    "nombre": "Diego",
+    "apellido": "Vargas",
+    "idCarrera": "30000000-0000-4000-8000-000000000001",
+    "semestre": 7
+  },
+  {
+    "id": "91d381d1-cd8c-4ed0-8e2e-0126b0f44fc6",
+    "nombre": "María",
+    "apellido": "López",
+    "idCarrera": "30000000-0000-4000-8000-000000000001",
+    "semestre": 6
+  },
+  {
+    "id": "df66618e-b352-4763-8a51-cf85b7ca3e4a",
+    "nombre": "Camila",
+    "apellido": "Paz",
+    "idCarrera": "30000000-0000-4000-8000-000000000001",
+    "semestre": 5
+  },
+  {
+    "id": "41f241b8-388e-4fd3-85a7-94fa9bd75862",
+    "nombre": "Lucas",
+    "apellido": "Méndez",
+    "idCarrera": "30000000-0000-4000-8000-000000000001",
+    "semestre": 8
+  }
+]
