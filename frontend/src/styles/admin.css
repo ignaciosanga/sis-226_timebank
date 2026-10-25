@@ -1,6 +1,9 @@
 .admin-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); align-items: start; gap: 36px; }
 .admin-sidebar { position: sticky; top: 112px; min-width: 0; }
 .admin-sidebar-title { display: flex; align-items: center; gap: 10px; margin-bottom: 26px; color: var(--ucb-blue); font-weight: 600; }
+.admin-section-nav { display: grid; gap: 6px; }
+.admin-sidebar-link { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 10px 14px; border-left: 3px solid transparent; border-radius: 0 8px 8px 0; color: var(--ucb-blue); font-size: .9375rem; }
+.admin-sidebar-link:hover { background: #eaf2f7; }
 .admin-sidebar-current { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 10px 14px; border-left: 3px solid var(--ucb-blue); border-radius: 0 8px 8px 0; background: #e1ecf4; color: var(--ucb-blue-dark); font-weight: 600; }
 .admin-sidebar-copy { margin: 18px 0 24px; color: var(--muted); font-size: .9375rem; line-height: 1.6; }
 .admin-back-link { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; color: var(--muted); font-size: .9375rem; }
@@ -104,7 +107,9 @@
   .admin-layout { grid-template-columns: 1fr; gap: 20px; }
   .admin-sidebar { position: static; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
   .admin-sidebar-title { margin: 0; }
-  .admin-sidebar-current, .admin-sidebar-copy { display: none; }
+  .admin-sidebar-copy { display: none; }
+  .admin-section-nav { display: flex; flex: 1 0 100%; flex-wrap: wrap; order: 1; gap: 8px; }
+  .admin-sidebar-link { flex: 1 1 160px; }
 }
 @media (max-width: 820px) {
   .admin-users-table, .admin-users-table tbody { display: block; }

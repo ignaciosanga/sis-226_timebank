@@ -1,5 +1,26 @@
 # Avances Equipo Frontend
 
+## Verificación de gestión de usuarios tras unificar la navegación
+
+- **Fecha:** 2026-10-25
+- **Estado:** Comprobado localmente; cambios sin publicar.
+
+Usuarios y Métricas generales comparten menú lateral y estilo de cabecera.
+Se conservaron las funciones de gestión de usuarios, servicios y store.
+Se agregaron 14 pruebas reproducibles en `tests/admin-api.integration.test.js`:
+carga/paginación, búsqueda/filtros, roles, creación/validación/duplicados,
+baja/reactivación/conflictos, créditos/reintento con la misma clave,
+fallos de red, 401, 403 y 503. Ejecutan el setup real de la vista Vue y sus
+observadores con los servicios HTTP y respuestas controladas, sin navegador.
+
+`npm test`: 46 pruebas correctas. `npm run build`: correcto. Para repetir solo
+estas pruebas, `npm run test:admin-api`. No se modifican usuarios ni créditos
+en el backend desplegado. La comprobación remota de solo lectura confirmó
+`GET /health/ready` con 200/PostgreSQL y `GET /admin/users` con 401 sin token.
+La carga autenticada contra el backend real y la revisión visual quedan
+pendientes de una sesión ADMIN. Sin cambios en `src/services`, store, Backend
+ni Base de Datos.
+
 ## Integración de métricas con el frontend conectado a la API
 
 - **Fecha:** 2026-10-25

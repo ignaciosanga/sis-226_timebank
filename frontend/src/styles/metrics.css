@@ -40,8 +40,6 @@
 .profile-hero .profile-actions { flex-wrap: wrap; }
 .profile-layout-summary { grid-template-columns: minmax(0, 1fr); }
 .profile-tabs { margin-bottom: 0; }
-.admin-sidebar .admin-metrics-link { display: flex; align-items: center; gap: 10px; min-height: 44px; margin-top: 6px; border-radius: 8px; padding: 12px 14px; color: var(--ucb-blue); font-size: .9375rem; }
-.admin-sidebar .admin-metrics-link:hover { background: #eaf2f7; }
 @media (max-width: 720px) {
   .metrics-header { align-items: flex-start; flex-direction: column; gap: 18px; }
   .metrics-signature { padding-block: 6px; }

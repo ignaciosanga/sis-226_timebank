@@ -34,6 +34,17 @@ npm test
 npm run build
 ```
 
+Para comprobar solo la integración de gestión de usuarios:
+
+```bash
+npm run test:admin-api
+```
+
+Estas pruebas ejecutan la lógica real de la vista, sus observadores y los servicios
+HTTP con respuestas controladas. Comprueban carga, búsqueda, filtros, paginación,
+alta, baja, reactivación, carga de créditos y errores de red/sesión. No escriben
+en el backend desplegado ni sustituyen la revisión visual en navegador.
+
 ## Alcance actual
 
 El registro, login y las operaciones de estudiante están conectados al backend

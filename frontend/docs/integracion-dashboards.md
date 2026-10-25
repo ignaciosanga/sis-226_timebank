@@ -10,6 +10,9 @@ endpoints de estadísticas.
 | Métricas generales | `/#/administracion/metricas` | `div#dashboard-administrador` |
 
 Accesos: Perfil → pestaña Mi resumen; Administración → Métricas generales.
+Usuarios y Métricas generales comparten `components/layout/AdminSidebar.vue`,
+el mismo menú lateral y estilo de cabecera. La navegación resalta únicamente
+el apartado actual y mantiene ambos accesos visibles también en móvil.
 El resumen conserva la cabecera del perfil y las pestañas Mi perfil / Mi resumen.
 No aparece como pestaña independiente del menú principal ni como acceso en Inicio.
 `/#/analiticas` vuelve a conducir al resumen personal. Créditos conserva su ruta
@@ -72,6 +75,9 @@ inventar indicadores ni porcentajes. Sin animaciones automáticas.
 ## Verificación
 
 `npm test` valida las URLs y los accesos además de las pruebas existentes.
+Incluye 14 pruebas de integración de gestión de usuarios; también se pueden
+ejecutar con `npm run test:admin-api`. Utilizan la lógica de la vista y sus
+servicios reales con un servidor HTTP simulado, sin modificar datos desplegados.
 `npm run build` comprueba la compilación. Se comprueban mediante renderizado
 las vistas vacías, la redirección y los estados de acceso e iframe con URLs
 sintéticas, sin consultar informes externos. La revisión visual en navegador
