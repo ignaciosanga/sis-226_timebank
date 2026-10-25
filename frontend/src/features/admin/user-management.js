@@ -1,16 +1,10 @@
 // Frontend-only demonstration. This module never calls an API.
+import { DEMO_CAREERS } from '../timebank/catalogs.js'
+import { validateAccount } from '../auth/account-validation.js'
 export const ADMIN_USERS_STORAGE_KEY = 'nexo-u.admin-users.v1'
 export const DEMO_ADMIN_ID = 'demo-admin'
 export class AdminUserError extends Error {}
-export const CAREERS = [
-  'Administración de Empresas',
-  'Comercio Internacional',
-  'Diseño Digital',
-  'Economía',
-  'Ingeniería Comercial',
-  'Ingeniería de Sistemas',
-  'Ingeniería Industrial',
-]
+export const CAREERS = DEMO_CAREERS.map((career) => career.nombre)
 
 export function seedAdminUsers() {
   const rows = [
@@ -27,7 +21,8 @@ export function seedAdminUsers() {
   return [
     ...rows.map(([id, nombre, apellido, correo, carrera, semestre], index) => ({
       id: `demo-${id}`, nombre, apellido, correo, carrera, semestre,
-      rol: 'Estudiante', estado: index === 6 ? 'Inactivo' : 'Activo',
+      idCarrera: DEMO_CAREERS.find((item) => item.nombre === carrera).id_carrera,
+      rol: 'Estudiante', estado: index === 6 ? 'Inactivo' : index === 8 ? 'Suspendido' : 'Activo',
       fechaRegistro: `2026-10-${String(22 - index).padStart(2, '0')}T14:00:00.000Z`,
       fechaBaja: index === 6 ? '2026-10-22T15:00:00.000Z' : null,
       motivoBaja: index === 6 ? 'Baja de ejemplo para revisar el listado.' : null,
@@ -53,33 +48,22 @@ export function filterAdminUsers(users, search = '', status = 'Todos') {
   })
 }
 
-export function validateNewUser(input, users) {
-  const errors = {}
-  for (const field of ['nombre', 'apellido']) {
-    const value = String(input[field] ?? '').trim()
-    if (!value) errors[field] = field === 'nombre' ? 'Escribe el nombre.' : 'Escribe el apellido.'
-    else if (value.length > 80) errors[field] = 'Utiliza hasta 80 caracteres.'
-  }
+export function validateNewUser(input, users, careers = DEMO_CAREERS) {
+  const errors = validateAccount(input, careers, { confirm: true })
   const email = String(input.correo ?? '').trim().toLowerCase()
-  if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    errors.correo = 'Escribe un correo válido, por ejemplo nombre@ucb.edu.bo.'
-  } else if (users.some((user) => user.correo.toLowerCase() === email)) {
+  if (!errors.correo && users.some((user) => user.correo.toLowerCase() === email)) {
     errors.correo = 'Este correo ya pertenece a un usuario, incluso si está inactivo.'
-  }
-  if (!CAREERS.includes(input.carrera)) errors.carrera = 'Selecciona una carrera.'
-  const semester = Number(input.semestre)
-  if (!Number.isInteger(semester) || semester < 1 || semester > 12) {
-    errors.semestre = 'Selecciona un semestre entre 1 y 12.'
   }
   return errors
 }
 
-export function addAdminUser(users, input, { id = globalThis.crypto.randomUUID(), now = new Date().toISOString() } = {}) {
-  const errors = validateNewUser(input, users)
+export function addAdminUser(users, input, { id = globalThis.crypto.randomUUID(), now = new Date().toISOString(), careers = DEMO_CAREERS } = {}) {
+  const errors = validateNewUser(input, users, careers)
   if (Object.keys(errors).length) return { errors }
   const user = {
     id, nombre: input.nombre.trim(), apellido: input.apellido.trim(),
-    correo: input.correo.trim().toLowerCase(), carrera: input.carrera,
+    correo: input.correo.trim().toLowerCase(), idCarrera: input.idCarrera,
+    carrera: careers.find((career) => career.id_carrera === input.idCarrera).nombre,
     semestre: Number(input.semestre), rol: 'Estudiante', estado: 'Activo',
     fechaRegistro: now, fechaBaja: null, motivoBaja: null,
   }
@@ -93,7 +77,7 @@ export function deactivateAdminUser(users, id, reason = '', now = new Date().toI
     throw new AdminUserError('La cuenta administrativa de demostración no se puede dar de baja.')
   }
   if (user.estado !== 'Activo') throw new AdminUserError('Este usuario ya está inactivo.')
-  if (reason.trim().length > 300) throw new AdminUserError('El motivo puede tener hasta 300 caracteres.')
+  if (reason.trim().length > 255) throw new AdminUserError('El motivo puede tener hasta 255 caracteres.')
   const updated = { ...user, estado: 'Inactivo', fechaBaja: now, motivoBaja: reason.trim() || null }
   return { user: updated, users: users.map((item) => item.id === id ? updated : item) }
 }
@@ -102,11 +86,11 @@ function validSavedUser(user) {
   return user && typeof user.id === 'string' && user.id.length > 0
     && ['nombre', 'apellido', 'correo'].every((key) => typeof user[key] === 'string' && user[key].length > 0)
     && ['Estudiante', 'Administrador'].includes(user.rol)
-    && ['Activo', 'Inactivo'].includes(user.estado)
+    && ['Activo', 'Inactivo', 'Suspendido'].includes(user.estado)
     && Number.isFinite(Date.parse(user.fechaRegistro))
     && (user.fechaBaja === null || Number.isFinite(Date.parse(user.fechaBaja)))
     && (user.motivoBaja === null || typeof user.motivoBaja === 'string')
-    && (user.rol === 'Administrador' || (CAREERS.includes(user.carrera) && Number.isInteger(user.semestre) && user.semestre >= 1 && user.semestre <= 12))
+    && (user.rol === 'Administrador' || (typeof user.carrera === 'string' && user.carrera.length > 0 && Number.isInteger(user.semestre) && user.semestre >= 1 && user.semestre <= 12))
 }
 
 export function loadAdminUsers(storage) {
@@ -125,4 +109,12 @@ export function loadAdminUsers(storage) {
 export function saveAdminUsers(storage, users) {
   // Persist before changing UI state, so a failed write never looks successful.
   storage.setItem(ADMIN_USERS_STORAGE_KEY, JSON.stringify({ version: 1, users }))
+}
+
+export function reactivateAdminUser(users, id, now = new Date().toISOString()) {
+  const user = users.find((item) => item.id === id)
+  if (!user) throw new AdminUserError('No encontramos al usuario.')
+  if (user.estado !== 'Inactivo') throw new AdminUserError(user.estado === 'Suspendido' ? 'Los usuarios suspendidos requieren revisión de administración.' : 'El usuario ya está activo.')
+  const updated = { ...user, estado: 'Activo', fechaReactivacion: now }
+  return { user: updated, users: users.map((item) => item.id === id ? updated : item) }
 }

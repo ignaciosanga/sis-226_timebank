@@ -1,63 +1,34 @@
 <script setup>
 import { ref, watch } from 'vue'
-import { LockKeyhole, Mail, ShieldCheck, X } from '@lucide/vue'
+import { useRouter } from 'vue-router'
+import { LogIn } from '@lucide/vue'
 import { useAppStore } from '../../stores/app'
-import UcbLogo from '../../components/ui/UcbLogo.vue'
-
+import Dialog from '../admin/AdminDialog.vue'
 const store = useAppStore()
-const email = ref('valeria.nunez@ucb.edu.bo')
-const password = ref('demostracion')
+const router = useRouter()
+const email = ref('')
+const password = ref('')
+const message = ref('')
 const submitting = ref(false)
-
-watch(
-  () => store.loginOpen,
-  (open) => {
-    document.body.classList.toggle('modal-open', open)
-  },
-)
-
-function submit() {
+watch(() => store.loginOpen, () => { email.value = ''; password.value = ''; message.value = '' })
+async function submit() {
+  message.value = ''
   submitting.value = true
-  window.setTimeout(() => {
+  try {
+    await store.login(email.value.trim().toLowerCase(), password.value)
+  } catch (failure) {
+    message.value = failure.status === 401 ? 'Correo o contraseña incorrectos.' : failure.message
+  } finally {
+    password.value = ''
     submitting.value = false
-    store.completeLogin()
-  }, 450)
+  }
 }
+function register() { store.closeLogin(); router.push('/registro') }
 </script>
-
 <template>
-  <Teleport to="body">
-    <Transition name="modal">
-      <div v-if="store.loginOpen" class="modal-backdrop" @mousedown.self="store.closeLogin()">
-        <section class="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title">
-          <button class="modal-close" type="button" aria-label="Cerrar" @click="store.closeLogin()"><X :size="21" /></button>
-          <div class="login-brand">
-            <UcbLogo />
-            <span>Nexo U</span>
-          </div>
-          <div class="login-icon"><ShieldCheck :size="27" /></div>
-          <p class="eyebrow">ACCESO INSTITUCIONAL</p>
-          <h2 id="login-title">Inicia sesión para continuar</h2>
-          <p class="modal-copy">
-            {{ store.pendingCourseId ? 'Para inscribirte en este curso necesitamos validar tu cuenta universitaria.' : 'Accede a tus cursos, puntos y progreso académico.' }}
-          </p>
-
-          <form @submit.prevent="submit">
-            <label>
-              <span>Correo institucional</span>
-              <span class="input-wrap"><Mail :size="18" /><input v-model="email" type="email" required autocomplete="username" /></span>
-            </label>
-            <label>
-              <span>Contraseña</span>
-              <span class="input-wrap"><LockKeyhole :size="18" /><input v-model="password" type="password" required autocomplete="current-password" /></span>
-            </label>
-            <button class="button button-primary button-full" type="submit" :disabled="submitting">
-              {{ submitting ? 'Validando…' : 'Ingresar con mi cuenta UCB' }}
-            </button>
-          </form>
-          <p class="demo-note">Mockup académico: cualquier contraseña permite continuar.</p>
-        </section>
-      </div>
-    </Transition>
-  </Teleport>
+  <Dialog :open="store.loginOpen" labelledby="login-title" describedby="login-description" @close="store.closeLogin">
+    <div class="admin-dialog-symbol"><LogIn :size="24" /></div><h2 id="login-title">Ingresa a Nexo U</h2><p id="login-description" class="admin-dialog-description">Accede a tus habilidades, intercambios y créditos.</p>
+    <form class="flow-form" @submit.prevent="submit"><div class="field"><label for="login-email">Correo institucional</label><input id="login-email" v-model="email" type="email" autocomplete="username" required maxlength="254" data-autofocus /></div><div class="field"><label for="login-password">Contraseña</label><input id="login-password" v-model="password" type="password" autocomplete="current-password" required maxlength="128" /></div><p v-if="message" class="notice notice-error" role="alert">{{ message }}</p><button class="button button-primary button-full" type="submit" :disabled="submitting">{{ submitting ? 'Ingresando…' : 'Ingresar' }}</button></form>
+    <p class="auth-footer">¿Todavía no tienes cuenta? <button class="inline-action" type="button" @click="register">Regístrate</button></p>
+  </Dialog>
 </template>

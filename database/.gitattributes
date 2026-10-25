@@ -1,0 +1,7 @@
+# Los scripts corren dentro de Linux (Docker): finales de línea LF siempre
+*.sh  text eol=lf
+*.sql text eol=lf
+*.yml text eol=lf
+.env* text eol=lf
+# El esquema original se guarda tal cual (byte por byte, con sus CRLF)
+db/init/01_schema_v0.31+.sql -text

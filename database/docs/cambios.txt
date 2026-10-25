@@ -1,0 +1,202 @@
+============================================================
+CAMBIOS EJECUTADOS — Sistema de Intercambio de Habilidades
+Versión: v0.31
+Archivos afectados: encriptacion_bd_v2.sql, vistas_bd_v2.sql
+============================================================
+
+ORDEN DE DESPLIEGUE RECOMENDADO
+------------------------------
+1) DDL v0.31 (CREATE TABLE, FKs, CHECKs)
+2) seed_data.sql (20 usuarios, catálogos, movimientos, etc.)
+3) encriptacion_bd_v2.sql
+4) vistas_bd_v2.sql
+5) [futuro] encriptacion_bd_v2_fase2.sql — DROP COLUMN planas
+
+REQUISITO PREVIO
+------------------------------
+Ejecutar en la sesión de PostgreSQL antes de encriptacion_bd_v2.sql:
+
+    SET app.encryption_key = '<clave-de-al-menos-32-caracteres>';
+
+En producción, la clave debe inyectarse desde:
+  - Variable de entorno de la aplicación
+  - HashiCorp Vault / AWS Secrets Manager / Azure Key Vault
+NUNCA hardcodeada en SQL ni en el repositorio.
+
+============================================================
+CAMBIOS EN encriptacion_bd_v2.sql (vs encriptacion_bd.sql)
+============================================================
+
+SEGURIDAD
+- Clave maestra YA NO está hardcodeada.
+  * v1: get_encryption_key() hacía RETURN decode('a1b2...','hex')
+  * v2: get_app_key() lee current_setting('app.encryption_key', true)
+        y lanza excepción si no existe o mide < 32 chars.
+- Cifrado cambió de encrypt(...,'aes') (IV cero, determinista) a
+  pgp_sym_encrypt / pgp_sym_decrypt (IV + salt aleatorios por fila).
+- Búsqueda por correo dejó de hacer full-table-scan con
+  decrypt_text(correo_enc) = input. Ahora usa columna correo_hash
+  (SHA-256 con pepper) + índice UNIQUE → O(1) en login.
+- Todas las funciones SECURITY DEFINER ahora incluyen
+  SET search_path = pg_catalog, public (mitiga hijacking).
+
+ESTRUCTURA
+- Nuevas columnas:
+  * usuarios.correo_hash bytea (UNIQUE index ux_usuarios_correo_hash)
+  * usuarios.nombre_enc, apellido_enc, correo_enc (bytea)
+  * calificaciones.comentario_enc bytea
+  * cancelaciones.motivo_enc bytea
+  * notificaciones.mensaje_enc bytea
+  * auditoria.datos_anteriores_enc, datos_nuevos_enc bytea
+- Backfill de datos existentes desde columnas planas a columnas *_enc.
+
+TRIGGERS (dual-write, mismo patrón que v1)
+- trg_encrypt_usuario, trg_encrypt_calificacion, trg_encrypt_cancelacion,
+  trg_encrypt_notificacion, trg_encrypt_auditoria.
+- Ahora también generan correo_hash en INSERT/UPDATE.
+
+FUNCIONES
+- get_encryption_key()  → RENOMBRADA a get_app_key(); comportamiento distinto.
+- encrypt_text / decrypt_text → reescritas sobre pgp_sym_*.
+- NUEVA: hash_lookup(text) → digest(lower(trim(value)) || pepper, 'sha256').
+- buscar_usuario_por_correo(text) → reescrita para usar correo_hash.
+
+VISTAS
+- Se mantienen v_usuarios_desencriptados,
+  v_calificaciones_desencriptadas, v_cancelaciones_desencriptadas,
+  v_notificaciones_desencriptadas, v_auditoria_desencriptada.
+- No se modifican sus nombres ni columnas (compatibilidad).
+
+IDEMPOTENCIA
+- Bloque de RESET al inicio (DROP TRIGGER / DROP FUNCTION / DROP VIEW
+  / DROP COLUMN IF EXISTS) permite re-ejecutar el script sin errores.
+- Script envuelto en BEGIN/COMMIT (todo o nada).
+
+CONVENCIONES
+- Nombres de tabla en minúsculas sin comillas (alineado con DBML v0.31).
+  En v1 se usaba "USUARIOS", "CALIFICACIONES", etc. (rompía con
+  las tablas creadas desde el DBML).
+
+============================================================
+CAMBIOS EN vistas_bd_v2.sql (vs vistas_bd.sql)
+============================================================
+
+LECTURA DE DATOS CIFRADOS
+- Todas las vistas que exponen nombre/apellido/correo/comentario/mensaje
+  /datos_* ahora leen de v_*_desencriptad* en lugar de las columnas
+  planas.
+- Motivo: en fase 2 se eliminarán las columnas planas; sin este cambio
+  todas estas vistas dejarían de funcionar.
+- Afectadas: v_usuarios_completo, v_usuarios_roles, v_usuarios_activos,
+  v_usuario_habilidades_detalle, v_disponibilidades_*, v_solicitudes_*,
+  v_reservas_*, v_cuentas_credito_usuario, v_movimientos_credito_detalle,
+  v_transferencias_detalle, v_ranking_creditos, v_calificaciones_*,
+  v_reputacion_usuarios, v_notificaciones_*, v_auditoria_detalle,
+  v_auditoria_por_usuario, v_usuarios_mas_activos.
+
+CORRECCIÓN DE BUGS LÓGICOS
+- Eliminadas 3 tautologías (WHERE redundante que ya estaba en el JOIN):
+  * v_solicitudes_recibidas → reemplazada por fn_solicitudes_recibidas(uuid)
+  * v_solicitudes_enviadas  → reemplazada por fn_solicitudes_enviadas(uuid)
+  * v_calificaciones_recibidas → reemplazada por fn_calificaciones_recibidas(uuid)
+  Antes devolvían TODAS las filas, no solo las del usuario.
+- v_reservas_usuario tenía un CROSS JOIN "USUARIOS" u (producto
+  cartesiano) antes de filtrar. Se reemplazó por
+  fn_reservas_usuario(uuid).
+- v_reputacion_usuarios usaba LEFT JOIN con OR en la condición
+  (id_evaluado = u.id OR id_evaluador = u.id), lo que impide usar
+  índices. Reescrita con CTEs (recibidas / dadas).
+
+CONSOLIDACIÓN
+- v_habilidades_populares y v_ofertantes_por_habilidad eran casi
+  idénticas. Ahora v_habilidades_populares = SELECT sobre
+  v_ofertantes_por_habilidad + ORDER BY + LIMIT 20.
+
+CASING
+- v_actividad_mensual filtraba entidad = 'SOLICITUDES_INTERCAMBIO'
+  y entidad = 'USUARIOS' (mayúsculas), pero los inserts de auditoría
+  usan minúsculas. Ahora se usa lower(entidad) y upper(accion) para
+  ser robusto a la convención que use el backend.
+
+ORDER BY
+- Se eliminó ORDER BY de la definición de vistas (excepto en
+  v_habilidades_populares, que necesita LIMIT).
+- Motivo: el ORDER BY dentro de una vista no está garantizado por
+  el estándar; el orden debe aplicarlo el caller.
+
+CONVENCIONES
+- Nombres en minúsculas sin comillas (igual que el DBML v0.31 y que
+  encriptacion_bd_v2.sql).
+
+============================================================
+NUEVAS FUNCIONES (reemplazan vistas parametrizadas)
+============================================================
+
+fn_solicitudes_recibidas(p_usuario uuid)
+  Retorna las solicitudes pendientes recibidas por el ofertante p_usuario.
+  Uso: SELECT * FROM fn_solicitudes_recibidas('<uuid>');
+
+fn_solicitudes_enviadas(p_usuario uuid)
+  Retorna las solicitudes enviadas por p_usuario.
+  Uso: SELECT * FROM fn_solicitudes_enviadas('<uuid>');
+
+fn_calificaciones_recibidas(p_usuario uuid)
+  Retorna las calificaciones recibidas por p_usuario.
+  Uso: SELECT * FROM fn_calificaciones_recibidas('<uuid>');
+
+fn_reservas_usuario(p_usuario uuid)
+  Retorna las reservas donde p_usuario participa (solicitante u ofertante)
+  con columna rol_usuario.
+  Uso: SELECT * FROM fn_reservas_usuario('<uuid>');
+
+============================================================
+PENDIENTE (fase 2, no incluido en esta entrega)
+============================================================
+
+encriptacion_bd_v2_fase2.sql eliminará las columnas planas:
+
+    ALTER TABLE usuarios        DROP COLUMN nombre, DROP COLUMN apellido, DROP COLUMN correo;
+    ALTER TABLE calificaciones  DROP COLUMN comentario;
+    ALTER TABLE cancelaciones   DROP COLUMN motivo;
+    ALTER TABLE notificaciones  DROP COLUMN mensaje;
+    ALTER TABLE auditoria       DROP COLUMN datos_anteriores, DROP COLUMN datos_nuevos;
+
+Se ejecuta SOLO después de:
+  1. Confirmar que el backfill cubrió el 100% de filas.
+  2. Confirmar que las vistas v2 no tocan columnas planas.
+  3. Confirmar que el backend ya escribe en las columnas cifradas.
+
+Pre-requisito de verificación (ejecutar antes de fase 2):
+
+    SELECT COUNT(*) FILTER (WHERE nombre_enc   IS NULL) AS sin_nombre,
+           COUNT(*) FILTER (WHERE apellido_enc IS NULL) AS sin_apellido,
+           COUNT(*) FILTER (WHERE correo_enc   IS NULL) AS sin_correo,
+           COUNT(*) FILTER (WHERE correo_hash  IS NULL) AS sin_hash
+    FROM usuarios;
+    -- Los 4 conteos deben ser 0.
+
+    SELECT COUNT(*) FROM calificaciones WHERE comentario_enc IS NULL AND comentario IS NOT NULL;  -- 0
+    SELECT COUNT(*) FROM cancelaciones  WHERE motivo_enc     IS NULL AND motivo     IS NOT NULL;  -- 0
+    SELECT COUNT(*) FROM notificaciones WHERE mensaje_enc    IS NULL AND mensaje    IS NOT NULL;  -- 0
+
+============================================================
+HISTÓRICO DE CAMBIOS DEL PROYECTO (v0.31)
+============================================================
+
+Cambios funcionales (cambios.txt originales):
+  - USUARIOS: + semestre int
+  - RESERVAS: + modalidad varchar, + lugar varchar
+  - CANCELACIONES: id_reserva UNIQUE, + horas_anticipacion int (regla 5h)
+  - MOVIMIENTOS_CREDITO.tipo: dominio + retencion / liberacion / consumo
+  - DISPONIBILIDADES: sin cambios (ya usaba fecha_inicio / fecha_fin)
+  - Nuevas tablas: CALIFICACIONES, NOTIFICACIONES, AUDITORIA
+  - CUENTAS_CREDITO: + creditos_retenidos int
+    (CHECK creditos_retenidos >= 0 AND creditos_retenidos <= saldo)
+  - MOVIMIENTOS_CREDITO: + retenidos_anterior / retenidos_posterior int
+
+Encriptación (encriptacion_bd_v2.sql): descrita arriba.
+Vistas (vistas_bd_v2.sql): descritas arriba.
+
+============================================================
+FIN DEL REGISTRO
+============================================================

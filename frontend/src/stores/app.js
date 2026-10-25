@@ -1,72 +1,153 @@
 import { defineStore } from 'pinia'
-import { courses, initialEnrollmentIds, monthlyActivity, student, taughtCourses } from '../data/mockData'
+import { getToken, onUnauthorized } from '../services/api'
+import * as auth from '../services/auth'
+import * as catalogs from '../services/catalogs'
+import * as timebank from '../services/timebank'
+import community from '../services/community.json'
 
+const GUEST = { id: '', nombre: 'Invitado', apellido: 'UCB', correo: '', idCarrera: '', semestre: '—', rol: 'Invitado', roles: [] }
+const emptyAccount = () => ({ saldo: '0', creditos_retenidos: '0', disponibles: '0' })
+const sessionData = () => ({ ownSkills: [], ownAvailability: [], requests: [], reservations: [], accountData: emptyAccount(), movements: [], offers: [], communityAvailability: [] })
+
+let toastTimer
 export const useAppStore = defineStore('app', {
   state: () => ({
     authenticated: false,
-    user: { ...student },
-    courses,
-    enrollmentIds: [...initialEnrollmentIds],
-    monthlyActivity,
-    taughtCourses,
+    profile: null,
+    careers: [],
+    categories: [],
+    skills: [],
+    catalogState: 'loading',
+    community: community.map((user) => ({ ...user })),
+    ...sessionData(),
     loginOpen: false,
-    pendingCourseId: null,
     toast: null,
   }),
   getters: {
-    enrolledCourses: (state) => state.courses.filter((course) => state.enrollmentIds.includes(course.id)),
-    enrolledDates() {
-      return this.enrolledCourses.map((course) => course.date)
+    user: (state) => state.profile ?? GUEST,
+    career() {
+      if (!this.authenticated) return 'Inicia sesión para ver tu perfil'
+      return this.careers.find((row) => row.id_carrera === this.user.idCarrera)?.nombre ?? 'Carrera no disponible'
     },
-    analytics(state) {
-      return {
-        enrolled: state.enrollmentIds.length + state.user.completed,
-        completed: state.user.completed,
-        success: 94,
-        hours: state.user.hours + state.enrollmentIds.length,
-      }
-    },
+    account: (state) => state.accountData,
+    myRequests: (state) => state.requests,
+    myReservations: (state) => state.reservations,
+    myAvailability: (state) => state.ownAvailability,
+    mySkills: (state) => state.ownSkills,
+    myMovements: (state) => state.movements,
+    pendingCount() { return this.myRequests.filter((row) => row.id_ofertante === this.user.id && row.estado === 'Solicitada').length },
   },
   actions: {
-    requestEnrollment(courseId) {
-      if (!this.authenticated) {
-        this.pendingCourseId = courseId
-        this.loginOpen = true
-        return
+    findUser(id) {
+      if (this.profile && id === this.profile.id) return this.profile
+      return this.community.find((user) => user.id === id)
+    },
+    findSkill(id) { return this.skills.find((skill) => skill.id_habilidad === id) },
+    async init() {
+      onUnauthorized(() => this.expireSession())
+      await this.loadCatalogs()
+      if (!getToken()) return
+      try {
+        this.profile = await auth.getProfile()
+        this.authenticated = true
+        await this.loadSessionData()
+      } catch {
+        auth.logout()
+        this.resetSession()
       }
-      this.enroll(courseId)
     },
-    requestLogin() {
-      this.pendingCourseId = null
-      this.loginOpen = true
+    async loadCatalogs() {
+      this.catalogState = 'loading'
+      try {
+        const [careers, categories, skills] = await Promise.all([catalogs.getCareers(), catalogs.getCategories(), catalogs.getSkills()])
+        Object.assign(this, { careers, categories, skills, catalogState: 'ready' })
+      } catch {
+        this.catalogState = 'error'
+      }
     },
-    completeLogin() {
+    reloadDemoCareers() { return this.loadCatalogs() },
+    async loadMine() {
+      const [ownSkills, ownAvailability, requests, reservations, accountData, movements] = await Promise.allSettled([
+        timebank.getMySkills(), timebank.getMyAvailability(), timebank.getMyExchanges(),
+        timebank.getMyReservations(), timebank.getAccount(), timebank.getMovements(),
+      ])
+      const value = (result, fallback) => (result.status === 'fulfilled' ? result.value : fallback)
+      this.ownSkills = value(ownSkills, this.ownSkills)
+      this.ownAvailability = value(ownAvailability, this.ownAvailability)
+      this.requests = value(requests, this.requests)
+      this.reservations = value(reservations, this.reservations)
+      this.accountData = value(accountData, this.accountData)
+      this.movements = value(movements, this.movements)
+    },
+    async loadCommunity() {
+      const others = this.community.filter((user) => user.id !== this.user.id)
+      const results = await Promise.all(others.map(async (user) => {
+        const [skills, slots] = await Promise.allSettled([timebank.getUserSkills(user.id), timebank.getUserAvailability(user.id)])
+        return { skills: skills.status === 'fulfilled' ? skills.value : [], slots: slots.status === 'fulfilled' ? slots.value : [] }
+      }))
+      this.offers = results.flatMap((result) => result.skills.map(({ id_usuario, id_habilidad, nivel }) => ({ id_usuario, id_habilidad, nivel })))
+      this.communityAvailability = results.flatMap((result) => result.slots)
+    },
+    loadSessionData() { return Promise.all([this.loadMine(), this.loadCommunity()]) },
+    async login(correo, password) {
+      this.profile = await auth.login(correo, password)
       this.authenticated = true
-      const pending = this.pendingCourseId
       this.loginOpen = false
-      this.pendingCourseId = null
-      if (pending) this.enroll(pending)
-      else this.showToast('Sesión iniciada. Bienvenida a Nexo U.')
+      await this.loadSessionData()
+      this.showToast(`Hola, ${this.profile.nombre}. Sesión iniciada.`)
     },
-    closeLogin() {
-      this.loginOpen = false
-      this.pendingCourseId = null
+    register(payload) { return auth.register(payload) },
+    async updateProfile(changes) {
+      this.profile = await auth.updateProfile(changes)
+      this.showToast('Perfil actualizado.')
     },
-    enroll(courseId) {
-      const course = this.courses.find((item) => item.id === courseId)
-      if (!course) return
-      if (this.enrollmentIds.includes(courseId)) {
-        this.showToast('Este curso ya está en tu agenda.', 'info')
-        return
-      }
-      this.enrollmentIds.push(courseId)
-      this.showToast(`Te inscribiste en “${course.title}”.`)
+    resetSession() { Object.assign(this, { authenticated: false, profile: null, ...sessionData() }) },
+    logout() {
+      auth.logout()
+      this.resetSession()
+      this.showToast('Cerraste sesión.', 'info')
+    },
+    expireSession() {
+      auth.logout()
+      this.resetSession()
+      this.loginOpen = true
+      this.showToast('Tu sesión expiró. Vuelve a ingresar.', 'info')
+    },
+    requestLogin() { this.loginOpen = true },
+    closeLogin() { this.loginOpen = false },
+    requireSession() {
+      if (!this.authenticated) { this.requestLogin(); return false }
+      return true
+    },
+    async publishSkill(input) {
+      await timebank.publishSkill(input)
+      this.ownSkills = await timebank.getMySkills()
+    },
+    async publishAvailability(input) {
+      await timebank.publishAvailability(input)
+      this.ownAvailability = await timebank.getMyAvailability()
+    },
+    async sendExchange(input) {
+      await timebank.sendExchange(input)
+      await this.loadSessionData()
+    },
+    async respondRequest(id, action) {
+      await timebank.respondExchange(id, action)
+      await this.loadSessionData()
+    },
+    async cancelReservation(id, reason) {
+      await timebank.cancelReservation(id, reason)
+      await this.loadMine()
+    },
+    async confirmReservation(id) {
+      await timebank.confirmReservation(id)
+      await this.loadMine()
     },
     showToast(message, type = 'success') {
-      this.toast = { id: Date.now(), message, type }
-      window.setTimeout(() => {
-        this.toast = null
-      }, 3600)
+      this.toast = { message, type }
+      clearTimeout(toastTimer)
+      if (typeof window !== 'undefined') toastTimer = window.setTimeout(() => { this.toast = null }, 5000)
     },
+    setCareers(rows, state = 'ready') { this.careers = rows; this.catalogState = state },
   },
 })

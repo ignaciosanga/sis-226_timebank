@@ -3,10 +3,12 @@ services:
     name: timebank-backend
     runtime: docker
     plan: free
-    rootDir: backend
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     healthCheckPath: /health/ready
+    buildFilter:
+      paths:
+        - backend/**
     envVars:
       - key: PERSISTENCE_MODE
         value: prisma
@@ -24,7 +26,7 @@ services:
   - type: web
     name: timebank-frontend
     runtime: static
-    buildCommand: cd frontend && npm install && npm run build
+    buildCommand: cd frontend && npm install && npm run build -- --base=/
     staticPublishPath: ./frontend/dist
     buildFilter:
       paths:
