@@ -7,6 +7,10 @@ import community from '../services/community.json'
 
 const GUEST = { id: '', nombre: 'Invitado', apellido: 'UCB', correo: '', idCarrera: '', semestre: '—', rol: 'Invitado', roles: [] }
 const emptyAccount = () => ({ saldo: '0', creditos_retenidos: '0', disponibles: '0' })
+const personFrom = (row) => {
+  const [nombre = 'Estudiante', ...rest] = row.nombre.trim().split(/\s+/)
+  return { id: row.id_usuario, nombre, apellido: rest.join(' ') }
+}
 const sessionData = () => ({ ownSkills: [], ownAvailability: [], requests: [], reservations: [], accountData: emptyAccount(), movements: [], offers: [], communityAvailability: [] })
 
 let toastTimer
@@ -80,6 +84,18 @@ export const useAppStore = defineStore('app', {
       this.movements = value(movements, this.movements)
     },
     async loadCommunity() {
+      const results = await Promise.allSettled(this.skills.map((skill) => timebank.getSkillProviders(skill.id_habilidad)))
+      if (!results.some((result) => result.status === 'fulfilled')) return this.loadDemoCommunity()
+      const providers = results.flatMap((result) => (result.status === 'fulfilled' ? result.value : [])).filter((row) => row.id_usuario !== this.user.id)
+      const people = new Map(this.community.map((user) => [user.id, user]))
+      for (const row of providers) if (!people.has(row.id_usuario)) people.set(row.id_usuario, personFrom(row))
+      this.community = [...people.values()]
+      const ids = [...new Set(providers.map((row) => row.id_usuario))]
+      const slots = await Promise.allSettled(ids.map((id) => timebank.getUserAvailability(id)))
+      this.offers = providers.map(({ id_usuario, id_habilidad, nivel }) => ({ id_usuario, id_habilidad, nivel }))
+      this.communityAvailability = slots.flatMap((result) => (result.status === 'fulfilled' ? result.value : []))
+    },
+    async loadDemoCommunity() {
       const others = this.community.filter((user) => user.id !== this.user.id)
       const results = await Promise.all(others.map(async (user) => {
         const [skills, slots] = await Promise.allSettled([timebank.getUserSkills(user.id), timebank.getUserAvailability(user.id)])

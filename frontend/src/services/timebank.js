@@ -5,6 +5,14 @@ const post = (path, body = {}) => apiRequest(path, { method: 'POST', body, idemp
 export const getMySkills = () => apiRequest('/users/me/skills')
 export const publishSkill = ({ skillId, nivel }) => apiRequest('/users/me/skills', { method: 'POST', body: { skillId, nivel } })
 export const getUserSkills = (userId) => apiRequest(`/users/${userId}/skills`)
+export async function getSkillProviders(skillId) {
+  const rows = []
+  for (let page = 1; ; page += 1) {
+    const result = await apiRequest(`/skills/${skillId}/providers?page=${page}&limit=100`)
+    rows.push(...result.data)
+    if (page >= result.meta.totalPages) return rows
+  }
+}
 
 export const getMyAvailability = () => apiRequest('/availability/me')
 export const publishAvailability = ({ fechaInicio, fechaFin }) => apiRequest('/availability', { method: 'POST', body: { fechaInicio, fechaFin } })
