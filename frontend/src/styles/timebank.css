@@ -32,6 +32,10 @@
 .demo-entry { padding-top: 20px; margin-top: 24px; border-top: 1px solid var(--line); }
 .demo-entry p, .auth-footer { color: var(--muted); font-size: .9375rem; }
 .auth-footer { margin: 22px 0 0; text-align: center; }
+.google-signin { display: grid; justify-items: center; gap: 14px; margin-top: 18px; }
+.auth-divider { display: flex; align-items: center; gap: 12px; width: 100%; color: var(--muted); font-size: .875rem; }
+.auth-divider::before, .auth-divider::after { content: ""; flex: 1; border-top: 1px solid var(--line-soft); }
+.google-signin-button { min-height: 44px; }
 .registration-layout { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); max-width: 1040px; margin: 0 auto; align-items: start; }
 .registration-story { min-height: 520px; padding: 40px 36px; border-radius: 16px 0 0 16px; background: var(--ucb-blue); color: white; }
 .registration-mark { display: inline-grid; place-items: center; width: 60px; height: 60px; margin-bottom: 38px; border: 1px solid #6b9cbc; border-radius: 14px; color: var(--ucb-yellow); }

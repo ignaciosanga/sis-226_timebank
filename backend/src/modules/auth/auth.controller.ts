@@ -10,7 +10,9 @@ import {
 } from '@nestjs/swagger';
 import { PublicUser } from '../users/user.types';
 import { AuthService } from './auth.service';
+import { GoogleLoginDto } from './dto/google-login.dto';
 import { LoginDto } from './dto/login.dto';
+import { GoogleAuthService } from './google-auth.service';
 import { RegisterDto } from './dto/register.dto';
 
 class LoginResponse {
@@ -28,7 +30,10 @@ class LoginResponse {
 })
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly googleAuth: GoogleAuthService,
+  ) {}
   @Post('register')
   @ApiCreatedResponse({
     type: PublicUser,
@@ -45,5 +50,15 @@ export class AuthController {
   @ApiUnauthorizedResponse()
   login(@Body() input: LoginDto) {
     return this.auth.login(input);
+  }
+  @Post('google')
+  @HttpCode(200)
+  @ApiOkResponse({
+    description:
+      'Sesión con una cuenta de Google @ucb.edu.bo verificada; si la cuenta no existe devuelve registration_required y se completa enviando idCarrera y semestre',
+  })
+  @ApiUnauthorizedResponse()
+  loginWithGoogle(@Body() input: GoogleLoginDto) {
+    return this.googleAuth.signIn(input);
   }
 }

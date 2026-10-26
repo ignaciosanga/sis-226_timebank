@@ -7,6 +7,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { UsersModule } from '../users/users.module';
 import { AuthService } from './auth.service';
+import { GoogleAuthService } from './google-auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { PasswordService } from './password.service';
 import { REGISTRATION_POLICY } from './registration-policy';
@@ -39,6 +40,7 @@ import { AdminUsersController } from '../users/admin-users.controller';
   controllers: [AuthController, UsersController, AdminUsersController],
   providers: [
     AuthService,
+    GoogleAuthService,
     PasswordService,
     JwtStrategy,
     JwtAuthGuard,

@@ -25,6 +25,7 @@ export const useAppStore = defineStore('app', {
     community: community.map((user) => ({ ...user })),
     ...sessionData(),
     loginOpen: false,
+    googlePending: null,
     toast: null,
   }),
   getters: {
@@ -111,6 +112,20 @@ export const useAppStore = defineStore('app', {
       this.loginOpen = false
       await this.loadSessionData()
       this.showToast(`Hola, ${this.profile.nombre}. Sesión iniciada.`)
+    },
+    async loginWithGoogle(body) {
+      const result = await auth.googleSignIn(body)
+      this.loginOpen = false
+      if (result.pending) {
+        this.googlePending = { credential: body.credential, profile: result.pending }
+        return false
+      }
+      this.googlePending = null
+      this.profile = result.user
+      this.authenticated = true
+      await this.loadSessionData()
+      this.showToast(`Hola, ${this.profile.nombre}. Sesión iniciada.`)
+      return true
     },
     async register(payload) {
       await auth.register(payload)
