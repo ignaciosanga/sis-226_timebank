@@ -6,6 +6,13 @@ export async function login(correo, password) {
   return data.user
 }
 
+export async function googleSignIn(body) {
+  const data = await apiRequest('/auth/google', { method: 'POST', body })
+  if (data.registration_required) return { pending: data.profile }
+  setToken(data.access_token)
+  return { user: data.user }
+}
+
 export const register = (payload) => apiRequest('/auth/register', { method: 'POST', body: payload })
 
 export const getProfile = () => apiRequest('/users/me')

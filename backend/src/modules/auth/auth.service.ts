@@ -9,7 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Role } from '../../common/enums/role.enum';
 import { UsersService } from '../users/users.service';
 import { EmailAlreadyExistsError } from '../users/users.repository';
-import { toPublicUser } from '../users/user.types';
+import { toPublicUser, UserRecord } from '../users/user.types';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { PasswordService } from './password.service';
@@ -76,8 +76,13 @@ export class AuthService {
     );
     if (!valid || !user?.active)
       throw new UnauthorizedException('Credenciales invalidas');
+    return this.sessionFor(user);
+  }
+
+  async sessionFor(user: UserRecord) {
+    if (!user.active) throw new UnauthorizedException('Credenciales invalidas');
     const access_token = await this.jwt.signAsync({ sub: user.id });
-    if (!(await repository.recordActiveLogin(user.id, new Date())))
+    if (!(await this.users.repository.recordActiveLogin(user.id, new Date())))
       throw new UnauthorizedException('Credenciales invalidas');
     return {
       access_token,

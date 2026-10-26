@@ -80,6 +80,10 @@ export class Environment {
 
   @IsOptional()
   @IsString()
+  GOOGLE_LOGIN_CLIENT_ID?: string;
+
+  @IsOptional()
+  @IsString()
   GOOGLE_CALENDAR_REDIRECT_URI?: string;
 
   @IsString()
