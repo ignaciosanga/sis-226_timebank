@@ -463,3 +463,15 @@ h1, h2, h3 { font-family: "Sora", sans-serif; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
+
+.skeleton-page { display: grid; gap: 16px; max-width: 760px; margin: 32px auto; padding: 0 16px; }
+.skeleton-list { display: grid; gap: 16px; }
+.skeleton-card { display: grid; gap: 12px; padding: 24px; }
+.skeleton { display: block; border-radius: 8px; background: linear-gradient(90deg, #e6edf2 25%, #f3f6f9 37%, #e6edf2 63%); background-size: 400% 100%; animation: skeleton-shimmer 1.4s ease infinite; }
+.skeleton-avatar { width: 48px; height: 48px; border-radius: 50%; }
+.skeleton-line { height: 14px; width: 100%; }
+.skeleton-short { width: 40%; }
+.skeleton-title { height: 24px; width: 60%; }
+.skeleton-heading { height: 34px; width: 70%; }
+@keyframes skeleton-shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
