@@ -74,10 +74,11 @@ export class CalendarService {
       typeof state.reservationId !== 'string'
     )
       throw new ConflictException('Autorizacion de Google invalida');
-    const reservation = await this.exchanges.getReservation(
+    const details = await this.exchanges.getReservationCalendarDetails(
       state.sub,
       state.reservationId,
     );
+    const { reservation } = details;
     if (reservation.estado !== ReservationStatus.CONFIRMADA)
       throw new ConflictException(
         'La reserva ya no se puede agregar al calendario',
@@ -100,8 +101,22 @@ export class CalendarService {
       {
         method: 'POST',
         body: JSON.stringify({
-          summary: 'Banco de Tiempo: reserva confirmada',
-          description: `Reserva ${reservation.id_reserva}. Modalidad: ${reservation.modalidad}. Lugar: ${reservation.lugar}.`,
+          summary: `Clase reservada: ${details.skillName}`,
+          description: [
+            `Clase o habilidad: ${details.skillName}`,
+            `Tutor/a: ${details.providerName}`,
+            `Estudiante: ${details.requesterName}`,
+            `Modalidad: ${reservation.modalidad}`,
+            `Lugar: ${reservation.lugar}`,
+            `Créditos: ${reservation.creditos}`,
+            details.requestDescription
+              ? `Detalle de la solicitud: ${details.requestDescription}`
+              : '',
+            `Reserva Timebank: ${reservation.id_reserva}`,
+          ]
+            .filter(Boolean)
+            .join('\n'),
+          location: reservation.lugar,
           start: { dateTime: reservation.fecha_inicio.toISOString() },
           end: { dateTime: reservation.fecha_fin.toISOString() },
           extendedProperties: {

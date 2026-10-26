@@ -3,6 +3,7 @@ import { getToken, onUnauthorized } from '../services/api'
 import * as auth from '../services/auth'
 import * as catalogs from '../services/catalogs'
 import * as timebank from '../services/timebank'
+import * as calendar from '../services/calendar'
 import community from '../services/community.json'
 
 const GUEST = { id: '', nombre: 'Invitado', apellido: 'UCB', correo: '', idCarrera: '', semestre: '—', rol: 'Invitado', roles: [] }
@@ -197,6 +198,9 @@ export const useAppStore = defineStore('app', {
     async confirmReservation(id) {
       await timebank.confirmReservation(id)
       await this.loadMine()
+    },
+    addReservationToGoogleCalendar(id) {
+      return calendar.getReservationAuthorizationUrl(id)
     },
     showToast(message, type = 'success') {
       this.toast = { message, type }
