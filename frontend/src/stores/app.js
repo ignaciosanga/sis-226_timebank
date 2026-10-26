@@ -26,6 +26,8 @@ export const useAppStore = defineStore('app', {
     community: community.map((user) => ({ ...user })),
     ...sessionData(),
     loginOpen: false,
+    booting: true,
+    communityLoading: false,
     googlePending: null,
     toast: null,
   }),
@@ -52,14 +54,21 @@ export const useAppStore = defineStore('app', {
     async init() {
       onUnauthorized(() => this.expireSession())
       await this.loadCatalogs()
-      if (!getToken()) return this.loadCommunity()
+      if (!getToken()) {
+        this.booting = false
+        return this.loadCommunity()
+      }
       try {
         this.profile = await auth.getProfile()
         this.authenticated = true
+        this.booting = false
         await this.loadSessionData()
       } catch {
         auth.logout()
         this.resetSession()
+        this.loadCommunity()
+      } finally {
+        this.booting = false
       }
     },
     async loadCatalogs() {
@@ -86,6 +95,14 @@ export const useAppStore = defineStore('app', {
       this.movements = value(movements, this.movements)
     },
     async loadCommunity() {
+      this.communityLoading = true
+      try {
+        await this.fetchCommunity()
+      } finally {
+        this.communityLoading = false
+      }
+    },
+    async fetchCommunity() {
       const results = await Promise.allSettled(this.skills.map((skill) => timebank.getSkillProviders(skill.id_habilidad)))
       if (!results.some((result) => result.status === 'fulfilled')) return this.loadDemoCommunity()
       const providers = results.flatMap((result) => (result.status === 'fulfilled' ? result.value : [])).filter((row) => row.id_usuario !== this.user.id)
@@ -185,11 +202,13 @@ export const useAppStore = defineStore('app', {
     },
     async sendExchange(input) {
       await timebank.sendExchange(input)
-      await this.loadSessionData()
+      await this.loadMine()
+      this.loadCommunity()
     },
     async respondRequest(id, action) {
       await timebank.respondExchange(id, action)
-      await this.loadSessionData()
+      await this.loadMine()
+      this.loadCommunity()
     },
     async cancelReservation(id, reason) {
       await timebank.cancelReservation(id, reason)
