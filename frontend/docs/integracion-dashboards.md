@@ -15,8 +15,10 @@ el mismo menú lateral y estilo de cabecera. La navegación resalta únicamente
 el apartado actual y mantiene ambos accesos visibles también en móvil.
 El resumen conserva la cabecera del perfil y las pestañas Mi perfil / Mi resumen.
 No aparece como pestaña independiente del menú principal ni como acceso en Inicio.
-`/#/analiticas` vuelve a conducir al resumen personal. Créditos conserva su ruta
-y sus operaciones. La administración de usuarios usa los servicios reales del
+`/#/analiticas` vuelve a conducir al resumen personal. Créditos se consulta en
+Perfil → Créditos (`/#/perfil/creditos`), junto a Mi resumen. La ruta anterior
+`/#/creditos` redirige a esa pestaña y se conservan sus operaciones y servicios.
+La administración de usuarios usa los servicios reales del
 PR #14, incluidas las altas, bajas, reactivaciones y cargas de créditos.
 
 ## Activar los informes

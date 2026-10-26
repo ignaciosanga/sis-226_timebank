@@ -3,6 +3,8 @@
 Pantallas universitarias para intercambiar habilidades por tiempo, con el diseño
 Red universitaria y la identidad UCB.
 
+El registro de esta entrega está en [Avances del equipo Frontend](../docs/avances/frontend.md).
+
 ## Ejecutar desde esta carpeta
 
 ```bash
@@ -17,11 +19,16 @@ npm run dev
 - Disponibilidad: `/disponibilidad`.
 - Solicitudes: `/intercambios`.
 - Reservas: `/intercambios?tab=reservas` (o `/reservas`).
-- Créditos y movimientos: `/creditos`.
+- Créditos y movimientos: Perfil → Créditos, en `/perfil/creditos`. La ruta anterior `/creditos` redirige a esta pestaña.
 - Perfil y habilidades propias: `/perfil`.
 - Pestaña Mi resumen dentro de Perfil (contenedor Looker Studio): `/perfil/resumen`.
 - Alta, baja y reactivación de usuarios: `/administracion`.
 - Métricas generales (contenedor Looker Studio): `/administracion/metricas`.
+
+El menú principal y el móvil muestran solo Habilidades sin sesión, solo Admin
+con una sesión de rol `ADMIN`, y Habilidades, Intercambios, Disponibilidad y
+Perfil para las demás cuentas autenticadas. Los permisos de las APIs siguen
+controlados por el backend.
 
 Los informes muestran «En preparación» hasta que el equipo de Dashboards entregue
 sus enlaces. Ver [Integración de dashboards](docs/integracion-dashboards.md) para

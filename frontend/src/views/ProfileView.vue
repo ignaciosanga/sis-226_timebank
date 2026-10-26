@@ -12,6 +12,7 @@ import { useAppStore } from '../stores/app'
 import Dialog from '../features/admin/AdminDialog.vue'
 import UcbLogo from '../components/ui/UcbLogo.vue'
 import ReportPanel from '../features/metrics/ReportPanel.vue'
+import CreditsView from './CreditsView.vue'
 import { fullName, initials } from '../features/timebank/format'
 import {
   SKILL_LEVELS,
@@ -21,6 +22,7 @@ import {
 const store = useAppStore()
 const route = useRoute()
 const showingSummary = computed(() => route.name === 'student-metrics')
+const showingProfile = computed(() => route.name === 'profile')
 
 // Publicación de habilidades.
 const open = ref(false)
@@ -204,7 +206,7 @@ async function saveProfile() {
 </script>
 
 <template>
-  <div class="profile-layout" :class="{ 'profile-layout-summary': showingSummary }">
+  <div class="profile-layout" :class="{ 'profile-layout-wide': !showingProfile }">
     <section class="profile-main">
       <article class="panel profile-hero">
         <div class="profile-banner">
@@ -267,10 +269,11 @@ async function saveProfile() {
       <nav class="metrics-navigation profile-tabs" aria-label="Apartados de mi perfil">
         <RouterLink to="/perfil">Mi perfil</RouterLink>
         <RouterLink to="/perfil/resumen">Mi resumen</RouterLink>
+        <RouterLink to="/perfil/creditos">Créditos</RouterLink>
       </nav>
 
       <section
-        v-if="!showingSummary"
+        v-if="showingProfile"
         class="surface-section"
         aria-labelledby="my-skills-title"
       >
@@ -331,10 +334,13 @@ async function saveProfile() {
         </div>
       </section>
 
-      <ReportPanel v-else audience="student" />
+      <ReportPanel v-else-if="showingSummary" audience="student" />
+      <section v-else aria-label="Mis créditos">
+        <CreditsView />
+      </section>
     </section>
 
-    <aside v-if="!showingSummary" class="profile-side">
+    <aside v-if="showingProfile" class="profile-side">
       <section class="profile-academic">
         <h2>Información académica</h2>
 
@@ -377,7 +383,7 @@ async function saveProfile() {
           <strong>{{ store.myAvailability.length }}</strong>
         </RouterLink>
 
-        <RouterLink class="text-link" to="/creditos">
+        <RouterLink class="text-link" to="/perfil/creditos">
           {{ store.account.disponibles }} créditos disponibles
         </RouterLink>
       </section>

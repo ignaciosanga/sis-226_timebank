@@ -53,10 +53,9 @@
 .registration-success > svg { color: var(--success); }
 .registration-success h2, .registration-success p { margin: 0; }
 .registration-success p { color: var(--muted); }
-.skill-category-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
-.skill-category-filters button { min-height: 40px; border: 1px solid transparent; border-radius: 7px; padding: 7px 11px; background: transparent; color: var(--muted); font: inherit; font-size: .9375rem; }
-.skill-category-filters button.active { border-color: #c4d7e4; background: #e1ecf4; color: var(--ucb-blue-dark); font-weight: 600; }
-.skill-category-filters button:hover { background: #e1ecf4; }
+.skill-category-filter { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+.skill-category-filter > span { color: var(--muted); font-size: .9375rem; }
+.skill-category-filter select { width: min(100%, 260px); min-width: 0; color: var(--ink); }
 .skill-offer { padding: 24px; border: 1px solid var(--line); border-radius: var(--radius); background: white; }
 .skill-person, .exchange-person { display: flex; align-items: center; gap: 12px; }
 .skill-person .avatar, .exchange-person .avatar { width: 46px; height: 46px; flex: 0 0 auto; font-size: .875rem; }

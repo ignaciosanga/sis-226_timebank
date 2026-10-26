@@ -38,7 +38,7 @@
 .metrics-topics h2 { margin-bottom: 7px; font-size: 1rem; }
 .metrics-topics p { max-width: 36ch; margin: 0; color: var(--muted); font-size: .9375rem; }
 .profile-hero .profile-actions { flex-wrap: wrap; }
-.profile-layout-summary { grid-template-columns: minmax(0, 1fr); }
+.profile-layout-wide { grid-template-columns: minmax(0, 1fr); }
 .profile-tabs { margin-bottom: 0; }
 @media (max-width: 720px) {
   .metrics-header { align-items: flex-start; flex-direction: column; gap: 18px; }

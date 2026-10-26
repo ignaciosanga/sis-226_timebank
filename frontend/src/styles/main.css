@@ -100,6 +100,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .panel-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .panel-title-row h2 { margin-bottom: 0; font-size: 1.08rem; }
 .linkedin-grid { display: grid; grid-template-columns: 220px minmax(0, 1fr) 250px; align-items: start; gap: 32px; }
+.home-layout { grid-template-columns: 220px minmax(0, 1fr); }
+.home-layout.home-layout-public { grid-template-columns: 220px minmax(0, 1fr) 250px; }
+.public-sidebar { position: sticky; top: 112px; min-width: 0; }
+.public-sidebar h2 { margin-bottom: 16px; font-family: "Sora", sans-serif; font-size: 1.05rem; line-height: 1.5; letter-spacing: -.03em; }
+.public-sidebar p, .public-sidebar li { max-width: 65ch; color: var(--muted); font-size: .9375rem; line-height: 1.7; }
+.public-sidebar p:last-child { margin-bottom: 0; }
+.public-intro { border-top: 4px solid var(--ucb-yellow); padding-top: 22px; }
+.public-about { border-top: 1px solid var(--line); padding-top: 24px; }
+.public-benefits { display: grid; gap: 12px; margin: 20px 0; padding-left: 18px; }
+.public-benefits li::marker { color: var(--ucb-blue); }
+.public-credit-rule { border-top: 1px solid var(--line); padding-top: 18px; }
+.public-sidebar .button { width: 100%; margin-top: 6px; }
 .left-rail, .right-rail { display: grid; min-width: 0; gap: 28px; position: sticky; top: 112px; }
 
 .mini-profile { overflow: hidden; text-align: left; }
@@ -402,6 +414,8 @@ h1, h2, h3 { font-family: "Sora", sans-serif; }
   .mobile-panel a.router-link-exact-active { background: #edf6fa; color: var(--ucb-blue); }
   .mobile-caption { margin: 2px 8px 5px; color: var(--muted); font-size: .75rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
   .linkedin-grid { grid-template-columns: 210px minmax(0, 1fr); }
+  .home-layout.home-layout-public { grid-template-columns: 210px minmax(0, 1fr); }
+  .public-about { grid-column: 1 / -1; position: static; }
   .right-rail { display: none; }
   .courses-layout { grid-template-columns: 270px minmax(0, 1fr); }
   .courses-side { display: none; }
@@ -419,6 +433,9 @@ h1, h2, h3 { font-family: "Sora", sans-serif; }
   .global-search { justify-self: stretch; }.login-button { display: inline-flex; }
   .main-content { padding: 18px 14px 42px; }
   .linkedin-grid { grid-template-columns: 1fr; }
+  .home-layout.home-layout-public { grid-template-columns: minmax(0, 1fr); }
+  .public-sidebar { position: static; }
+  .public-about { grid-column: auto; }
   .left-rail { display: none; }
   .courses-layout { grid-template-columns: 1fr; }
   .calendar-panel { position: static; }
