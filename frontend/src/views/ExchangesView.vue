@@ -12,6 +12,14 @@ const now = useClock()
 const busy = ref(false)
 const tab = ref('solicitudes'), direction = ref('recibidas'), status = ref(''), action = ref(null), reason = ref(''), error = ref('')
 watch(() => route.query.tab, (value) => { tab.value = value === 'reservas' ? 'reservas' : 'solicitudes'; status.value = '' }, { immediate: true })
+watch(() => route.query.calendar, (result) => {
+  if (result === 'created') store.showToast('La reserva se añadió a Google Calendar.')
+  else if (result === 'exists') store.showToast('Esta reserva ya estaba en Google Calendar.', 'info')
+  else return
+  const query = { ...route.query }
+  delete query.calendar
+  router.replace({ name: 'exchanges', query })
+}, { immediate: true })
 const requests = computed(() => store.myRequests.filter((row) => (direction.value === 'recibidas' ? row.id_ofertante === store.user.id : row.id_solicitante === store.user.id) && (!status.value || row.estado === status.value)))
 const reservations = computed(() => store.myReservations.filter((row) => !status.value || row.estado === status.value))
 const other = (row) => store.findUser(row.id_ofertante === store.user.id ? row.id_solicitante : row.id_ofertante)
@@ -22,12 +30,6 @@ function downloadIcs(row) {
   downloadReservationIcs({ reservation: row, skill: store.findSkill(row.id_habilidad)?.nombre ?? 'Intercambio', otherName: fullName(other(row)), role: row.id_ofertante === store.user.id ? 'Compartes tu habilidad' : 'Aprendes una habilidad' })
   store.showToast('Descargamos el archivo .ics. Ábrelo para agregar la sesión a tu calendario.')
 }
-watch(() => route.query.calendar, (result) => {
-  if (result === 'created') store.showToast('Sesión agregada a tu Google Calendar.')
-  else if (result === 'exists') store.showToast('Esta sesión ya estaba en tu Google Calendar.', 'info')
-  else return
-  router.replace({ name: 'exchanges', query: { tab: 'reservas' } })
-}, { immediate: true })
 async function addToGoogle(row) {
   try {
     const { authorizationUrl } = await store.addReservationToGoogleCalendar(row.id_reserva)
