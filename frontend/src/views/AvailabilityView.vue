@@ -1,23 +1,495 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { CalendarDays, Clock3, Plus } from '@lucide/vue'
 import { useAppStore } from '../stores/app'
-import { dateLabel, localDate, timeLabel, toZonedISO } from '../features/timebank/format'
+import Dialog from '../features/admin/AdminDialog.vue'
+import {
+  dateLabel,
+  localDate,
+  timeLabel,
+  toZonedISO,
+} from '../features/timebank/format'
+
 const store = useAppStore()
-const date = ref(''), from = ref(''), to = ref(''), error = ref(''), feedback = ref('')
+
+// Publicación de horarios.
+const date = ref('')
+const from = ref('')
+const to = ref('')
+const error = ref('')
+const feedback = ref('')
+const busy = ref(false)
+
 const today = localDate(new Date().toISOString())
-const slots = computed(() => [...store.myAvailability].sort((a, b) => Date.parse(a.fecha_inicio) - Date.parse(b.fecha_inicio)))
+
+const slots = computed(() =>
+  [...store.myAvailability].sort(
+    (a, b) =>
+      Date.parse(a.fecha_inicio) - Date.parse(b.fecha_inicio),
+  ),
+)
+
 async function submit() {
-  if (!store.requireSession()) return
-  error.value = ''; feedback.value = ''
+  if (busy.value || !store.requireSession()) return
+
+  error.value = ''
+  feedback.value = ''
+
+  const fechaInicio = toZonedISO(date.value, from.value)
+  const fechaFin = toZonedISO(date.value, to.value)
+
+  if (
+    !fechaInicio ||
+    !fechaFin ||
+    Date.parse(fechaFin) <= Date.parse(fechaInicio)
+  ) {
+    error.value = 'La hora final debe ser posterior a la inicial.'
+    return
+  }
+
+  busy.value = true
+
   try {
-    await store.publishAvailability({ fechaInicio: toZonedISO(date.value, from.value), fechaFin: toZonedISO(date.value, to.value) })
+    await store.publishAvailability({
+      fechaInicio,
+      fechaFin,
+    })
+
     feedback.value = 'Tu disponibilidad se publicó.'
-    date.value = ''; from.value = ''; to.value = ''
-  } catch (failure) { error.value = failure.message }
+    date.value = ''
+    from.value = ''
+    to.value = ''
+  } catch (failure) {
+    error.value = failure.message
+  } finally {
+    busy.value = false
+  }
+}
+
+// Edición y desactivación.
+const editOpen = ref(false)
+const deactivateOpen = ref(false)
+const selectedId = ref('')
+const dialogError = ref('')
+
+const edit = reactive({
+  start: '',
+  end: '',
+})
+
+// Convierte UTC a los valores del formulario en horario de La Paz.
+function toInput(value) {
+  const offset = 4 * 60 * 60 * 1000
+  return new Date(Date.parse(value) - offset)
+    .toISOString()
+    .slice(0, 23)
+}
+
+function openEdit(slot) {
+  if (busy.value || !store.requireSession()) return
+
+  selectedId.value = slot.id_disponibilidad
+  edit.start = toInput(slot.fecha_inicio)
+  edit.end = toInput(slot.fecha_fin)
+
+  dialogError.value = ''
+  editOpen.value = true
+}
+
+async function saveEdit() {
+  if (busy.value || !store.requireSession()) return
+
+  dialogError.value = ''
+  feedback.value = ''
+  error.value = ''
+  busy.value = true
+
+  try {
+    // La zona se indica explícitamente para evitar usar
+    // la zona horaria configurada en la computadora.
+    const start = Date.parse(`${edit.start}-04:00`)
+    const end = Date.parse(`${edit.end}-04:00`)
+
+    if (
+      !edit.start ||
+      !edit.end ||
+      !Number.isFinite(start) ||
+      !Number.isFinite(end)
+    ) {
+      throw new Error('Ingresa fechas y horas válidas.')
+    }
+
+    if (end <= start) {
+      throw new Error('El fin debe ser posterior al inicio.')
+    }
+
+    await store.updateAvailability(selectedId.value, {
+      fechaInicio: new Date(start).toISOString(),
+      fechaFin: new Date(end).toISOString(),
+    })
+
+    editOpen.value = false
+    feedback.value = 'El horario se actualizó.'
+  } catch (failure) {
+    dialogError.value = failure.message
+  } finally {
+    busy.value = false
+  }
+}
+
+function askDeactivate(slot) {
+  if (busy.value || !store.requireSession()) return
+
+  selectedId.value = slot.id_disponibilidad
+  dialogError.value = ''
+  deactivateOpen.value = true
+}
+
+async function deactivate() {
+  if (busy.value || !store.requireSession()) return
+
+  dialogError.value = ''
+  feedback.value = ''
+  error.value = ''
+  busy.value = true
+
+  try {
+    await store.deactivateAvailability(selectedId.value)
+
+    deactivateOpen.value = false
+    feedback.value = 'El horario se desactivó.'
+  } catch (failure) {
+    dialogError.value = failure.message
+  } finally {
+    busy.value = false
+  }
 }
 </script>
+
 <template>
-  <header class="workspace-header"><div><h1>Mi disponibilidad</h1><p>Elige cuándo puedes compartir lo que sabes.</p></div><span class="subtle-label"><Clock3 :size="17" />Horario de La Paz (UTC−4)</span></header>
-  <div class="availability-layout"><section class="surface-section" aria-labelledby="availability-form-title"><h2 id="availability-form-title">Publicar un horario</h2><p class="lead-copy">Otros estudiantes podrán solicitar un intervalo dentro de este bloque.</p><form class="flow-form" @submit.prevent="submit"><div class="field"><label for="availability-date">Fecha</label><input id="availability-date" v-model="date" type="date" :min="today" required /></div><div class="account-pair"><div class="field"><label for="availability-from">Desde</label><input id="availability-from" v-model="from" type="time" step="900" required /></div><div class="field"><label for="availability-to">Hasta</label><input id="availability-to" v-model="to" type="time" step="900" required /></div></div><p class="field-hint">Bloques de 15 minutos, hasta 8 horas. El horario debe ser futuro y no coincidir con otro bloque o reserva.</p><p v-if="error" class="notice notice-error" role="alert">{{ error }}</p><p v-if="feedback" class="notice notice-success" role="status">{{ feedback }}</p><button class="button button-primary" type="submit"><Plus :size="18" />Publicar horario</button></form></section><section class="availability-list" aria-labelledby="availability-list-title"><div class="section-heading"><h2 id="availability-list-title">Horarios publicados</h2><span class="subtle-label">{{ slots.length }} bloques</span></div><article v-for="slot in slots" :key="slot.id_disponibilidad" class="availability-row"><span class="date-icon"><CalendarDays :size="24" /></span><div><h3>{{ dateLabel(slot.fecha_inicio) }}</h3><p>{{ timeLabel(slot.fecha_inicio) }}–{{ timeLabel(slot.fecha_fin) }}</p></div><span class="state-label" :class="{ 'state-muted': Date.parse(slot.fecha_fin) <= Date.now() }">{{ Date.parse(slot.fecha_fin) <= Date.now() ? 'Finalizado' : 'Disponible' }}</span></article><div v-if="!slots.length" class="panel empty-state"><CalendarDays :size="28" /><h3>Publica tu primer horario</h3><p>Elige una fecha y una franja en el formulario.</p></div><p class="field-hint">La disponibilidad indica cuándo puedes enseñar. Una reserva se genera después de aceptar una solicitud.</p></section></div>
+  <header class="workspace-header">
+    <div>
+      <h1>Mi disponibilidad</h1>
+      <p>Elige cuándo puedes compartir lo que sabes.</p>
+    </div>
+
+    <span class="subtle-label">
+      <Clock3 :size="17" />
+      Horario de La Paz (UTC−4)
+    </span>
+  </header>
+
+  <p
+    v-if="error"
+    class="notice notice-error"
+    role="alert"
+  >
+    {{ error }}
+  </p>
+
+  <p
+    v-if="feedback"
+    class="notice notice-success"
+    role="status"
+  >
+    {{ feedback }}
+  </p>
+
+  <div class="availability-layout">
+    <section
+      class="surface-section"
+      aria-labelledby="availability-form-title"
+    >
+      <h2 id="availability-form-title">
+        Publicar un horario
+      </h2>
+
+      <p class="lead-copy">
+        Otros estudiantes podrán solicitar un intervalo dentro
+        de este bloque.
+      </p>
+
+      <form class="flow-form" @submit.prevent="submit">
+        <div class="field">
+          <label for="availability-date">Fecha</label>
+          <input
+            id="availability-date"
+            v-model="date"
+            type="date"
+            :min="today"
+            required
+            :disabled="busy"
+          />
+        </div>
+
+        <div class="account-pair">
+          <div class="field">
+            <label for="availability-from">Desde</label>
+            <input
+              id="availability-from"
+              v-model="from"
+              type="time"
+              step="900"
+              required
+              :disabled="busy"
+            />
+          </div>
+
+          <div class="field">
+            <label for="availability-to">Hasta</label>
+            <input
+              id="availability-to"
+              v-model="to"
+              type="time"
+              step="900"
+              required
+              :disabled="busy"
+            />
+          </div>
+        </div>
+
+        <p class="field-hint">
+          El fin debe ser posterior al inicio. Tus horarios
+          activos no pueden superponerse.
+        </p>
+
+        <button
+          class="button button-primary"
+          type="submit"
+          :disabled="busy"
+        >
+          <Plus :size="18" />
+          {{ busy ? 'Procesando…' : 'Publicar horario' }}
+        </button>
+      </form>
+    </section>
+
+    <section
+      class="availability-list"
+      aria-labelledby="availability-list-title"
+    >
+      <div class="section-heading">
+        <h2 id="availability-list-title">
+          Horarios publicados
+        </h2>
+
+        <span class="subtle-label">
+          {{ slots.length }} bloques
+        </span>
+      </div>
+
+      <article
+        v-for="slot in slots"
+        :key="slot.id_disponibilidad"
+        class="availability-row"
+      >
+        <span class="date-icon">
+          <CalendarDays :size="24" />
+        </span>
+
+        <div>
+          <h3>{{ dateLabel(slot.fecha_inicio) }}</h3>
+
+          <p>
+            {{ timeLabel(slot.fecha_inicio) }}–
+            <template
+              v-if="
+                localDate(slot.fecha_inicio) !==
+                localDate(slot.fecha_fin)
+              "
+            >
+              {{ dateLabel(slot.fecha_fin) }},
+            </template>
+            {{ timeLabel(slot.fecha_fin) }}
+          </p>
+        </div>
+
+        <span
+          class="state-label"
+          :class="{
+            'state-muted':
+              Date.parse(slot.fecha_fin) <= Date.now(),
+          }"
+        >
+          {{
+            Date.parse(slot.fecha_fin) <= Date.now()
+              ? 'Finalizado'
+              : 'Disponible'
+          }}
+        </span>
+
+        <div
+          v-if="store.authenticated"
+          class="slot-actions"
+        >
+          <button
+            class="button button-outline"
+            type="button"
+            :disabled="busy"
+            :aria-label="`Editar horario del ${dateLabel(
+              slot.fecha_inicio,
+            )} a las ${timeLabel(slot.fecha_inicio)}`"
+            @click="openEdit(slot)"
+          >
+            Editar
+          </button>
+
+          <button
+            class="button button-outline"
+            type="button"
+            :disabled="busy"
+            :aria-label="`Desactivar horario del ${dateLabel(
+              slot.fecha_inicio,
+            )} a las ${timeLabel(slot.fecha_inicio)}`"
+            @click="askDeactivate(slot)"
+          >
+            Desactivar
+          </button>
+        </div>
+      </article>
+
+      <div
+        v-if="!slots.length"
+        class="panel empty-state"
+      >
+        <CalendarDays :size="28" />
+        <h3>Publica tu primer horario</h3>
+        <p>Elige una fecha y una franja en el formulario.</p>
+      </div>
+
+      <p class="field-hint">
+        Una reserva se genera después de aceptar una solicitud.
+        Los horarios que respaldan reservas activas pueden
+        tener restricciones para su edición o desactivación.
+      </p>
+    </section>
+  </div>
+
+  <Dialog
+    :open="editOpen"
+    labelledby="edit-availability-title"
+    describedby="edit-availability-description"
+    @close="!busy && (editOpen = false)"
+  >
+    <h2 id="edit-availability-title">Editar horario</h2>
+
+    <p id="edit-availability-description">
+      Actualiza el intervalo en horario de La Paz (UTC−4).
+    </p>
+
+    <form class="flow-form" @submit.prevent="saveEdit">
+      <div class="field">
+        <label for="edit-start">
+          Fecha y hora de inicio
+        </label>
+
+        <input
+          id="edit-start"
+          v-model="edit.start"
+          type="datetime-local"
+          step="0.001"
+          required
+          :disabled="busy"
+          data-autofocus
+        />
+      </div>
+
+      <div class="field">
+        <label for="edit-end">
+          Fecha y hora de fin
+        </label>
+
+        <input
+          id="edit-end"
+          v-model="edit.end"
+          type="datetime-local"
+          step="0.001"
+          required
+          :disabled="busy"
+        />
+      </div>
+
+      <p
+        v-if="dialogError"
+        class="notice notice-error"
+        role="alert"
+      >
+        {{ dialogError }}
+      </p>
+
+      <footer class="admin-dialog-actions">
+        <button
+          class="button button-outline"
+          type="button"
+          :disabled="busy"
+          @click="editOpen = false"
+        >
+          Cancelar
+        </button>
+
+        <button
+          class="button button-primary"
+          type="submit"
+          :disabled="busy"
+        >
+          {{ busy ? 'Guardando…' : 'Guardar cambios' }}
+        </button>
+      </footer>
+    </form>
+  </Dialog>
+
+  <Dialog
+    :open="deactivateOpen"
+    labelledby="deactivate-title"
+    describedby="deactivate-description"
+    @close="!busy && (deactivateOpen = false)"
+  >
+    <h2 id="deactivate-title">Desactivar horario</h2>
+
+    <p id="deactivate-description">
+      ¿Quieres dejar de ofrecer este horario? Dejará de aparecer
+      entre tus horarios disponibles.
+    </p>
+
+    <p
+      v-if="dialogError"
+      class="notice notice-error"
+      role="alert"
+    >
+      {{ dialogError }}
+    </p>
+
+    <footer class="admin-dialog-actions">
+      <button
+        class="button button-outline"
+        type="button"
+        :disabled="busy"
+        @click="deactivateOpen = false"
+      >
+        Cancelar
+      </button>
+
+      <button
+        class="button button-primary"
+        type="button"
+        :disabled="busy"
+        @click="deactivate"
+      >
+        {{ busy ? 'Desactivando…' : 'Desactivar horario' }}
+      </button>
+    </footer>
+  </Dialog>
 </template>
+
+<style scoped>
+.availability-row {
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.slot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+</style>

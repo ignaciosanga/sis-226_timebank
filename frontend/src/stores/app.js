@@ -168,6 +168,20 @@ export const useAppStore = defineStore('app', {
       await timebank.publishAvailability(input)
       this.ownAvailability = await timebank.getMyAvailability()
     },
+    async removeSkill(skillId) {
+      await timebank.removeSkill(skillId)
+      this.ownSkills = await timebank.getMySkills()
+    },
+
+    async updateAvailability(id, input) {
+      await timebank.updateAvailability(id, input)
+      this.ownAvailability = await timebank.getMyAvailability()
+    },
+
+    async deactivateAvailability(id) {
+      await timebank.deactivateAvailability(id)
+      this.ownAvailability = await timebank.getMyAvailability()
+    },
     async sendExchange(input) {
       await timebank.sendExchange(input)
       await this.loadSessionData()
