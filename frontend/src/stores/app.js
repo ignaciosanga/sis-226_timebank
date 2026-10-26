@@ -50,7 +50,7 @@ export const useAppStore = defineStore('app', {
     async init() {
       onUnauthorized(() => this.expireSession())
       await this.loadCatalogs()
-      if (!getToken()) return
+      if (!getToken()) return this.loadCommunity()
       try {
         this.profile = await auth.getProfile()
         this.authenticated = true
@@ -112,7 +112,15 @@ export const useAppStore = defineStore('app', {
       await this.loadSessionData()
       this.showToast(`Hola, ${this.profile.nombre}. Sesión iniciada.`)
     },
-    register(payload) { return auth.register(payload) },
+    async register(payload) {
+      await auth.register(payload)
+      try {
+        await this.login(payload.correo, payload.password)
+        return true
+      } catch {
+        return false
+      }
+    },
     async updateProfile(changes) {
       this.profile = await auth.updateProfile(changes)
       this.showToast('Perfil actualizado.')
@@ -121,11 +129,13 @@ export const useAppStore = defineStore('app', {
     logout() {
       auth.logout()
       this.resetSession()
+      this.loadCommunity()
       this.showToast('Cerraste sesión.', 'info')
     },
     expireSession() {
       auth.logout()
       this.resetSession()
+      this.loadCommunity()
       this.loginOpen = true
       this.showToast('Tu sesión expiró. Vuelve a ingresar.', 'info')
     },
