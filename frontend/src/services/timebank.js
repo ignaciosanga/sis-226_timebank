@@ -32,3 +32,19 @@ export const cancelReservation = (id, motivo) => post(`/reservations/${id}/cance
 
 export const getAccount = () => apiRequest('/credits/me')
 export const getMovements = () => apiRequest('/credits/me/movements')
+
+export const removeSkill = (skillId) =>
+  apiRequest(`/users/me/skills/${skillId}`, {
+    method: 'DELETE',
+  })
+
+export const updateAvailability = (id, { fechaInicio, fechaFin }) =>
+  apiRequest(`/availability/${id}`, {
+    method: 'PATCH',
+    body: { fechaInicio, fechaFin },
+  })
+
+export const deactivateAvailability = (id) =>
+  apiRequest(`/availability/${id}`, {
+    method: 'DELETE',
+  })
