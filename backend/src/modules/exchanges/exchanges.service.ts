@@ -483,6 +483,30 @@ export class ExchangesService {
       return this.reservationView(state, record);
     });
   }
+  async getReservationCalendarDetails(actor: string, id: string) {
+    const reservation = await this.getReservation(actor, id);
+    const [skill, requester, provider, requestDescription] =
+      await Promise.all([
+        this.skills.requireActive(reservation.id_habilidad),
+        this.users.repository.findById(reservation.id_solicitante),
+        this.users.repository.findById(reservation.id_ofertante),
+        this.persistence.read((state) =>
+          reservation.id_solicitud
+            ? (state.requestMetadata.get(reservation.id_solicitud)
+                ?.descripcion ?? '')
+            : '',
+        ),
+      ]);
+    const fullName = (user: { nombre: string; apellido: string } | null) =>
+      user ? `${user.nombre} ${user.apellido}` : 'Estudiante';
+    return {
+      reservation,
+      skillName: skill.nombre,
+      requesterName: fullName(requester),
+      providerName: fullName(provider),
+      requestDescription,
+    };
+  }
   confirmReservation(actor: string, id: string, key?: string) {
     return this.operation(
       actor,
