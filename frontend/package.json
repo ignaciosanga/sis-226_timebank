@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test src/features/admin/user-management.test.js src/features/auth/account-validation.test.js src/features/timebank/demo-actions.test.js src/features/timebank/ics.test.js src/features/metrics/report-config.test.js src/features/metrics/overview-format.test.js tests/admin-api.integration.test.js",
+    "test": "node --test src/features/offers/offer-form.test.js tests/offer-form.integration.test.js src/features/admin/user-management.test.js src/features/auth/account-validation.test.js src/features/timebank/demo-actions.test.js src/features/timebank/ics.test.js src/features/metrics/report-config.test.js src/features/metrics/overview-format.test.js tests/admin-api.integration.test.js",
     "test:admin-api": "node --test tests/admin-api.integration.test.js",
     "test:admin": "node --test src/features/admin/user-management.test.js"
   },

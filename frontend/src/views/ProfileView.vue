@@ -248,9 +248,9 @@ async function saveProfile() {
 
             <RouterLink
               class="button button-outline"
-              to="/disponibilidad"
+              :to="{ name: 'home', query: { ofertar: '1' } }"
             >
-              Publicar disponibilidad
+              Ofertar una habilidad
             </RouterLink>
 
             <button

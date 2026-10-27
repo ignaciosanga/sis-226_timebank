@@ -16,7 +16,7 @@ const navItems = computed(() => {
   return [
     ...publicItems,
     { label: 'Intercambios', to: '/intercambios', icon: ArrowLeftRight, badge: true },
-    { label: 'Disponibilidad', to: '/disponibilidad', icon: CalendarDays },
+    { label: 'Horarios', to: '/disponibilidad', icon: CalendarDays },
     { label: 'Perfil', to: '/perfil', icon: UserRound },
   ]
 })

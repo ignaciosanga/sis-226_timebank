@@ -16,7 +16,8 @@ npm run dev
 
 - Habilidades: `/`.
 - Registro de estudiantes con validaciones: `/registro`.
-- Disponibilidad: `/disponibilidad`.
+- Horarios existentes (consulta, edición y desactivación): `/disponibilidad`.
+- Preparación de ofertas: botón amarillo en Inicio; acceso desde Perfil mediante `/?ofertar=1`.
 - Solicitudes: `/intercambios`.
 - Reservas: `/intercambios?tab=reservas` (o `/reservas`).
 - Créditos y movimientos: Perfil → Créditos, en `/perfil/creditos`. La ruta anterior `/creditos` redirige a esta pestaña.
@@ -26,9 +27,15 @@ npm run dev
 - Métricas generales (contenedor Looker Studio): `/administracion/metricas`.
 
 El menú principal y el móvil muestran solo Habilidades sin sesión, solo Admin
-con una sesión de rol `ADMIN`, y Habilidades, Intercambios, Disponibilidad y
+con una sesión de rol `ADMIN`, y Habilidades, Intercambios, Horarios y
 Perfil para las demás cuentas autenticadas. Los permisos de las APIs siguen
 controlados por el backend.
+
+El formulario de ofertas permite seleccionar una habilidad propia y revisar su
+horario. **Todavía no publica:** espera el contrato que asocie habilidad y horario.
+Se retiró la creación de horarios generales de Horarios; se conservan las acciones
+sobre bloques existentes. Ver [Ofertas y entrega a APIs](docs/ofertas-habilidades.md)
+para conocer la integración pendiente antes de habilitar la publicación.
 
 Los informes muestran «En preparación» hasta que el equipo de Dashboards entregue
 sus enlaces. Ver [Integración de dashboards](docs/integracion-dashboards.md) para

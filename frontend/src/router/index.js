@@ -11,7 +11,7 @@ const router = createRouter({
   routes: [
     { path: '/', name: 'home', component: HomeView, meta: { title: 'Habilidades' } },
     { path: '/registro', name: 'register', component: RegisterView, meta: { title: 'Crear cuenta' } },
-    { path: '/disponibilidad', name: 'availability', component: AvailabilityView, meta: { title: 'Mi disponibilidad' } },
+    { path: '/disponibilidad', name: 'availability', component: AvailabilityView, meta: { title: 'Mis horarios' } },
     { path: '/intercambios', name: 'exchanges', component: ExchangesView, meta: { title: 'Mis intercambios' } },
     { path: '/creditos', redirect: '/perfil/creditos' },
     { path: '/perfil', name: 'profile', component: ProfileView, meta: { title: 'Mi perfil' } },
