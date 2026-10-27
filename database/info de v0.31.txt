@@ -1,0 +1,3 @@
+la base de datos fue generada a partir de la informacion que dio el scrum master de este grupo
+para mejorar y ver posibles errores se uso deepseek
+el archivo json fue generado por deepseek tambien

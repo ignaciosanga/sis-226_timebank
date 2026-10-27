@@ -1,0 +1,22 @@
+{
+  "name": "nexo-u-mockup",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test src/features/admin/user-management.test.js src/features/auth/account-validation.test.js src/features/timebank/demo-actions.test.js src/features/timebank/ics.test.js src/features/metrics/report-config.test.js src/features/metrics/overview-format.test.js tests/admin-api.integration.test.js",
+    "test:admin-api": "node --test tests/admin-api.integration.test.js",
+    "test:admin": "node --test src/features/admin/user-management.test.js"
+  },
+  "dependencies": {
+    "@lucide/vue": "^1.55.0",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "pinia": "^3.0.3",
+    "vite": "^7.1.7",
+    "vue": "^3.5.22",
+    "vue-router": "^4.6.3"
+  }
+}

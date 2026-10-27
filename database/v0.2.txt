@@ -1,0 +1,187 @@
+
+// CAMBIO : tabla nueva para catálogo de carreras y facultades
+Table CARRERAS {
+  id_carrera uuid [pk]
+  nombre varchar
+  facultad varchar
+  estado varchar
+}
+
+// CAMBIO: tabla nueva para catálogo de categorías de habilidades
+Table CATEGORIAS {
+  id_categoria uuid [pk]
+  nombre varchar [unique]
+  estado varchar
+}
+
+// ==========================================
+// TABLAS EXISTENTES ACTUALIZADAS
+// ==========================================
+
+Table USUARIOS {
+  id_usuario uuid [pk]
+  nombre varchar
+  apellido varchar
+  correo varchar [unique]
+  password_hash varchar // CAMBIO: agregado para inicio de sesión
+  id_carrera uuid // CAMBIO: agregado para carrera/facultad del estudiante
+  fecha_registro timestamptz [default: `now()`] // CAMBIO: agregado y con zona horaria
+  ultimo_acceso timestamptz // CAMBIO: agregado y con zona horaria
+  estado varchar
+}
+
+Table ROLES {
+  id_rol uuid [pk]
+  nombre varchar [unique]
+}
+
+Table USUARIO_ROLES {
+  id_usuario uuid [pk]
+  id_rol uuid [pk]
+}
+
+Table HABILIDADES {
+  id_habilidad uuid [pk]
+  nombre varchar [unique]
+  id_categoria uuid // CAMBIO: agregado para categoría de habilidad
+  estado varchar
+}
+
+Table USUARIO_HABILIDADES {
+  id_usuario uuid [pk]
+  id_habilidad uuid [pk]
+  nivel varchar
+}
+
+Table DISPONIBILIDADES {
+  id_disponibilidad uuid [pk]
+  id_usuario uuid
+  // CAMBIO se reemplazan fecha/hora_inicio/hora_fin por rango TIMESTAMPTZ
+  fecha_inicio timestamptz
+  fecha_fin timestamptz
+  estado varchar
+}
+
+Table SOLICITUDES_INTERCAMBIO {
+  id_solicitud uuid [pk]
+  id_solicitante uuid
+  id_ofertante uuid
+  id_habilidad uuid
+  // CAMBIO: se reemplaza fecha_propuesta por fecha_inicio_propuesta y fecha_fin_propuesta
+  fecha_inicio_propuesta timestamptz
+  fecha_fin_propuesta timestamptz
+  creditos_requeridos int
+  // CAMBIO: estados claros: solicitada, aceptada, rechazada, cancelada
+  estado varchar [note: 'solicitada | aceptada | rechazada | cancelada']
+  created_at timestamptz [default: `now()`] // CAMBIO: agregado
+  respondida_at timestamptz // CAMBIO: agregado
+}
+
+Table RESERVAS {
+  id_reserva uuid [pk]
+  id_solicitud uuid [unique] // CAMBIO: único, una solicitud genera una sola reserva
+  id_solicitante uuid
+  id_ofertante uuid
+  id_habilidad uuid
+  fecha_inicio timestamptz // CAMBIO  TIMESTAMPTZ
+  fecha_fin timestamptz // CAMBIO :  TIMESTAMPTZ
+  creditos int
+  // CAMBIO: estados claros: confirmada, completada, cancelada
+  estado varchar [note: 'confirmada | completada | cancelada']
+  created_at timestamptz [default: `now()`] // CAMBIO: agregado
+  completed_at timestamptz // CAMBIO: agregado
+  cancelled_at timestamptz // CAMBIO: agregado
+}
+
+Table CONFIRMACIONES {
+  id_confirmacion uuid [pk]
+  id_reserva uuid
+  id_usuario uuid
+  fecha_confirmacion timestamptz [default: `now()`] // CAMBIO : TIMESTAMPTZ
+
+  indexes {
+    // CAMBIO: restricción única por reserva y usuario para evitar confirmación duplicada
+    (id_reserva, id_usuario) [unique]
+  }
+}
+
+Table CANCELACIONES {
+  id_cancelacion uuid [pk]
+  id_reserva uuid
+  id_usuario uuid
+  motivo varchar
+  fecha_cancelacion timestamptz [default: `now()`] // CAMBIO : TIMESTAMPTZ
+}
+
+Table CUENTAS_CREDITO {
+  id_cuenta uuid [pk]
+  id_usuario uuid [unique] // CAMBIO: único, un usuario tiene una sola cuenta
+  saldo int [note: 'CHECK (saldo >= 0)'] // CAMBIO: saldo nunca negativo
+}
+
+Table MOVIMIENTOS_CREDITO {
+  id_movimiento uuid [pk]
+  id_cuenta uuid
+  id_reserva uuid
+  tipo varchar
+  cantidad int
+  saldo_anterior int
+  saldo_posterior int
+  created_at timestamptz [default: `now()`] // CAMBIO: agregado
+  descripcion varchar // CAMBIO: agregado
+}
+
+Table TRANSFERENCIAS_CREDITO {
+  id_transferencia uuid [pk]
+  id_reserva uuid [unique] // CAMBIO: único, evita transferencia duplicada
+  id_emisor uuid
+  id_receptor uuid
+  cantidad int
+  estado varchar
+  fecha_transferencia timestamptz [default: `now()`] // CAMBIO: agregado
+  motivo varchar // CAMBIO: agregado
+}
+
+// ==========================================
+// RELACIONES / LLAVES FORÁNEAS
+// ==========================================
+
+// CAMBIO: nuevas relaciones para carreras y categorías
+Ref: CARRERAS.id_carrera < USUARIOS.id_carrera
+Ref: CATEGORIAS.id_categoria < HABILIDADES.id_categoria
+
+// Roles y habilidades de usuarios
+Ref: USUARIOS.id_usuario < USUARIO_ROLES.id_usuario
+Ref: ROLES.id_rol < USUARIO_ROLES.id_rol
+Ref: USUARIOS.id_usuario < USUARIO_HABILIDADES.id_usuario
+Ref: HABILIDADES.id_habilidad < USUARIO_HABILIDADES.id_habilidad
+
+// Disponibilidades
+Ref: USUARIOS.id_usuario < DISPONIBILIDADES.id_usuario
+
+// Solicitudes de intercambio
+Ref: USUARIOS.id_usuario < SOLICITUDES_INTERCAMBIO.id_solicitante
+Ref: USUARIOS.id_usuario < SOLICITUDES_INTERCAMBIO.id_ofertante
+Ref: HABILIDADES.id_habilidad < SOLICITUDES_INTERCAMBIO.id_habilidad
+
+// Reservas
+Ref: SOLICITUDES_INTERCAMBIO.id_solicitud < RESERVAS.id_solicitud
+Ref: USUARIOS.id_usuario < RESERVAS.id_solicitante
+Ref: USUARIOS.id_usuario < RESERVAS.id_ofertante
+Ref: HABILIDADES.id_habilidad < RESERVAS.id_habilidad
+
+// Confirmaciones y cancelaciones
+Ref: RESERVAS.id_reserva < CONFIRMACIONES.id_reserva
+Ref: USUARIOS.id_usuario < CONFIRMACIONES.id_usuario
+Ref: RESERVAS.id_reserva < CANCELACIONES.id_reserva
+Ref: USUARIOS.id_usuario < CANCELACIONES.id_usuario
+
+// Sistema de créditos
+Ref: USUARIOS.id_usuario < CUENTAS_CREDITO.id_usuario
+Ref: CUENTAS_CREDITO.id_cuenta < MOVIMIENTOS_CREDITO.id_cuenta
+Ref: RESERVAS.id_reserva < MOVIMIENTOS_CREDITO.id_reserva
+
+// Transferencias de créditos
+Ref: RESERVAS.id_reserva < TRANSFERENCIAS_CREDITO.id_reserva
+Ref: USUARIOS.id_usuario < TRANSFERENCIAS_CREDITO.id_emisor
+Ref: USUARIOS.id_usuario < TRANSFERENCIAS_CREDITO.id_receptor
