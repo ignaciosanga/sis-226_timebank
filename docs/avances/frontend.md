@@ -33,6 +33,11 @@ visitantes sin sesión. Se mantiene la identidad visual UCB.
 - Sin sesión, la columna izquierda explica el intercambio de habilidades y
   ofrece acceso al registro; la derecha contiene Sobre nosotros. La distribución
   se adapta a escritorio, tableta y móvil.
+- Con sesión, Inicio muestra a la derecha las habilidades propias con su nivel
+  y los créditos disponibles, retenidos y totales. Se reutilizan `mySkills` y
+  `account` del store, con enlaces a Perfil y Créditos. En pantallas pequeñas
+  estos bloques se sitúan debajo del catálogo. Se comprobó el estado sin
+  habilidades, los valores del saldo y su actualización mediante renderizado Vue.
 
 ### Rutas y compatibilidad
 

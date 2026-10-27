@@ -67,7 +67,29 @@ const sending = ref(false)
       <div v-else-if="store.communityLoading" class="skeleton-list" aria-busy="true" aria-label="Cargando habilidades"><div v-for="n in 3" :key="n" class="panel skeleton-card"><span class="skeleton skeleton-avatar"></span><span class="skeleton skeleton-line skeleton-short"></span><span class="skeleton skeleton-line skeleton-title"></span><span class="skeleton skeleton-line"></span></div></div>
       <div v-else class="panel empty-state"><Search :size="28" /><h2>No encontramos habilidades</h2><p>Prueba otro término o explora todas las áreas.</p><button class="button button-outline" type="button" @click="query = ''; category = ''">Limpiar filtros</button></div>
     </section>
-    <aside v-if="!store.authenticated" class="public-sidebar public-about" aria-labelledby="public-about-title">
+    <aside v-if="store.authenticated" class="account-sidebar" aria-label="Mis habilidades y créditos">
+      <section aria-labelledby="home-skills-title">
+        <h2 id="home-skills-title">Mis habilidades</h2>
+        <ul v-if="store.mySkills.length" class="account-skill-list">
+          <li v-for="skill in store.mySkills" :key="skill.id_habilidad">
+            <strong>{{ store.findSkill(skill.id_habilidad)?.nombre ?? skill.habilidad?.nombre ?? 'Habilidad compartida' }}</strong>
+            <span>{{ levelLabel(skill.nivel) }}</span>
+          </li>
+        </ul>
+        <p v-else>Aún no compartes habilidades. Agrega lo que sabes en tu perfil.</p>
+        <RouterLink class="account-sidebar-link" to="/perfil">Gestionar habilidades</RouterLink>
+      </section>
+      <section aria-labelledby="home-credits-title">
+        <h2 id="home-credits-title">Mis créditos</h2>
+        <dl class="account-credit-list">
+          <div class="account-credit-available"><dt>Disponibles</dt><dd>{{ store.account.disponibles }}</dd></div>
+          <div><dt>Retenidos</dt><dd>{{ store.account.creditos_retenidos }}</dd></div>
+          <div><dt>Saldo total</dt><dd>{{ store.account.saldo }}</dd></div>
+        </dl>
+        <RouterLink class="account-sidebar-link" to="/perfil/creditos">Ver movimientos</RouterLink>
+      </section>
+    </aside>
+    <aside v-else class="public-sidebar public-about" aria-labelledby="public-about-title">
       <h2 id="public-about-title">Sobre nosotros</h2>
       <p>Nexo U es un proyecto universitario pensado para la comunidad de la Universidad Católica Boliviana en La Paz.</p>
       <p>Buscamos que los estudiantes puedan apoyarse, compartir sus conocimientos y aprender unos de otros a través del intercambio de tiempo.</p>

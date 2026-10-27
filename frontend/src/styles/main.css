@@ -100,7 +100,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .panel-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .panel-title-row h2 { margin-bottom: 0; font-size: 1.08rem; }
 .linkedin-grid { display: grid; grid-template-columns: 220px minmax(0, 1fr) 250px; align-items: start; gap: 32px; }
-.home-layout { grid-template-columns: 220px minmax(0, 1fr); }
 .home-layout.home-layout-public { grid-template-columns: 220px minmax(0, 1fr) 250px; }
 .public-sidebar { position: sticky; top: 112px; min-width: 0; }
 .public-sidebar h2 { margin-bottom: 16px; font-family: "Sora", sans-serif; font-size: 1.05rem; line-height: 1.5; letter-spacing: -.03em; }
@@ -112,6 +111,22 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .public-benefits li::marker { color: var(--ucb-blue); }
 .public-credit-rule { border-top: 1px solid var(--line); padding-top: 18px; }
 .public-sidebar .button { width: 100%; margin-top: 6px; }
+.account-sidebar { display: grid; gap: 28px; min-width: 0; position: sticky; top: 112px; }
+.account-sidebar section { border-top: 1px solid var(--line); padding-top: 22px; }
+.account-sidebar h2 { margin-bottom: 18px; font-size: 1.05rem; line-height: 1.5; }
+.account-sidebar p { color: var(--muted); font-size: .9375rem; line-height: 1.7; }
+.account-skill-list { display: grid; gap: 16px; list-style: none; padding: 0; margin: 0 0 20px; }
+.account-skill-list li { display: grid; gap: 3px; overflow-wrap: anywhere; }
+.account-skill-list strong { font-size: .9375rem; font-weight: 600; }
+.account-skill-list span { color: var(--muted); font-size: .875rem; }
+.account-sidebar-link { display: inline-block; color: var(--ucb-blue); font-size: .9375rem; font-weight: 600; }
+.account-sidebar-link:hover { text-decoration: underline; }
+.account-credit-list { display: grid; gap: 12px; margin: 0 0 20px; }
+.account-credit-list > div { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+.account-credit-list dt { color: var(--muted); font-size: .9375rem; }
+.account-credit-list dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.account-credit-available { padding-bottom: 12px; border-bottom: 1px solid var(--line-soft); }
+.account-credit-available dd { color: var(--ucb-blue); font-family: "Sora", sans-serif; font-size: 1.75rem; }
 .left-rail, .right-rail { display: grid; min-width: 0; gap: 28px; position: sticky; top: 112px; }
 
 .mini-profile { overflow: hidden; text-align: left; }
@@ -416,6 +431,7 @@ h1, h2, h3 { font-family: "Sora", sans-serif; }
   .linkedin-grid { grid-template-columns: 210px minmax(0, 1fr); }
   .home-layout.home-layout-public { grid-template-columns: 210px minmax(0, 1fr); }
   .public-about { grid-column: 1 / -1; position: static; }
+  .account-sidebar { grid-column: 1 / -1; position: static; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .right-rail { display: none; }
   .courses-layout { grid-template-columns: 270px minmax(0, 1fr); }
   .courses-side { display: none; }
@@ -436,6 +452,7 @@ h1, h2, h3 { font-family: "Sora", sans-serif; }
   .home-layout.home-layout-public { grid-template-columns: minmax(0, 1fr); }
   .public-sidebar { position: static; }
   .public-about { grid-column: auto; }
+  .account-sidebar { grid-column: auto; grid-template-columns: minmax(0, 1fr); }
   .left-rail { display: none; }
   .courses-layout { grid-template-columns: 1fr; }
   .calendar-panel { position: static; }
