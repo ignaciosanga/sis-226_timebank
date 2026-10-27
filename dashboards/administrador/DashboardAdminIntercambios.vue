@@ -29,7 +29,7 @@
 import { ref } from 'vue'
 
 // URL oficial del informe interactivo de Looker Studio
-const embedUrl = ref('https://datastudio.google.com/embed/reporting/1bac8147-8dd5-43b1-9aed-2db46c8e5392/page/p_g27hvlxo8d')
+const embedUrl = ref('https://lookerstudio.google.com/embed/reporting/a8f8857e-67b0-40ae-a773-32afcaf3f1bf/page/p_11luxd2o8d')
 </script>
 
 <style scoped>
