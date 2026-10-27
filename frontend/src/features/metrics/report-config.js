@@ -1,7 +1,6 @@
-// Paste only the src URL supplied by Dashboards, never an entire iframe tag.
 export const REPORT_URLS = {
-  student: import.meta.env?.VITE_LOOKER_STUDENT_URL || '',
-  admin: import.meta.env?.VITE_LOOKER_ADMIN_URL || '',
+  student: import.meta.env?.VITE_LOOKER_STUDENT_URL || 'https://lookerstudio.google.com/embed/reporting/67e3aee0-28d4-4d25-9dc9-dc9b45f74b2a/page/11BCG',
+  admin: import.meta.env?.VITE_LOOKER_ADMIN_URL || 'https://lookerstudio.google.com/embed/reporting/a8f8857e-67b0-40ae-a773-32afcaf3f1bf/page/p_11luxd2o8d',
 }
 
 export function lookerEmbedUrl(value) {
