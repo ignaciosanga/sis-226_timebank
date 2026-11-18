@@ -21,7 +21,8 @@ export function validateOfferForm(form, ownSkills, now = Date.now()) {
   if (!errors.date && !errors.from && !errors.to) {
     const start = toZonedISO(form.date, form.from)
     const end = toZonedISO(form.date, form.to)
-    if (Date.parse(end) <= Date.parse(start)) errors.to = 'La hora final debe ser posterior a la inicial.'
+    if (Date.parse(end) - Date.parse(start) > 8 * 3600000) errors.to = 'La tutoría puede durar hasta 8 horas.'
+    else if (Date.parse(end) <= Date.parse(start)) errors.to = 'La hora final debe ser posterior a la inicial.'
   }
   return errors
 }

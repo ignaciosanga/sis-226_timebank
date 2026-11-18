@@ -103,7 +103,7 @@ async function render(component) {
 function fill(view) {
   // Fix the date relative to the test clock, so this stays a future-day test.
   const date = new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10)
-  Object.assign(view.form, { skillId: 'excel', date, from: '16:00', to: '18:00' })
+  Object.assign(view.form, { skillId: 'excel', date, from: '16:00', to: '18:00', titulo: 'Excel para proyectos', descripcion: 'Practicaremos tablas y gráficos con ejercicios.', costoCreditos: '7' })
 }
 
 test('the offer entry is visible only to student sessions and navigation says Horarios', async () => {
@@ -112,10 +112,10 @@ test('the offer entry is visible only to student sessions and navigation says Ho
   assert.match(html, />Horarios</)
   store.authenticated = false
   html = await render(Home)
-  assert.doesNotMatch(html, /aria-haspopup="dialog"/)
+  assert.doesNotMatch(html, /Ofertar una habilidad/)
   store.authenticated = true; store.profile.roles = ['ADMIN']
   html = await render(Home)
-  assert.doesNotMatch(html, /aria-haspopup="dialog"/)
+  assert.doesNotMatch(html, /Ofertar una habilidad/)
   assert.equal(calls.length, 0)
 })
 
@@ -125,11 +125,36 @@ test('review keeps the selected published skill and dates without any HTTP call 
   assert.deepEqual(view.ownSkills.value.map(skill => skill.id_habilidad), ['excel'])
   fill(view); await view.review()
   assert.equal(view.draft.value.skillId, 'excel')
+  assert.equal(view.creditTotal.value, 7)
   assert.match(view.draft.value.fechaInicio, /T20:00:00\.000Z$/)
   assert.equal(calls.length, 0)
   props.open = false; await flush(); props.open = true; await flush()
   assert.equal(view.draft.value, null)
   assert.equal(view.form.date, '')
+  assert.equal(view.creditTotal.value, null)
+})
+
+test('the tutor chooses the total independently of duration and invalid prices block review', async () => {
+  const view = setup(OfferSetup)
+  assert.equal(view.creditTotal.value, null)
+  fill(view)
+  assert.equal(view.creditTotal.value, 7)
+  view.form.to = '16:15'
+  assert.equal(view.creditTotal.value, 7)
+  await view.review()
+  assert.equal(view.draft.value.costoCreditos, 7)
+  view.form.costoCreditos = '19'
+  assert.equal(view.draft.value, null)
+  await view.review()
+  assert.equal(view.draft.value.costoCreditos, 19)
+  for (const price of ['', '0', '-2', '2.5', 'invalid', '9007199254740992']) {
+    view.form.costoCreditos = price
+    await view.review()
+    assert.equal(view.creditTotal.value, null, price)
+    assert.equal(view.draft.value, null)
+    assert.ok(view.errors.value.costoCreditos)
+  }
+  assert.equal(calls.length, 0)
 })
 
 test('an unowned skill or invalid interval cannot reach review', async () => {
@@ -151,7 +176,7 @@ test('withdrawing the skill invalidates review and ending the session closes the
   assert.deepEqual(emissions, [['close']]); assert.equal(calls.length, 0)
 })
 
-test('the profile shortcut opens the draft once without losing the catalog search', async () => {
+test('the direct offer link opens the draft once without losing the catalog search', async () => {
   await router.push('/?ofertar=1&q=excel#catalogo')
   const view = setup(HomeSetup, {})
   await flush()
@@ -166,7 +191,7 @@ test('Horarios has no publishing form and preserves edit and deactivate through 
   const html = await render(Schedules)
   assert.match(html, /<h1[^>]*>Mis horarios<\/h1>/)
   assert.doesNotMatch(html, /Publicar un horario|availability-date|Publicar horario/)
-  assert.match(html, /Editar/); assert.match(html, /Desactivar/)
+  assert.match(html, /Calendario de horarios e intercambios/); assert.match(html, /Solicitudes enviadas/); assert.match(html, /Reservas confirmadas/)
   allowScheduleRequests = true
   const view = setup(ScheduleSetup, {})
   view.openEdit(slot)

@@ -12,9 +12,9 @@ Entrega de Frontend del 27 de octubre de 2026, en `frontend/ofertar-habilidad`.
 - **Publicar oferta permanece deshabilitado.** Se avisa desde el inicio del
   formulario que no se guardan datos ni se publica nada. El borrador vive solo
   en la ventana y se descarta al cerrarla.
-- El enlace de Perfil abre este mismo formulario en Inicio mediante
-  `/?ofertar=1`. Al abrirlo se consume ese parámetro, conservando la búsqueda y
-  el fragmento de la URL.
+- Las ofertas se preparan desde **Habilidades**. En Perfil, **Añadir habilidad**
+  abre el pensum para elegir una materia y nivel, sin preparar horarios.
+  El enlace directo `/?ofertar=1` se conserva para compatibilidad.
 - El menú de escritorio y móvil cambia Disponibilidad por **Horarios**. Se
   mantienen la ruta `/disponibilidad`, su nombre `availability` y la vista
   `AvailabilityView.vue` para conservar los accesos existentes.
