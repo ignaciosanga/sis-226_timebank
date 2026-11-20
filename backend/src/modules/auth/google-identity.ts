@@ -5,12 +5,15 @@ import {
 } from '@nestjs/common';
 
 export interface GoogleIdentity {
+  subject: string;
   correo: string;
   nombre: string;
   apellido: string;
 }
 
 type TokenInfo = {
+  sub?: string;
+  hd?: string;
   aud?: string;
   iss?: string;
   email?: string;
@@ -33,6 +36,7 @@ export async function verifyGoogleIdToken(
   try {
     response = await fetcher(
       `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
+      { signal: AbortSignal.timeout(5000) },
     );
   } catch {
     throw new ServiceUnavailableException(
@@ -41,13 +45,34 @@ export async function verifyGoogleIdToken(
   }
   if (!response.ok)
     throw new UnauthorizedException('La sesión de Google no es válida');
-  const info = (await response.json()) as TokenInfo;
+  let info: TokenInfo;
+  try {
+    const body: unknown = await response.json();
+    if (!body || typeof body !== 'object' || Array.isArray(body))
+      throw new Error('Invalid tokeninfo');
+    info = body as TokenInfo;
+  } catch {
+    throw new UnauthorizedException('La sesión de Google no es válida');
+  }
   if (info.aud !== clientId || !ISSUERS.includes(info.iss ?? ''))
     throw new UnauthorizedException('La sesión de Google no es válida');
-  if (!info.exp || Number(info.exp) * 1000 <= now)
+  if (
+    !Number.isFinite(Number(info.exp)) ||
+    !info.exp ||
+    Number(info.exp) * 1000 <= now
+  )
     throw new UnauthorizedException('La sesión de Google expiró');
   if (info.email_verified !== true && info.email_verified !== 'true')
     throw new UnauthorizedException('Google no verificó este correo');
+  if (
+    typeof info.sub !== 'string' ||
+    !info.sub ||
+    info.sub.length > 255 ||
+    info.hd !== 'ucb.edu.bo'
+  )
+    throw new UnauthorizedException(
+      'Google no acredita la identidad institucional',
+    );
   const correo = String(info.email ?? '')
     .trim()
     .toLowerCase();
@@ -55,8 +80,15 @@ export async function verifyGoogleIdToken(
     throw new ForbiddenException('Solo se permiten cuentas @ucb.edu.bo');
   const usuario = correo.split('@')[0]!;
   return {
+    subject: info.sub,
     correo,
-    nombre: info.given_name?.trim() || usuario,
-    apellido: info.family_name?.trim() || usuario,
+    nombre:
+      typeof info.given_name === 'string'
+        ? info.given_name.trim() || usuario
+        : usuario,
+    apellido:
+      typeof info.family_name === 'string'
+        ? info.family_name.trim() || usuario
+        : usuario,
   };
 }

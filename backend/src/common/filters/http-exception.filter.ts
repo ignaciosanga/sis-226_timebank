@@ -24,8 +24,25 @@ export class HttpExceptionFilter implements ExceptionFilter {
       status >= 500
         ? 'Servicio temporalmente no disponible'
         : 'Solicitud rechazada';
+    let code: string | undefined;
     if (exception instanceof HttpException && status < 500) {
       const body = exception.getResponse();
+      if (
+        typeof body === 'object' &&
+        body !== null &&
+        'code' in body &&
+        typeof body.code === 'string' &&
+        [
+          'EMAIL_VERIFICATION_REQUIRED',
+          'OFFER_PRICE_FLOW_PENDING',
+          'OFFER_AVAILABILITY_MANAGED',
+          'OFFER_MISMATCH',
+          'OFFER_NOT_AVAILABLE',
+          'OFFER_SNAPSHOT_REQUIRED',
+          'DECIMAL_SETTLEMENT_PENDING',
+        ].includes(body.code)
+      )
+        code = body.code;
       if (typeof body === 'string') message = body;
       else if (typeof body === 'object' && body !== null && 'message' in body) {
         const candidate: unknown = body.message;
@@ -43,6 +60,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     response.status(status).json({
       statusCode: status,
       message,
+      ...(code ? { code } : {}),
       timestamp: new Date().toISOString(),
     });
   }

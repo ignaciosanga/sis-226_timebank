@@ -28,7 +28,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       typeof payload !== 'object' ||
       !('sub' in payload) ||
       typeof payload.sub !== 'string' ||
-      !payload.sub
+      !payload.sub ||
+      !('purpose' in payload) ||
+      payload.purpose !== 'session' ||
+      'action' in payload
     ) {
       throw new UnauthorizedException('Autenticacion invalida');
     }

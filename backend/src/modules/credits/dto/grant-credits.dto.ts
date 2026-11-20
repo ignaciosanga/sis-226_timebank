@@ -15,11 +15,11 @@ export class GrantCreditsDto {
   @ApiProperty({
     example: '8',
     description:
-      'Creditos enteros: 1 credito = 15 minutos; carga de desarrollo',
+      'Creditos como texto, entero o una decima; las bases con esquema entero siguen rechazando fracciones. Carga de desarrollo.',
   })
   @IsString()
   @MaxLength(16)
-  @Matches(/^\d+$/)
+  @Matches(/^\d+(?:\.\d)?$/)
   amount!: string;
   @ApiProperty({ maxLength: 500 })
   @Transform(({ value }: { value: unknown }) =>

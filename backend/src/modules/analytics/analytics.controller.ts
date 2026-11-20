@@ -54,8 +54,12 @@ export class AnalyticsController {
   }
 
   @Get('credits')
-  @ApiOkResponse({ description: 'Créditos como strings enteros' })
-  @ApiOperation({ summary: 'Créditos transferidos, liberados, bonos y retenidos' })
+  @ApiOkResponse({
+    description: 'Creditos exactos como strings enteros o con una decima',
+  })
+  @ApiOperation({
+    summary: 'Créditos transferidos, liberados, bonos y retenidos',
+  })
   credits(@Query() query: AnalyticsQueryDto) {
     return this.analytics.credits(query);
   }

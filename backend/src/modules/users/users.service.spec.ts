@@ -17,11 +17,12 @@ describe('UsersService', () => {
       id: 'usuario-test',
       nombre: 'Ana',
       apellido: 'Perez',
-      correo: 'ana@example.test',
+      correo: 'ana@ucb.edu.bo',
       idCarrera: '30000000-0000-4000-8000-000000000001',
       semestre: 3,
       rol: 'Estudiante',
       roles: ['ESTUDIANTE'],
+      estado: 'Activo',
     });
   });
 

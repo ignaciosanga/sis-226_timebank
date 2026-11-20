@@ -80,6 +80,16 @@ export class MemoryAvailabilityRepository implements AvailabilityRepository {
         'La disponibilidad respalda una reserva activa; cancela la reserva antes de quitar su horario',
       );
   }
+  private assertNotManagedByOffer(state: ExchangeState, id: string): void {
+    if (
+      [...state.offers.values()].some((offer) => offer.id_disponibilidad === id)
+    )
+      throw new ConflictException({
+        code: 'OFFER_AVAILABILITY_MANAGED',
+        message:
+          'El horario pertenece a una oferta y no se puede modificar desde disponibilidad',
+      });
+  }
   create(userId: string, input: AvailabilityInterval): Promise<Availability> {
     return this.persistence.transaction((state) => {
       const interval = availabilityInterval(
@@ -110,6 +120,7 @@ export class MemoryAvailabilityRepository implements AvailabilityRepository {
         record.estado === AvailabilityStatus.CANCELADO
       )
         return null;
+      this.assertNotManagedByOffer(state, id);
       if (patch.fecha_inicio === undefined && patch.fecha_fin === undefined)
         throw new BadRequestException('Debes indicar fechaInicio o fechaFin');
       const interval = availabilityInterval(
@@ -127,6 +138,7 @@ export class MemoryAvailabilityRepository implements AvailabilityRepository {
     return this.persistence.transaction((state) => {
       const record = state.availability.get(id);
       if (!record || record.id_usuario !== userId) return false;
+      this.assertNotManagedByOffer(state, id);
       this.assertReservationsCovered(state, id);
       state.availability.set(id, {
         ...record,
