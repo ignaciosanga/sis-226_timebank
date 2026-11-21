@@ -101,7 +101,7 @@ export interface ExchangeState {
   creditSchema: 'integer' | 'decimal';
   offers: Map<string, TutoringOffer>;
   banners: Map<string, TutoringBanner>;
-  /** Lectura de calificaciones existentes; fase 3 no escribe reseñas. */
+  /** Opiniones inmutables; escritura por el solicitante de una reserva completada. */
   ratings: Map<string, OfferRating>;
   verifications: Map<string, EmailVerification>;
   users: Map<string, StoredUser>;

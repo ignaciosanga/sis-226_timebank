@@ -4,6 +4,9 @@ import {
   Get,
   Headers,
   Post,
+  Put,
+  Param,
+  ParseUUIDPipe,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -19,7 +22,7 @@ import {
   ApiForbiddenResponse,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { ListQueryDto } from '../../common/dto/list-query.dto';
+import { OffersQueryDto } from './dto/offers-query.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { IdempotencyHeader } from '../exchanges/exchanges.controller';
 import { PublicUser } from '../users/user.types';
@@ -37,8 +40,35 @@ export class TutoringController {
       'Catalogo publico de ofertas vigentes; page, limit y search opcional',
   })
   @ApiOkResponse({ type: OfferPage })
-  list(@Query() query: ListQueryDto) {
+  list(@Query() query: OffersQueryDto) {
     return this.tutoring.list(query);
+  }
+
+  @Get(':id')
+  @ApiOkResponse({ type: OfferResponse })
+  @ApiOperation({
+    summary: 'Detalle público de una oferta activa, sin restricción de carrera',
+  })
+  detail(@Param('id', ParseUUIDPipe) id: string) {
+    return this.tutoring.detail(id);
+  }
+
+  @Put(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @IdempotencyHeader()
+  @ApiOkResponse({ type: OfferResponse })
+  @ApiOperation({
+    summary:
+      'Reemplazar contenido de oferta propia; conserva snapshots y bloquea cambios de horario contratado',
+  })
+  update(
+    @CurrentUser() user: PublicUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() input: CreateOfferDto,
+    @Headers('idempotency-key') key?: string,
+  ) {
+    return this.tutoring.update(user.id, id, input, key);
   }
 
   @Post()

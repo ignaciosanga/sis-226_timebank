@@ -3,6 +3,8 @@ import { RecordStatus } from '../../common/enums/record-status.enum';
 import { PaginationMeta } from '../../common/dto/list-query.dto';
 
 export class Skill {
+  @ApiProperty({ required: false, nullable: true, example: 'SIS-111' })
+  codigo?: string | null;
   @ApiProperty({ format: 'uuid' })
   id_habilidad!: string;
   @ApiProperty()

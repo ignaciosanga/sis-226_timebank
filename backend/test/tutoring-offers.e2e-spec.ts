@@ -142,6 +142,35 @@ describe('Ofertas con precio publicado por HTTP (memoria; correo simulado)', () 
     await app?.close();
   });
 
+  it('HU-05: detalle, filtros y edición propia conservan saldos y replay', async () => {
+    const created = await post(tutor, input()).expect(201);
+    const id = created.body.id_oferta as string;
+    await api().get(`/tutoring/offers/${id}`).expect(200);
+    const filtered = await api()
+      .get(`/tutoring/offers?skillId=${skillId}&excludeTutorId=${tutor.id}`)
+      .expect(200);
+    expect(filtered.body.data).toEqual([]);
+    const before = await finances();
+    const key = randomUUID();
+    const update = (actor: Actor) =>
+      api()
+        .put(`/tutoring/offers/${id}`)
+        .auth(actor.token, { type: 'bearer' })
+        .set('Idempotency-Key', key)
+        .send(input({ titulo: 'Enfoque actualizado', costoCreditos: '5' }));
+    await update(student).expect(403);
+    const edited = await update(tutor).expect(200);
+    expect((await update(tutor).expect(200)).body).toEqual(edited.body);
+    expect(edited.body.costo_creditos).toBe('5');
+    expect(await finances()).toEqual(before);
+  });
+
+  it('HU-05: una materia inexistente devuelve 400 sin escrituras parciales', async () => {
+    const before = await counts();
+    await post(tutor, input({ skillId: randomUUID() })).expect(400);
+    expect(await counts()).toEqual(before);
+  });
+
   it('publica 45 minutos por 3.7, permite descubrirla y no modifica saldos ni movimientos', async () => {
     const before = await finances();
     const response = await post(tutor, input()).expect(201);
@@ -229,7 +258,7 @@ describe('Ofertas con precio publicado por HTTP (memoria; correo simulado)', () 
     const pending = await register(false);
     await post(pending, input()).expect(401);
     await post(tutor, input({ skillId: otherSkillId })).expect(403);
-    await post(tutor, input({ skillId: randomUUID() })).expect(404);
+    await post(tutor, input({ skillId: randomUUID() })).expect(400);
     await post(tutor, input({ nivel: 'Avanzado' })).expect(409);
     await post(tutor, input({ titulo: '' })).expect(400);
     await post(tutor, input({ titulo: 'a'.repeat(101) })).expect(400);

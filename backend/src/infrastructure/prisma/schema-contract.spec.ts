@@ -101,6 +101,35 @@ describe('Contrato Prisma del modelo optimizado elegido', () => {
     );
     actual.delete('OFERTAS');
     actual.delete('BANNERS_TUTORIA');
+    const academic: Record<string, Record<string, string>> = {
+      CURRICULOS: { codigo: 'varchar', nombre: 'varchar', id_carrera: 'uuid' },
+      AREAS_ACADEMICAS: { codigo: 'varchar', nombre: 'varchar' },
+      MATERIAS_ACADEMICAS: {
+        curriculum: 'varchar',
+        codigo: 'varchar',
+        nombre: 'varchar',
+        semestre: 'int',
+        area: 'varchar',
+        externo: 'boolean',
+        id_habilidad: 'uuid',
+      },
+      PRERREQUISITOS_ACADEMICOS: {
+        curriculum: 'varchar',
+        codigo: 'varchar',
+        requisito: 'varchar',
+      },
+      PROGRESO_ACADEMICO: {
+        id_usuario: 'uuid',
+        curriculum: 'varchar',
+        codigo: 'varchar',
+        estado: 'varchar',
+        updated_at: 'timestamptz',
+      },
+    };
+    for (const [table, columns] of Object.entries(academic)) {
+      expect(actual.get(table)).toEqual(new Map(Object.entries(columns)));
+      actual.delete(table);
+    }
     const user = actual.get('USUARIOS')!;
     for (const [column, type] of Object.entries({
       cuenta_previa: 'boolean',

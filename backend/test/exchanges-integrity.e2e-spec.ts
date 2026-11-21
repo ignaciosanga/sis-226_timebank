@@ -551,7 +551,8 @@ describe('Reservas y creditos atomicos por HTTP con memoria y JWT reales', () =>
     expect(canceled.body.estado).toBe('Cancelada');
     const retry = await post(requester, path, body, key).expect(200);
     expect(retry.body).toEqual(canceled.body);
-    await post(requester, path, body).expect(200);
+    // HU-08: solo la misma clave reproduce éxito; otra operación es un conflicto.
+    await post(requester, path, body).expect(409);
     expect(await wallet(requester)).toMatchObject({
       saldo: '8',
       creditos_retenidos: '0',

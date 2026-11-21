@@ -233,6 +233,11 @@ export class PrismaExchangeRepository implements ExchangeRepository {
       for (const [id, row] of next)
         if (!same(previous.get(id), row)) await save(row);
     };
+    await write(before.ratings, after.ratings, (row) => {
+      if (before.ratings.has(row.id_calificacion))
+        throw new ConflictException('Las opiniones publicadas son inmutables');
+      return tx.calificacion.create({ data: row });
+    });
     await write(before.users, after.users, (row) => {
       if (before.creditSchema === 'decimal') return persistDecimalUser(tx, row);
       const integerRow = {

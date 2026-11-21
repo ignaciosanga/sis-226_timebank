@@ -12,7 +12,7 @@ export function configureApp(app: INestApplication): void {
       .get('CORS_ORIGINS', { infer: true })
       .split(',')
       .map((origin) => origin.trim()),
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key'],
     credentials: false,
   });

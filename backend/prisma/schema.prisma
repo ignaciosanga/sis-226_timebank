@@ -13,6 +13,7 @@ datasource db {
 }
 
 model Carrera {
+  curriculos Curriculo[]
   id_carrera String    @id @default(uuid()) @db.Uuid
   nombre     String    @db.VarChar
   facultad   String    @db.VarChar
@@ -34,6 +35,7 @@ model Categoria {
 }
 
 model Usuario {
+  progresoAcademico ProgresoAcademico[]
   id_usuario          String               @id @default(uuid()) @db.Uuid
   nombre              String               @db.VarChar
   apellido            String               @db.VarChar
@@ -90,6 +92,7 @@ model VerificacionCorreo {
 }
 
 model Habilidad {
+  materia      MateriaAcademica?
   id_habilidad String                 @id @default(uuid()) @db.Uuid
   nombre       String                 @unique @db.VarChar
   id_categoria String                 @db.Uuid
@@ -293,4 +296,63 @@ model Auditoria {
   @@index([id_usuario, created_at])
   @@index([entidad, entidad_id])
   @@map("AUDITORIA")
+}
+
+// Propuesta académica; SQL incremental en prisma/proposals, pendiente de BD.
+model Curriculo {
+  codigo String @id @db.VarChar(32)
+  nombre String @db.VarChar(120)
+  id_carrera String @db.Uuid
+  carrera Carrera @relation(fields: [id_carrera], references: [id_carrera], onDelete: Restrict)
+  materias MateriaAcademica[]
+  @@map("CURRICULOS")
+}
+
+model AreaAcademica {
+  codigo String @id @db.VarChar(32)
+  nombre String @db.VarChar(120)
+  materias MateriaAcademica[]
+  @@map("AREAS_ACADEMICAS")
+}
+
+model MateriaAcademica {
+  curriculum String @db.VarChar(32)
+  codigo String @db.VarChar(16)
+  nombre String @db.VarChar(160)
+  semestre Int
+  area String @db.VarChar(32)
+  externo Boolean @default(false)
+  id_habilidad String? @unique @db.Uuid
+  plan Curriculo @relation(fields: [curriculum], references: [codigo], onDelete: Restrict)
+  areaAcademica AreaAcademica @relation(fields: [area], references: [codigo], onDelete: Restrict)
+  habilidad Habilidad? @relation(fields: [id_habilidad], references: [id_habilidad], onDelete: Restrict)
+  requisitos PrerrequisitoAcademico[] @relation("MateriaRequisitos")
+  requeridaPor PrerrequisitoAcademico[] @relation("RequisitoMateria")
+  progreso ProgresoAcademico[]
+  @@id([curriculum, codigo])
+  @@index([curriculum, semestre, area])
+  @@map("MATERIAS_ACADEMICAS")
+}
+
+model PrerrequisitoAcademico {
+  curriculum String @db.VarChar(32)
+  codigo String @db.VarChar(16)
+  requisito String @db.VarChar(16)
+  materia MateriaAcademica @relation("MateriaRequisitos", fields: [curriculum, codigo], references: [curriculum, codigo], onDelete: Restrict)
+  previo MateriaAcademica @relation("RequisitoMateria", fields: [curriculum, requisito], references: [curriculum, codigo], onDelete: Restrict)
+  @@id([curriculum, codigo, requisito])
+  @@map("PRERREQUISITOS_ACADEMICOS")
+}
+
+model ProgresoAcademico {
+  id_usuario String @db.Uuid
+  curriculum String @db.VarChar(32)
+  codigo String @db.VarChar(16)
+  estado String @db.VarChar(16)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  usuario Usuario @relation(fields: [id_usuario], references: [id_usuario], onDelete: Restrict)
+  materia MateriaAcademica @relation(fields: [curriculum, codigo], references: [curriculum, codigo], onDelete: Restrict)
+  @@id([id_usuario, curriculum, codigo])
+  @@index([curriculum, codigo, estado])
+  @@map("PROGRESO_ACADEMICO")
 }

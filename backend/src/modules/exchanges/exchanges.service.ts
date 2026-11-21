@@ -738,7 +738,7 @@ export class ExchangesService {
         const admin = user.roles.includes(Role.ADMIN);
         if (!admin) this.requireParticipant(record, actor);
         if (record.estado === ReservationStatus.CANCELADA)
-          return this.reservationView(state, record);
+            throw new ConflictException('La reserva ya fue cancelada; solo se admite el replay con la misma Idempotency-Key');
         if (record.estado === ReservationStatus.COMPLETADA)
           throw new ConflictException(
             'Una reserva completada no se puede cancelar',
