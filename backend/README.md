@@ -1,6 +1,85 @@
 # Banco de Tiempo Universitario — Backend v0.4.0
 
+## Continuación académica — puntos 6 y 7 del plan (20/11/2026)
+
+**Resultado de la revisión completa del 21/11:** todavía no se cumplen todos los
+criterios. Pasan 261 unitarias y las 10 suites HTTP verificadas (188 casos, con
+repeticiones de las suites corregidas), Prisma/build/lint. PostgreSQL, integración
+académica y reglas económicas siguen pendientes. Ver la
+[matriz de cumplimiento y evidencias](docs/verification-2026-11-21.md).
+
+Rama **`feat/backend-academico-reputacion-parcial3`**, creada exactamente desde
+`8fe275bc465b061e9df651dfc870ef293b3870f7` de `feat/backend-nucleo-transaccional-parcial3`.
+Se admite Node **>=26.8.2 <27** (entorno actual **26.13.1**), npm **11** (actual **11.20.0**), NestJS **11.2.7**, TypeScript **5.9**,
+Prisma **7.10.1**, PostgreSQL **16** y las dependencias del lockfile.
+
+Esta continuación implementa el catálogo de 49 materias, prerrequisitos, Mi ruta,
+opiniones, reputación descriptiva, resumen personal y consultas ADMIN para Command
+Center y economía. El [contrato académico y diccionario KPI](docs/academic-integration.md)
+detalla endpoints, filtros, privacidad, decisiones pendientes y validación real.
+
+**Antes de usar el pensum persistido:** la ampliación de Prisma tiene su SQL en
+[`prisma/proposals/academic-reputation.sql`](prisma/proposals/academic-reputation.sql).
+Está preparada para revisión de BD, **fuera de las seis migraciones oficiales**.
+`db:migrate` por sí solo todavía no la aplica. No ejecutar `db push`, no alterar
+las migraciones anteriores ni aplicarla en una base compartida sin coordinación.
+El catálogo anterior, las reservas y las opiniones funcionan sobre el esquema base;
+Mi ruta e indicadores académicos responden **503** hasta integrar el esquema y su carga.
+`schema.prisma` incluye el modelo propuesto; no interpretar esa presencia como una migración ejecutada.
+
+Después de que BD apruebe e incorpore la propuesta como nueva migración, en una
+base local aislada ya configurada según este README:
+
+```powershell
+npm.cmd run prisma:generate
+npm.cmd run prisma:validate
+npm.cmd run db:migrate
+$env:LOCAL_DEVELOPMENT_SEED = 'true'
+npm.cmd run db:seed:academic
+Remove-Item Env:LOCAL_DEVELOPMENT_SEED
+npm.cmd run build
+```
+
+La semilla requiere una única carrera activa «Ingeniería de Sistemas». Conserva
+UUID, nombres, estados y categorías de habilidades existentes; genera códigos
+mediante su relación con materias. Imprime el listado real de equivalencias.
+Ante duplicados ambiguos revierte toda la carga para revisión, sin fusionar
+historiales. MAT-030 no crea habilidad; LIBRE-I y LIBRE-II no se cargan.
+
+Las opiniones exigen `Idempotency-Key`, solicitante autenticado y clase completada
+después de su fin. Reutilizan `CALIFICACIONES` y la transacción existente, sin
+mover créditos. Knowledge Score, bonos y cancelación injustificada siguen pendientes
+del PO. No activar flags del frontend sin verificación conjunta.
+
+**Validación de esta continuación:** ver el registro al final de
+[academic-integration.md](docs/academic-integration.md). No se arrancó la API,
+Docker ni PostgreSQL, ni se aplicaron migraciones durante la implementación.
+Los resultados históricos de fases 1–6 que siguen abajo pertenecen al commit base
+y no certifican estas funcionalidades nuevas. La tabla «Dónde continuar» describe
+el estado heredado; para el estado de esta rama usar esta sección y su contrato.
+
 ## Inicio rápido para el equipo
+
+### Actualización de historias de usuario — 21/11/2026
+
+HU-05 añade `GET /tutoring/offers/:id`, filtros `skillId`, `codigo`, `tutorId`,
+`excludeTutorId` y `PUT /tutoring/offers/:id` (mismo DTO completo que POST y
+`Idempotency-Key`). Solo edita el tutor propietario; no cambia materia ni los
+montos pactados anteriormente. No permite mover horarios con solicitudes activas
+o reservas vinculadas. Se publica por UUID resuelto en GET /skills; un código
+académico nunca reemplaza un UUID. El banner debe provenir de la carga propia.
+
+HU-08 conserva motivo, actor, fecha, horas de anticipación y Liberacion atómica.
+Misma clave reproduce la cancelación; una clave nueva sobre una reserva Cancelada
+devuelve 409. Analytics distingue cancelaciones registradas de injustificadas.
+
+**HU-06 y la clasificación/penalización de HU-08 dependen de la migración de BD**:
+el documento no incluye fórmulas, factores, umbral ni importes. No se inventaron.
+El flujo decimal y los snapshots heredados se conservan; la tarifa histórica no
+se presenta como economía dinámica terminada. Ver el
+[estado por historia y contrato pendiente](docs/sprint3-user-stories.md).
+El nuevo reparto asigna opiniones a APIs y semilla oficial a BD; el trabajo
+académico anterior se conserva como propuesta para coordinar su integración.
 
 La entrega de las seis fases está en **`feat/backend-nucleo-transaccional-parcial3`**, repositorio `ignaciosanga/sis-226_timebank`. Crea tu trabajo académico desde esa rama. El [contrato de integración](docs/frontend-integration.md) describe cuerpos, permisos y códigos; el [cierre de fase 6](docs/fase6-cierre-integracion-demo.md) distingue lo comprobado de los pendientes de integración.
 
@@ -28,7 +107,7 @@ Si esa rama académica ya existe, usa `git switch feat/backend-academico-reputac
 ### 2. Requisitos reales
 
 - Git y Docker Desktop con motor Linux y Docker Compose v2.
-- **Node.js 26.8.2** y **npm 11**; esta entrega se comprobó con npm **11.19.1**. `package.json` y el lockfile fijan Node 26.8.2 y admiten npm `>=11 <12`.
+- **Node.js >=26.8.2 <27** y **npm >=11 <12**. La base se comprobó con Node 26.8.2/npm 11.19.1; esta continuación usa Node 26.13.1/npm 11.20.0. `package.json` y lockfile mantienen el mismo rango; Docker conserva su imagen fijada en 26.8.2.
 - `npm ci` instala las versiones del lockfile: NestJS **11.2.7**, TypeScript **5.9.3**, Prisma/cliente/adaptador **7.10.1** y Nodemailer **10.6.1**. No instales Prisma globalmente.
 - Compose usa PostgreSQL **16.15-alpine**; el correo local opcional usa Mailpit **v1.27.8**. El Dockerfile usa `node:26.8.2-bookworm-slim`.
 

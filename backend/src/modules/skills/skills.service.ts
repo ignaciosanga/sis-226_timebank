@@ -30,6 +30,13 @@ export class SkillsService {
     await this.categories.requireActive(skill.id_categoria);
     return skill;
   }
+  async academicCodes(): Promise<Map<string, string>> {
+    return new Map(
+      (await this.repository.findAll())
+        .filter((skill) => skill.codigo)
+        .map((skill) => [skill.id_habilidad, skill.codigo!]),
+    );
+  }
   async create(input: CreateSkillDto) {
     await this.categories.requireActive(input.categoryId);
     return this.repository.create(input.nombre, input.categoryId);

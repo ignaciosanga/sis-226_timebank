@@ -3,7 +3,7 @@ import {
   ReservationStatus,
 } from '../exchanges/exchange.types';
 
-/** Lectura de CALIFICACIONES; esta fase no incorpora escritura de opiniones. */
+/** Proyección de CALIFICACIONES compartida por ofertas y opiniones. */
 export interface OfferRating {
   id_calificacion: string;
   id_reserva: string;

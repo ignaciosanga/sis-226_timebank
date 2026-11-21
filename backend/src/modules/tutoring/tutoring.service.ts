@@ -8,7 +8,8 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomUUID } from 'node:crypto';
-import { ListQueryDto, paginate } from '../../common/dto/list-query.dto';
+import { paginate } from '../../common/dto/list-query.dto';
+import { OffersQueryDto } from './dto/offers-query.dto';
 import {
   AvailabilityStatus,
   UserStatus,
@@ -20,7 +21,11 @@ import {
   EXCHANGE_REPOSITORY,
   ExchangeRepository,
 } from '../exchanges/exchange.repository';
-import { ExchangeState, ReservationStatus } from '../exchanges/exchange.types';
+import {
+  ExchangeState,
+  RequestStatus,
+  ReservationStatus,
+} from '../exchanges/exchange.types';
 import { SkillsService } from '../skills/skills.service';
 import { TutoringBannerService } from './banners/banner.service';
 import { CreateOfferDto } from './dto/create-offer.dto';
@@ -107,7 +112,15 @@ export class TutoringService {
           );
         return structuredClone(prior.result);
       }
-      const skill = await this.skills.requireActive(input.skillId);
+      const skill = await this.skills
+        .requireActive(input.skillId)
+        .catch((error: unknown) => {
+          if (error instanceof NotFoundException)
+            throw new BadRequestException(
+              'La materia debe existir y estar activa en el catálogo',
+            );
+          throw error;
+        });
       const own = state.userSkills.get(`${actor}:${input.skillId}`);
       if (!own)
         throw new ForbiddenException(
@@ -187,8 +200,142 @@ export class TutoringService {
     });
   }
 
-  async list(query: ListQueryDto) {
+  async update(actor: string, id: string, input: CreateOfferDto, key?: string) {
+    if (!key || !/^[A-Za-z0-9._:-]{16,128}$/.test(key))
+      throw new BadRequestException(
+        'Idempotency-Key requerida: 16 a 128 caracteres',
+      );
+    const price = parseOfferPrice(input.costoCreditos);
+    const interval = availabilityInterval(input.fechaInicio, input.fechaFin);
+    validateReservationInterval(interval.fecha_inicio, interval.fecha_fin);
+    const payload = [
+      id,
+      input.skillId,
+      input.nivel,
+      input.titulo.trim(),
+      input.descripcion.trim(),
+      price,
+      interval.fecha_inicio.toISOString(),
+      interval.fecha_fin.toISOString(),
+      input.bannerUrl ?? null,
+    ];
+    const fingerprint = createHash('sha256')
+      .update(JSON.stringify(payload))
+      .digest('hex');
+    return this.persistence.transaction(async (state) => {
+      const offer = state.offers.get(id);
+      if (!offer) throw new NotFoundException('Oferta no encontrada');
+      if (
+        offer.id_tutor !== actor ||
+        state.users.get(actor)?.estado !== UserStatus.ACTIVO
+      )
+        throw new ForbiddenException(
+          'Solo el tutor activo propietario puede editar',
+        );
+      const scope = `${actor}:tutoring-offer-update:${key}`;
+      const prior = state.idempotency.get(scope);
+      if (prior) {
+        if (prior.fingerprint !== fingerprint)
+          throw new ConflictException(
+            'Idempotency-Key ya utilizada con otro contenido',
+          );
+        return structuredClone(prior.result);
+      }
+      if (input.skillId !== offer.id_habilidad)
+        throw new BadRequestException(
+          'La materia de una oferta existente no puede cambiar',
+        );
+      const skill = await this.skills.requireActive(input.skillId);
+      if (!state.userSkills.has(`${actor}:${input.skillId}`))
+        throw new ForbiddenException('La materia debe pertenecer al perfil');
+      if (
+        state.userSkills.get(`${actor}:${input.skillId}`)!.nivel !== input.nivel
+      )
+        throw new ConflictException('Nivel incompatible con el perfil');
+      const slot = state.availability.get(offer.id_disponibilidad);
+      if (
+        !slot ||
+        offer.estado !== 'Activa' ||
+        slot.fecha_inicio.getTime() <= Date.now()
+      )
+        throw new ConflictException('Solo se editan ofertas activas futuras');
+      if (interval.fecha_inicio.getTime() <= Date.now())
+        throw new BadRequestException('El horario debe ser futuro');
+      const changed =
+        slot.fecha_inicio.getTime() !== interval.fecha_inicio.getTime() ||
+        slot.fecha_fin.getTime() !== interval.fecha_fin.getTime();
+      if (changed) {
+        if (
+          slot.estado !== AvailabilityStatus.DISPONIBLE ||
+          [...state.requests.values()].some(
+            (r) =>
+              (r.id_oferta === id ||
+                state.requestMetadata.get(r.id_solicitud)?.availabilityId ===
+                  slot.id_disponibilidad) &&
+              (r.estado === RequestStatus.PENDIENTE ||
+                r.estado === RequestStatus.ACEPTADA),
+          )
+        )
+          throw new ConflictException(
+            'No se cambia el horario con solicitudes o reservas vinculadas',
+          );
+        const overlaps = (start: Date, end: Date) =>
+          interval.fecha_inicio < end && interval.fecha_fin > start;
+        if (
+          [...state.availability.values()].some(
+            (s) =>
+              s.id_disponibilidad !== slot.id_disponibilidad &&
+              s.id_usuario === actor &&
+              s.estado !== AvailabilityStatus.CANCELADO &&
+              overlaps(s.fecha_inicio, s.fecha_fin),
+          ) ||
+          [...state.reservations.values()].some(
+            (r) =>
+              r.estado === ReservationStatus.CONFIRMADA &&
+              (r.id_solicitante === actor || r.id_ofertante === actor) &&
+              overlaps(r.fecha_inicio, r.fecha_fin),
+          )
+        )
+          throw new ConflictException('Horario superpuesto');
+      }
+      const bannerId = await this.banners.validateAndAttach(
+        state,
+        actor,
+        input.bannerUrl,
+        id,
+      );
+      if (offer.id_banner && offer.id_banner !== bannerId) {
+        const old = state.banners.get(offer.id_banner);
+        if (old) old.attached_offer_id = null;
+      }
+      Object.assign(offer, {
+        titulo: input.titulo.trim(),
+        descripcion: input.descripcion.trim(),
+        nivel: input.nivel,
+        costo_creditos: price,
+        id_banner: bannerId,
+      });
+      Object.assign(slot, interval);
+      const result = this.view(state, offer, skill);
+      state.idempotency.set(scope, { fingerprint, result });
+      return result;
+    });
+  }
+
+  async detail(id: string) {
+    const rows = await this.visibleOffers(new OffersQueryDto());
+    const offer = rows.find((row) => row.id_oferta === id);
+    if (!offer) throw new NotFoundException('Oferta activa no encontrada');
+    return offer;
+  }
+
+  async list(query: OffersQueryDto) {
+    return paginate(await this.visibleOffers(query), query);
+  }
+
+  private async visibleOffers(query: OffersQueryDto) {
     const state = await this.persistence.read((state) => state);
+    const codes = await this.skills.academicCodes();
     const now = Date.now();
     const rows = [];
     for (const offer of [...state.offers.values()].sort(
@@ -196,6 +343,13 @@ export class TutoringService {
         b.created_at.getTime() - a.created_at.getTime() ||
         a.id_oferta.localeCompare(b.id_oferta),
     )) {
+      if (
+        (query.skillId && query.skillId !== offer.id_habilidad) ||
+        (query.codigo && query.codigo !== codes.get(offer.id_habilidad)) ||
+        (query.tutorId && query.tutorId !== offer.id_tutor) ||
+        query.excludeTutorId === offer.id_tutor
+      )
+        continue;
       const user = state.users.get(offer.id_tutor),
         slot = state.availability.get(offer.id_disponibilidad);
       if (
@@ -222,13 +376,19 @@ export class TutoringService {
       const search = query.search?.toLocaleLowerCase('es');
       if (
         search &&
-        !`${view.titulo} ${view.descripcion} ${view.materia.nombre} ${view.tutor.nombre} ${view.tutor.apellido}`
+        !`${codes.get(offer.id_habilidad) ?? ''} ${view.titulo} ${view.descripcion} ${view.materia.nombre} ${view.tutor.nombre} ${view.tutor.apellido}`
           .toLocaleLowerCase('es')
           .includes(search)
       )
         continue;
-      rows.push(view);
+      rows.push({
+        ...view,
+        materia: {
+          ...view.materia,
+          codigo: codes.get(offer.id_habilidad) ?? null,
+        },
+      });
     }
-    return paginate(rows, query);
+    return rows;
   }
 }
