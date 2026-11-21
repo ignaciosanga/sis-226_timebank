@@ -1,6 +1,9 @@
 const { randomBytes } = require('node:crypto');
+const { join } = require('node:path');
+const { tmpdir } = require('node:os');
 process.env.NODE_ENV = 'test';
 process.env.PERSISTENCE_MODE = 'memory';
+process.env.REGISTRATION_INITIAL_CREDITS = '0';
 process.env.JWT_SECRET = randomBytes(48).toString('hex');
 process.env.DATABASE_ENABLED = 'false';
 process.env.DATABASE_URL = '';
@@ -9,3 +12,8 @@ process.env.RATE_LIMIT_MAX = '100';
 process.env.RATE_LIMIT_TTL_MS = '60000';
 process.env.CORS_ORIGINS = 'http://localhost:3000,http://localhost:5173';
 process.env.SWAGGER_ENABLED = 'true';
+// Separado de imagenes de demostracion y de cualquier base PostgreSQL real.
+process.env.BANNER_STORAGE_DIR = join(
+  tmpdir(),
+  `nexo-u-jest-banners-${process.pid}`,
+);

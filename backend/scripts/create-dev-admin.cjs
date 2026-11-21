@@ -8,8 +8,10 @@ const { USERS_REPOSITORY } = require('../dist/modules/users/users.repository');
 
 async function main() {
   const correo = process.argv[2];
-  if (!correo || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo))
-    throw new Error('Uso: npm run admin:local -- admin@example.test');
+  if (!correo || !/^[^\s@]+@ucb\.edu\.bo$/i.test(correo.trim()))
+    throw new Error(
+      'Uso: npm run admin:local -- admin@ucb.edu.bo (requiere SMTP)',
+    );
   const app = await NestFactory.createApplicationContext(AppModule, {
     logger: false,
     abortOnError: false,
@@ -39,7 +41,7 @@ async function main() {
     });
     await repository.grantDevelopmentAdmin(user.id);
     console.log(
-      `ADMIN local creado: ${correo}\nPassword aleatoria: ${password}\nAutenticar con POST /auth/login. Guardar la clave localmente.`,
+      `ADMIN local pendiente: ${correo}\nPassword aleatoria: ${password}\nConfirmar el correo enviado antes de POST /auth/login. Guardar la clave localmente.`,
     );
   } finally {
     await app.close();

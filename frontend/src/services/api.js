@@ -1,5 +1,9 @@
+import { demoEnabled } from '../features/demo/mode.js'
+import { createLocalDemoApi } from '../features/demo/local-api.js'
+
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:4000').replace(/\/+$/, '')
-const TOKEN_KEY = 'nexo-u.session'
+const TOKEN_KEY = demoEnabled ? 'nexo-u.synthetic-session' : 'nexo-u.session'
+const localDemoRequest = demoEnabled ? createLocalDemoApi() : null
 const MESSAGES = {
   400: 'Revisa los datos ingresados.',
   401: 'Tu sesión expiró. Vuelve a ingresar.',
@@ -46,13 +50,19 @@ function errorMessage(status, data) {
 }
 
 export async function apiRequest(path, { method = 'GET', body, idempotencyKey } = {}) {
+  if (localDemoRequest) {
+    const response = await localDemoRequest(path, { method, body, idempotencyKey })
+    if (response.status >= 400) throw new ApiError(response.status, response.data.message)
+    return response.data
+  }
   const headers = { Accept: 'application/json' }
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  const multipart = typeof FormData !== 'undefined' && body instanceof FormData
+  if (body !== undefined && !multipart) headers['Content-Type'] = 'application/json'
   if (token) headers.Authorization = `Bearer ${token}`
   if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey
   let response
   try {
-    response = await fetch(`${API_URL}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) })
+    response = await fetch(`${API_URL}${path}`, { method, headers, body: body === undefined ? undefined : multipart ? body : JSON.stringify(body) })
   } catch {
     throw new ApiError(0, 'No se pudo conectar con el servidor. Si el sistema estuvo inactivo, espera unos segundos y vuelve a intentar.')
   }

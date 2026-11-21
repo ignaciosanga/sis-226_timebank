@@ -10,6 +10,7 @@ import { ReservationStatus } from '../exchanges/exchange.types';
 import { ExchangesService } from '../exchanges/exchanges.service';
 
 type CalendarState = {
+  purpose: 'calendar-oauth';
   action: 'calendar-event';
   reservationId: string;
   sub: string;
@@ -37,11 +38,15 @@ export class CalendarService {
       );
     const state = await this.jwt.signAsync(
       {
+        purpose: 'calendar-oauth',
         action: 'calendar-event',
         reservationId,
         sub: actor,
       } satisfies CalendarState,
-      { expiresIn: 600 },
+      {
+        expiresIn: 600,
+        audience: `${this.config.get('JWT_AUDIENCE', { infer: true })}:calendar`,
+      },
     );
     const settings = this.settings();
     const params = new URLSearchParams({
@@ -64,11 +69,14 @@ export class CalendarService {
   ): Promise<'created' | 'exists'> {
     let state: CalendarState;
     try {
-      state = await this.jwt.verifyAsync<CalendarState>(stateValue);
+      state = await this.jwt.verifyAsync<CalendarState>(stateValue, {
+        audience: `${this.config.get('JWT_AUDIENCE', { infer: true })}:calendar`,
+      });
     } catch {
       throw new ConflictException('Autorizacion de Google expirada o invalida');
     }
     if (
+      state.purpose !== 'calendar-oauth' ||
       state.action !== 'calendar-event' ||
       typeof state.sub !== 'string' ||
       typeof state.reservationId !== 'string'

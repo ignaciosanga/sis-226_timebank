@@ -32,7 +32,7 @@ export function configureApp(app: INestApplication): void {
       new DocumentBuilder()
         .setTitle('Banco de Tiempo Universitario')
         .setDescription(
-          'v0.4: autenticacion JWT, catalogos, disponibilidad, solicitudes, reservas y creditos de tiempo transaccionales. PostgreSQL con modelo optimizado de 12 tablas y Docker Compose local.',
+          'v0.4, fase 5: cuentas institucionales, ofertas, solicitudes con precio pactado, retencion, cancelacion y doble confirmacion con pago exacto. El pago usa RESERVAS.creditos tras terminar la clase y recibir ambas confirmaciones. Ofertas y fracciones requieren esquema decimal compatible; la base entera mantiene OFFER_PRICE_FLOW_PENDING para contratar y DECIMAL_SETTLEMENT_PENDING para liquidar reservas de oferta. Importes financieros en JSON como strings.',
         )
         .setVersion('0.4.0')
         .addBearerAuth()

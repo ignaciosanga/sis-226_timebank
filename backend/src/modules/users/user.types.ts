@@ -2,6 +2,7 @@ import { DatabaseRole, Role } from '../../common/enums/role.enum';
 import { UserStatus } from '../../common/enums/record-status.enum';
 import { ApiProperty } from '@nestjs/swagger';
 import { PaginationMeta } from '../../common/dto/list-query.dto';
+import type { CreditValue } from '../exchanges/credits';
 
 // Contrato de aplicacion. Los IDs son opacos; no implica tipos SQL ni nombres Prisma.
 export class PublicUser {
@@ -21,6 +22,9 @@ export class PublicUser {
   rol!: DatabaseRole;
   @ApiProperty({ enum: Role, isArray: true })
   roles!: Role[];
+
+  @ApiProperty({ enum: UserStatus, required: false })
+  estado?: UserStatus;
 }
 
 export class AdminUsersPage {
@@ -41,7 +45,7 @@ export interface UserRecord extends PublicUser {
 /** Proyeccion administrativa: estado y fechas sin saldos ni secretos. */
 export class AdminUser extends PublicUser {
   @ApiProperty({ enum: UserStatus })
-  estado!: UserStatus;
+  estado: UserStatus = UserStatus.ACTIVO;
   @ApiProperty({ type: String, format: 'date-time' })
   fechaRegistro!: Date;
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
@@ -58,11 +62,16 @@ export interface StoredUser {
   rol: DatabaseRole;
   id_carrera: string | null;
   semestre: number | null;
-  saldo: number;
-  creditos_retenidos: number;
+  saldo: CreditValue;
+  creditos_retenidos: CreditValue;
   fecha_registro: Date;
   ultimo_acceso: Date | null;
   estado: UserStatus;
+  cuenta_previa?: boolean;
+  email_verificado_at?: Date | null;
+  metodo_verificacion?: string | null;
+  bono_decidido_at?: Date | null;
+  google_sub?: string | null;
 }
 
 export function adaptStoredUser(user: StoredUser): UserRecord {
@@ -106,5 +115,7 @@ export function toPublicUser(user: UserRecord): PublicUser {
     semestre: user.semestre,
     rol: user.rol,
     roles: [...user.roles],
+    estado:
+      user.estado ?? (user.active ? UserStatus.ACTIVO : UserStatus.INACTIVO),
   };
 }

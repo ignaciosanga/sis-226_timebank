@@ -10,6 +10,7 @@ export default tseslint.config(
       'coverage/**',
       'node_modules/**',
       '.npm-cache/**',
+      '.local/**',
       'src/generated/**',
     ],
   },

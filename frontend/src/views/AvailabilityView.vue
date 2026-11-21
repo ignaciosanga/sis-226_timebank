@@ -1,70 +1,28 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
-import { CalendarDays, Clock3, Plus } from '@lucide/vue'
+import { Clock3 } from '@lucide/vue'
 import { useAppStore } from '../stores/app'
 import Dialog from '../features/admin/AdminDialog.vue'
 import {
   dateLabel,
-  localDate,
   timeLabel,
-  toZonedISO,
 } from '../features/timebank/format'
+
+import ScheduleCalendar from '../features/timebank/ScheduleCalendar.vue'
+import { scheduleEvents } from '../features/timebank/schedule-calendar.js'
 
 const store = useAppStore()
 
-// Publicación de horarios.
-const date = ref('')
-const from = ref('')
-const to = ref('')
-const error = ref('')
 const feedback = ref('')
 const busy = ref(false)
-
-const today = localDate(new Date().toISOString())
-
-const slots = computed(() =>
-  [...store.myAvailability].sort(
-    (a, b) =>
-      Date.parse(a.fecha_inicio) - Date.parse(b.fecha_inicio),
-  ),
-)
-
-async function submit() {
-  if (busy.value || !store.requireSession()) return
-
-  error.value = ''
-  feedback.value = ''
-
-  const fechaInicio = toZonedISO(date.value, from.value)
-  const fechaFin = toZonedISO(date.value, to.value)
-
-  if (
-    !fechaInicio ||
-    !fechaFin ||
-    Date.parse(fechaFin) <= Date.parse(fechaInicio)
-  ) {
-    error.value = 'La hora final debe ser posterior a la inicial.'
-    return
-  }
-
-  busy.value = true
-
-  try {
-    await store.publishAvailability({
-      fechaInicio,
-      fechaFin,
-    })
-
-    feedback.value = 'Tu disponibilidad se publicó.'
-    date.value = ''
-    from.value = ''
-    to.value = ''
-  } catch (failure) {
-    error.value = failure.message
-  } finally {
-    busy.value = false
-  }
-}
+const events = computed(() => scheduleEvents({
+  userId: store.user.id,
+  requests: store.myRequests,
+  reservations: store.myReservations,
+  availability: store.myAvailability,
+  findSkill: (id) => store.findSkill(id),
+  findUser: (id) => store.findUser(id),
+}))
 
 // Edición y desactivación.
 const editOpen = ref(false)
@@ -101,7 +59,6 @@ async function saveEdit() {
 
   dialogError.value = ''
   feedback.value = ''
-  error.value = ''
   busy.value = true
 
   try {
@@ -150,7 +107,6 @@ async function deactivate() {
 
   dialogError.value = ''
   feedback.value = ''
-  error.value = ''
   busy.value = true
 
   try {
@@ -169,8 +125,8 @@ async function deactivate() {
 <template>
   <header class="workspace-header">
     <div>
-      <h1>Mi disponibilidad</h1>
-      <p>Elige cuándo puedes compartir lo que sabes.</p>
+      <h1>Mis horarios</h1>
+      <p>Consulta tus solicitudes, reservas y horarios para dar tutoría.</p>
     </div>
 
     <span class="subtle-label">
@@ -180,14 +136,6 @@ async function deactivate() {
   </header>
 
   <p
-    v-if="error"
-    class="notice notice-error"
-    role="alert"
-  >
-    {{ error }}
-  </p>
-
-  <p
     v-if="feedback"
     class="notice notice-success"
     role="status"
@@ -195,175 +143,14 @@ async function deactivate() {
     {{ feedback }}
   </p>
 
-  <div class="availability-layout">
-    <section
-      class="surface-section"
-      aria-labelledby="availability-form-title"
-    >
-      <h2 id="availability-form-title">
-        Publicar un horario
-      </h2>
-
-      <p class="lead-copy">
-        Otros estudiantes podrán solicitar un intervalo dentro
-        de este bloque.
-      </p>
-
-      <form class="flow-form" @submit.prevent="submit">
-        <div class="field">
-          <label for="availability-date">Fecha</label>
-          <input
-            id="availability-date"
-            v-model="date"
-            type="date"
-            :min="today"
-            required
-            :disabled="busy"
-          />
-        </div>
-
-        <div class="account-pair">
-          <div class="field">
-            <label for="availability-from">Desde</label>
-            <input
-              id="availability-from"
-              v-model="from"
-              type="time"
-              step="900"
-              required
-              :disabled="busy"
-            />
-          </div>
-
-          <div class="field">
-            <label for="availability-to">Hasta</label>
-            <input
-              id="availability-to"
-              v-model="to"
-              type="time"
-              step="900"
-              required
-              :disabled="busy"
-            />
-          </div>
-        </div>
-
-        <p class="field-hint">
-          El fin debe ser posterior al inicio. Tus horarios
-          activos no pueden superponerse.
-        </p>
-
-        <button
-          class="button button-primary"
-          type="submit"
-          :disabled="busy"
-        >
-          <Plus :size="18" />
-          {{ busy ? 'Procesando…' : 'Publicar horario' }}
-        </button>
-      </form>
-    </section>
-
-    <section
-      class="availability-list"
-      aria-labelledby="availability-list-title"
-    >
-      <div class="section-heading">
-        <h2 id="availability-list-title">
-          Horarios publicados
-        </h2>
-
-        <span class="subtle-label">
-          {{ slots.length }} bloques
-        </span>
-      </div>
-
-      <article
-        v-for="slot in slots"
-        :key="slot.id_disponibilidad"
-        class="availability-row"
-      >
-        <span class="date-icon">
-          <CalendarDays :size="24" />
-        </span>
-
-        <div>
-          <h3>{{ dateLabel(slot.fecha_inicio) }}</h3>
-
-          <p>
-            {{ timeLabel(slot.fecha_inicio) }}–
-            <template
-              v-if="
-                localDate(slot.fecha_inicio) !==
-                localDate(slot.fecha_fin)
-              "
-            >
-              {{ dateLabel(slot.fecha_fin) }},
-            </template>
-            {{ timeLabel(slot.fecha_fin) }}
-          </p>
-        </div>
-
-        <span
-          class="state-label"
-          :class="{
-            'state-muted':
-              Date.parse(slot.fecha_fin) <= Date.now(),
-          }"
-        >
-          {{
-            Date.parse(slot.fecha_fin) <= Date.now()
-              ? 'Finalizado'
-              : 'Disponible'
-          }}
-        </span>
-
-        <div
-          v-if="store.authenticated"
-          class="slot-actions"
-        >
-          <button
-            class="button button-outline"
-            type="button"
-            :disabled="busy"
-            :aria-label="`Editar horario del ${dateLabel(
-              slot.fecha_inicio,
-            )} a las ${timeLabel(slot.fecha_inicio)}`"
-            @click="openEdit(slot)"
-          >
-            Editar
-          </button>
-
-          <button
-            class="button button-outline"
-            type="button"
-            :disabled="busy"
-            :aria-label="`Desactivar horario del ${dateLabel(
-              slot.fecha_inicio,
-            )} a las ${timeLabel(slot.fecha_inicio)}`"
-            @click="askDeactivate(slot)"
-          >
-            Desactivar
-          </button>
-        </div>
-      </article>
-
-      <div
-        v-if="!slots.length"
-        class="panel empty-state"
-      >
-        <CalendarDays :size="28" />
-        <h3>Publica tu primer horario</h3>
-        <p>Elige una fecha y una franja en el formulario.</p>
-      </div>
-
-      <p class="field-hint">
-        Una reserva se genera después de aceptar una solicitud.
-        Los horarios que respaldan reservas activas pueden
-        tener restricciones para su edición o desactivación.
-      </p>
-    </section>
-  </div>
+  <section aria-labelledby="availability-list-title">
+    <div class="section-heading">
+      <h2 id="availability-list-title">Horarios publicados</h2>
+      <span class="subtle-label">Tu agenda de intercambios y tutorías</span>
+    </div>
+    <ScheduleCalendar :events="events" :busy="busy" @edit="openEdit" @deactivate="askDeactivate" />
+    <p class="field-hint" style="margin-top:18px">Una solicitud enviada está pendiente de respuesta. La reserva se confirma cuando el tutor la acepta. Los horarios con reservas activas pueden tener restricciones para editarse o desactivarse.</p>
+  </section>
 
   <Dialog
     :open="editOpen"
@@ -480,16 +267,3 @@ async function deactivate() {
     </footer>
   </Dialog>
 </template>
-
-<style scoped>
-.availability-row {
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.slot-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-</style>
