@@ -119,6 +119,22 @@ export class Environment {
 
   @IsString()
   FRONTEND_URL = 'http://localhost:5173';
+
+  @IsOptional()
+  @IsString()
+  ASSISTANT_API_KEY?: string;
+
+  @IsString()
+  ASSISTANT_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
+  @IsString()
+  @MinLength(1)
+  ASSISTANT_MODEL = 'llama-3.3-70b-versatile';
+
+  @IsInt()
+  @Min(1000)
+  @Max(60000)
+  ASSISTANT_TIMEOUT_MS = 15000;
 }
 
 export function validateEnvironment(
@@ -133,6 +149,7 @@ export function validateEnvironment(
     'REGISTRATION_INITIAL_CREDITS',
     'SMTP_PORT',
     'EMAIL_VERIFICATION_TTL_MINUTES',
+    'ASSISTANT_TIMEOUT_MS',
   ]) {
     if (input[key] !== undefined) parsed[key] = Number(input[key]);
   }

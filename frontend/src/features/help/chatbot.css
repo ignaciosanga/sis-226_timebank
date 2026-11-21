@@ -23,7 +23,12 @@
 .nexo-chat-message { max-width:92%; }
 .nexo-chat-message > span { display:block; margin-bottom:5px; color:var(--muted); font-size:.7rem; text-align:right; }
 .nexo-chat-message > p { margin:0; padding:11px 14px; border-radius:12px 12px 3px 12px; background:var(--ucb-blue); color:white; font-size:.9rem; line-height:1.55; white-space:pre-wrap; overflow-wrap:anywhere; }
-.nexo-chat-preview-status { align-self:stretch; margin:0; padding:12px; border:1px dashed var(--line); border-radius:8px; color:var(--muted); font-size:.8rem; line-height:1.5; }
+.nexo-chat-typing { align-self:flex-start; margin:0; padding:10px 14px; border:1px solid var(--line); border-radius:12px 12px 12px 3px; background:white; color:var(--muted); font-size:.82rem; line-height:1.5; }
+.nexo-chat-message.is-assistant { align-self:flex-start; }
+.nexo-chat-message.is-assistant > span { text-align:left; }
+.nexo-chat-message.is-assistant > p { border:1px solid var(--line); border-radius:12px 12px 12px 3px; background:white; color:var(--ink); }
+.nexo-chat-message.is-error > p { border-color:#efc9c4; background:#fdf3f2; color:#8a2b20; }
+.nexo-chat-suggestions button:disabled { opacity:.6; cursor:default; }
 .nexo-chat-composer { flex-shrink:0; padding:12px 14px; background:white; border-top:1px solid var(--line); }
 .nexo-chat-input-label { display:block; margin-bottom:6px; font-size:.8rem; font-weight:600; }
 .nexo-chat-input-wrap { display:flex; align-items:flex-end; gap:8px; padding:6px; border:1px solid var(--line); border-radius:10px; }
