@@ -15,6 +15,18 @@ export async function googleSignIn(body) {
 
 export const register = (payload) => apiRequest('/auth/register', { method: 'POST', body: payload })
 
+export const verifyEmail = (token) =>
+  apiRequest('/auth/verify-email', {
+    method: 'POST',
+    body: { token },
+  })
+
+export const resendVerification = (correo) =>
+  apiRequest('/auth/resend-verification', {
+    method: 'POST',
+    body: { correo },
+  })
+
 export const getProfile = () => apiRequest('/users/me')
 
 // changes: cualquiera de { nombre, apellido, idCarrera, semestre }.
