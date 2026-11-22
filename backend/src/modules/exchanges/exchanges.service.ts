@@ -17,9 +17,14 @@ import type { StoredUser } from '../users/user.types';
 import { SkillsService } from '../skills/skills.service';
 import {
   formatCredits,
-  MAX_CREDITS,
   parseCredits,
   reservationCost,
+  addCredits,
+  subtractCredits,
+  compareCredits,
+  isWholeCredits,
+  wouldExceedCreditLimit,
+  CreditValue,
 } from './credits';
 import { CreateExchangeDto } from './dto/create-exchange.dto';
 import { EXCHANGE_REPOSITORY, ExchangeRepository } from './exchange.repository';
@@ -32,6 +37,11 @@ import {
   ReservationStatus,
 } from './exchange.types';
 import { inspectIntegrity } from './integrity';
+import {
+  cancellationCharge,
+  classifyCancellation,
+} from './cancellation-policy';
+import type { TutoringOffer } from '../tutoring/offer.types';
 import { addNotification } from '../notifications/notification.factory';
 import { NotificationType } from '../notifications/notification.types';
 
@@ -72,6 +82,43 @@ export class ExchangesService {
       return result;
     });
   }
+
+  private async enrichParticipants<T extends {
+    id_solicitante: string;
+    id_ofertante: string;
+  }>(records: T[]) {
+    const userIds = [
+      ...new Set(
+        records.flatMap((record) => [
+          record.id_solicitante,
+          record.id_ofertante,
+        ]),
+      ),
+    ];
+
+    const users = await Promise.all(
+      userIds.map(async (id) => [
+        id,
+        await this.users.repository.findById(id),
+      ] as const),
+    );
+
+    const usersById = new Map(users);
+
+    return records.map((record) => {
+      const requester = usersById.get(record.id_solicitante);
+      const provider = usersById.get(record.id_ofertante);
+
+      return {
+        ...record,
+        nombre_solicitante: requester?.nombre ?? '',
+        apellido_solicitante: requester?.apellido ?? '',
+        nombre_ofertante: provider?.nombre ?? '',
+        apellido_ofertante: provider?.apellido ?? '',
+      };
+    });
+  }
+
   private fingerprint(input: unknown): string {
     const canonical = (value: unknown): unknown => {
       if (isDate(value)) return value.toISOString();
@@ -87,6 +134,42 @@ export class ExchangesService {
     return createHash('sha256')
       .update(JSON.stringify(canonical(input)))
       .digest('hex');
+  }
+  /** Canoniza también resultados idempotentes históricos que guardaban números. */
+  private financialResult(value: unknown): unknown {
+    if (isDate(value)) return value;
+    if (Array.isArray(value))
+      return value.map((item) => this.financialResult(item));
+    if (value && typeof value === 'object') {
+      const money = new Set([
+        'saldo',
+        'creditos_retenidos',
+        'disponibles',
+        'creditos_requeridos',
+        'creditos',
+        'cantidad',
+        'saldo_anterior',
+        'saldo_posterior',
+        'retenidos_anterior',
+        'retenidos_posterior',
+        'monto',
+        'monto_creditos',
+        'costo_creditos',
+      ]);
+      const result = Object.fromEntries(
+        Object.entries(value).map(([key, entry]) => [
+          key,
+          money.has(key) &&
+          (typeof entry === 'string' || typeof entry === 'number')
+            ? formatCredits(entry)
+            : this.financialResult(entry),
+        ]),
+      );
+      if ('creditos_requeridos' in result || 'creditos' in result)
+        result.id_oferta ??= null;
+      return result;
+    }
+    return value;
   }
   private async operation<T>(
     actor: string,
@@ -110,7 +193,7 @@ export class ExchangesService {
           throw new ConflictException(
             'Idempotency-Key ya utilizada con otro contenido',
           );
-        return structuredClone(previous.result) as T;
+        return this.financialResult(structuredClone(previous.result)) as T;
       }
       const result = await work(state);
       state.idempotency.set(scope, {
@@ -127,13 +210,16 @@ export class ExchangesService {
       throw new ConflictException('El usuario no esta activo');
     return account;
   }
-  private accountView(account: StoredUser) {
+  private accountView(
+    account: StoredUser,
+    schema: ExchangeState['creditSchema'] = 'integer',
+  ) {
     return {
       id_usuario: account.id_usuario,
       saldo: formatCredits(account.saldo),
       creditos_retenidos: formatCredits(account.creditos_retenidos),
-      disponibles: formatCredits(account.saldo - account.creditos_retenidos),
-      unidad: 'CREDITO_15_MINUTOS',
+      disponibles: subtractCredits(account.saldo, account.creditos_retenidos),
+      unidad: schema === 'decimal' ? 'CREDITO' : 'CREDITO_15_MINUTOS',
     };
   }
   private movement(
@@ -141,29 +227,41 @@ export class ExchangesService {
     account: StoredUser,
     reservationId: string | null,
     tipo: Movement['tipo'],
-    amount: number,
+    amount: CreditValue,
     description?: string,
   ): Movement {
     const before = {
       saldo: account.saldo,
       retenidos: account.creditos_retenidos,
     };
-    if (tipo === 'Retencion') account.creditos_retenidos += amount;
-    else if (tipo === 'Liberacion') account.creditos_retenidos -= amount;
+    if (tipo === 'Retencion')
+      account.creditos_retenidos = addCredits(
+        account.creditos_retenidos,
+        amount,
+      );
+    else if (tipo === 'Liberacion')
+      account.creditos_retenidos = subtractCredits(
+        account.creditos_retenidos,
+        amount,
+      );
     else {
-      account.saldo += amount;
-      if (tipo === 'Consumo') account.creditos_retenidos += amount;
+      account.saldo = addCredits(account.saldo, amount);
+      if (tipo === 'Consumo')
+        account.creditos_retenidos = addCredits(
+          account.creditos_retenidos,
+          amount,
+        );
     }
     const record: Movement = {
       id_movimiento: randomUUID(),
       id_usuario: account.id_usuario,
       id_reserva: reservationId,
       tipo,
-      cantidad: amount,
-      saldo_anterior: before.saldo,
-      saldo_posterior: account.saldo,
-      retenidos_anterior: before.retenidos,
-      retenidos_posterior: account.creditos_retenidos,
+      cantidad: formatCredits(amount),
+      saldo_anterior: formatCredits(before.saldo),
+      saldo_posterior: formatCredits(account.saldo),
+      retenidos_anterior: formatCredits(before.retenidos),
+      retenidos_posterior: formatCredits(account.creditos_retenidos),
       created_at: new Date(Date.now()),
       descripcion: description ?? null,
     };
@@ -171,12 +269,22 @@ export class ExchangesService {
     return record;
   }
   private movementView(record: Movement) {
-    return { ...record, monto: formatCredits(record.cantidad) };
+    return {
+      ...record,
+      cantidad: formatCredits(record.cantidad),
+      saldo_anterior: formatCredits(record.saldo_anterior),
+      saldo_posterior: formatCredits(record.saldo_posterior),
+      retenidos_anterior: formatCredits(record.retenidos_anterior),
+      retenidos_posterior: formatCredits(record.retenidos_posterior),
+      monto: formatCredits(record.cantidad),
+    };
   }
   private requestView(state: ExchangeState, record: ExchangeRequest) {
     const metadata = state.requestMetadata.get(record.id_solicitud);
     return {
       ...record,
+      id_oferta: record.id_oferta ?? null,
+      creditos_requeridos: formatCredits(record.creditos_requeridos),
       id_disponibilidad: metadata?.availabilityId ?? null,
       descripcion: metadata?.descripcion ?? '',
       costo_creditos: formatCredits(record.creditos_requeridos),
@@ -186,6 +294,10 @@ export class ExchangesService {
     const metadata = state.reservationMetadata.get(record.id_reserva);
     return {
       ...record,
+      id_oferta: record.id_solicitud
+        ? (state.requests.get(record.id_solicitud)?.id_oferta ?? null)
+        : null,
+      creditos: formatCredits(record.creditos),
       id_disponibilidad: metadata?.availabilityId ?? null,
       monto_creditos: formatCredits(record.creditos),
       confirmaciones: [
@@ -207,6 +319,7 @@ export class ExchangesService {
             motivo: record.motivo_cancelacion,
             fecha: record.cancelled_at,
             administrativa: metadata?.administrativa ?? false,
+            clasificacion: metadata?.clasificacionCancelacion ?? null,
           }
         : null,
     };
@@ -240,7 +353,59 @@ export class ExchangesService {
     availabilityId: string,
     start: Date,
     end: Date,
-  ): void {
+    skillId: string,
+    expectedOfferId?: string,
+    accepting = false,
+  ): TutoringOffer | undefined {
+    const offer = [...state.offers.values()].find(
+      (row) => row.id_disponibilidad === availabilityId,
+    );
+    if (expectedOfferId && offer?.id_oferta !== expectedOfferId)
+      throw new ConflictException({
+        code: 'OFFER_MISMATCH',
+        message:
+          'La oferta no corresponde al tutor, materia y horario solicitados',
+      });
+    if (offer) {
+      if (state.creditSchema !== 'decimal')
+        throw new ConflictException({
+          code: 'OFFER_PRICE_FLOW_PENDING',
+          message:
+            'Este esquema conserva creditos enteros; falta la migracion coordinada para contratar ofertas con precio pactado',
+        });
+      if (accepting && !expectedOfferId)
+        throw new ConflictException({
+          code: 'OFFER_SNAPSHOT_REQUIRED',
+          message:
+            'Esta solicitud historica no tiene un precio pactado de oferta',
+        });
+      const slot = state.availability.get(availabilityId);
+      if (
+        offer.estado !== 'Activa' ||
+        offer.id_tutor !== providerId ||
+        offer.id_habilidad !== skillId ||
+        !slot ||
+        slot.id_usuario !== providerId ||
+        slot.estado !== AvailabilityStatus.DISPONIBLE ||
+        slot.fecha_inicio.getTime() <= Date.now() ||
+        state.userSkills.get(`${providerId}:${skillId}`)?.nivel !== offer.nivel
+      )
+        throw new ConflictException({
+          code: 'OFFER_NOT_AVAILABLE',
+          message:
+            'La oferta o su horario ya no estan disponibles para contratar',
+        });
+      if (
+        slot.fecha_inicio.getTime() !== start.getTime() ||
+        slot.fecha_fin.getTime() !== end.getTime()
+      )
+        throw new ConflictException({
+          code: 'OFFER_MISMATCH',
+          message:
+            'Las fechas deben coincidir con la clase completa de la oferta',
+        });
+      return offer;
+    }
     const availability = state.availability.get(availabilityId);
     if (
       !availability ||
@@ -254,6 +419,7 @@ export class ExchangesService {
       throw new ConflictException(
         'El intervalo no esta cubierto por la disponibilidad',
       );
+    return undefined;
   }
   private requireOffering(
     state: ExchangeState,
@@ -305,26 +471,28 @@ export class ExchangesService {
         await this.users.requirePublishedStudent(actor);
         await this.users.requirePublishedStudent(input.providerId);
         const skill = await this.skills.requireActive(input.skillId);
-        this.requireFuture(interval.fecha_inicio);
-        this.requireOffering(state, input.providerId, input.skillId);
-        this.requireAvailability(
+        const offer = this.requireAvailability(
           state,
           input.providerId,
           input.availabilityId,
           interval.fecha_inicio,
           interval.fecha_fin,
+          input.skillId,
+          input.offerId,
         );
+        this.requireFuture(interval.fecha_inicio);
+        this.requireOffering(state, input.providerId, input.skillId);
         const record: ExchangeRequest = {
+          id_oferta: offer?.id_oferta ?? null,
           id_solicitud: randomUUID(),
           id_solicitante: actor,
           id_ofertante: input.providerId,
           id_habilidad: input.skillId,
           fecha_inicio_propuesta: interval.fecha_inicio,
           fecha_fin_propuesta: interval.fecha_fin,
-          creditos_requeridos: reservationCost(
-            interval.fecha_inicio,
-            interval.fecha_fin,
-          ),
+          creditos_requeridos: offer
+            ? parseCredits(offer.costo_creditos)
+            : reservationCost(interval.fecha_inicio, interval.fecha_fin),
           estado: RequestStatus.PENDIENTE,
           created_at: new Date(Date.now()),
           respondida_at: null,
@@ -348,7 +516,8 @@ export class ExchangesService {
   }
   async listRequests(actor: string) {
     await this.users.requireActive(actor);
-    return this.persistence.read((state) =>
+
+    const records = await this.persistence.read((state) =>
       [...state.requests.values()]
         .filter(
           (record) =>
@@ -356,6 +525,8 @@ export class ExchangesService {
         )
         .map((record) => this.requestView(state, record)),
     );
+
+    return this.enrichParticipants(records);
   }
   acceptRequest(
     actor: string,
@@ -399,6 +570,9 @@ export class ExchangesService {
           metadata.availabilityId,
           request.fecha_inicio_propuesta,
           request.fecha_fin_propuesta,
+          request.id_habilidad,
+          request.id_oferta ?? undefined,
+          true,
         );
         this.requireNoReservationConflict(
           state,
@@ -407,17 +581,27 @@ export class ExchangesService {
           request.fecha_inicio_propuesta,
           request.fecha_fin_propuesta,
         );
-        const amount = reservationCost(
-          request.fecha_inicio_propuesta,
-          request.fecha_fin_propuesta,
-        );
-        if (amount !== request.creditos_requeridos)
+        const amount = request.id_oferta
+          ? parseCredits(formatCredits(request.creditos_requeridos))
+          : reservationCost(
+              request.fecha_inicio_propuesta,
+              request.fecha_fin_propuesta,
+            );
+        if (
+          compareCredits(amount, request.creditos_requeridos) !== 0 ||
+          compareCredits(amount, '0') <= 0
+        )
           throw new ConflictException(
             'El costo de la solicitud es inconsistente',
           );
         const account = this.account(state, request.id_solicitante);
         this.account(state, request.id_ofertante);
-        if (account.saldo - account.creditos_retenidos < amount)
+        if (
+          compareCredits(
+            subtractCredits(account.saldo, account.creditos_retenidos),
+            amount,
+          ) < 0
+        )
           throw new ConflictException('Creditos disponibles insuficientes');
         const reservation: Reservation = {
           id_reserva: randomUUID(),
@@ -450,11 +634,14 @@ export class ExchangesService {
         this.notify(
           state,
           request.id_solicitante,
-          `reserva:${reservation.id_reserva}:confirmada`,
+          `solicitud:${request.id_solicitud}:aceptada`,
           NotificationType.SOLICITUD_ACEPTADA,
           'Tu solicitud fue aceptada',
           `${this.displayName(state, actor)} aceptó tu solicitud de ${skill.nombre}. La reserva quedó confirmada.`,
         );
+        if (request.id_oferta)
+          state.availability.get(metadata.availabilityId)!.estado =
+            AvailabilityStatus.RESERVADO;
         this.movement(
           state,
           account,
@@ -516,7 +703,8 @@ export class ExchangesService {
   }
   async listReservations(actor: string) {
     await this.users.requireActive(actor);
-    return this.persistence.read((state) =>
+
+    const records = await this.persistence.read((state) =>
       [...state.reservations.values()]
         .filter(
           (record) =>
@@ -524,6 +712,8 @@ export class ExchangesService {
         )
         .map((record) => this.reservationView(state, record)),
     );
+
+    return this.enrichParticipants(records);
   }
   async getReservation(actor: string, id: string) {
     await this.users.requireActive(actor);
@@ -535,18 +725,17 @@ export class ExchangesService {
   }
   async getReservationCalendarDetails(actor: string, id: string) {
     const reservation = await this.getReservation(actor, id);
-    const [skill, requester, provider, requestDescription] =
-      await Promise.all([
-        this.skills.requireActive(reservation.id_habilidad),
-        this.users.repository.findById(reservation.id_solicitante),
-        this.users.repository.findById(reservation.id_ofertante),
-        this.persistence.read((state) =>
-          reservation.id_solicitud
-            ? (state.requestMetadata.get(reservation.id_solicitud)
-                ?.descripcion ?? '')
-            : '',
-        ),
-      ]);
+    const [skill, requester, provider, requestDescription] = await Promise.all([
+      this.skills.requireActive(reservation.id_habilidad),
+      this.users.repository.findById(reservation.id_solicitante),
+      this.users.repository.findById(reservation.id_ofertante),
+      this.persistence.read((state) =>
+        reservation.id_solicitud
+          ? (state.requestMetadata.get(reservation.id_solicitud)?.descripcion ??
+            '')
+          : '',
+      ),
+    ]);
     const fullName = (user: { nombre: string; apellido: string } | null) =>
       user ? `${user.nombre} ${user.apellido}` : 'Estudiante';
     return {
@@ -570,10 +759,43 @@ export class ExchangesService {
           return this.reservationView(state, record);
         if (record.estado !== ReservationStatus.CONFIRMADA)
           throw new ConflictException('La reserva fue cancelada');
+        const offered =
+          record.id_solicitud &&
+          state.requests.get(record.id_solicitud)?.id_oferta;
+        if (
+          state.creditSchema !== 'decimal' &&
+          (offered || !isWholeCredits(record.creditos))
+        )
+          throw new ConflictException({
+            code: 'DECIMAL_SETTLEMENT_PENDING',
+            message:
+              'El esquema actual no permite liquidar reservas con precio pactado decimal',
+          });
         if (Date.now() < record.fecha_fin.getTime())
           throw new ConflictException('La reserva aun no termino');
         await this.users.requirePublishedStudent(record.id_solicitante);
         await this.users.requirePublishedStudent(record.id_ofertante);
+        // El importe de RESERVAS es el pacto; ni catalogo ni duracion lo recalculan.
+        const amount = parseCredits(formatCredits(record.creditos));
+        const requester = this.account(state, record.id_solicitante);
+        const provider = this.account(state, record.id_ofertante);
+        const events = [...state.movements.values()].filter(
+          (movement) =>
+            movement.id_reserva === id &&
+            ['Retencion', 'Liberacion', 'Consumo', 'Transferencia'].includes(
+              movement.tipo,
+            ),
+        );
+        if (
+          compareCredits(amount, '0') <= 0 ||
+          events.length !== 1 ||
+          events[0]!.tipo !== 'Retencion' ||
+          events[0]!.id_usuario !== record.id_solicitante ||
+          compareCredits(events[0]!.cantidad, amount) !== 0 ||
+          compareCredits(requester.creditos_retenidos, amount) < 0 ||
+          compareCredits(requester.saldo, amount) < 0
+        )
+          throw new ConflictException('Retencion de la reserva inconsistente');
         if (actor === record.id_solicitante)
           record.confirmacion_solicitante_at ??= new Date(Date.now());
         else record.confirmacion_ofertante_at ??= new Date(Date.now());
@@ -581,21 +803,21 @@ export class ExchangesService {
           record.confirmacion_solicitante_at &&
           record.confirmacion_ofertante_at;
         if (both) {
-          const requester = this.account(state, record.id_solicitante);
-          const provider = this.account(state, record.id_ofertante);
-          if (
-            requester.creditos_retenidos < record.creditos ||
-            requester.saldo < record.creditos
-          )
-            throw new ConflictException('Retencion inconsistente');
-          if (provider.saldo + record.creditos > MAX_CREDITS)
+          if (wouldExceedCreditLimit(provider.saldo, amount))
             throw new ConflictException(
               'La cuenta de destino excede el limite de creditos',
             );
-          this.movement(state, requester, id, 'Consumo', -record.creditos);
-          this.movement(state, provider, id, 'Transferencia', record.creditos);
+          this.movement(
+            state,
+            requester,
+            id,
+            'Consumo',
+            subtractCredits('0', amount),
+          );
+          this.movement(state, provider, id, 'Transferencia', amount);
           record.estado = ReservationStatus.COMPLETADA;
           record.completed_at = new Date(Date.now());
+        } else {
           const otherParticipant =
             actor === record.id_solicitante
               ? record.id_ofertante
@@ -603,10 +825,10 @@ export class ExchangesService {
           this.notify(
             state,
             otherParticipant,
-            `reserva:${id}:completada`,
-            NotificationType.RESERVA_COMPLETADA,
-            'Intercambio completado',
-            'Ambas personas confirmaron el intercambio. La reserva está completada.',
+            `reserva:${id}:confirmacion:${actor}`,
+            NotificationType.CLASE_POR_CONFIRMAR,
+            'Falta confirmar la tutoría',
+            `${this.displayName(state, actor)} confirmó la tutoría. Confirma para completar el intercambio.`,
           );
         }
         return this.reservationView(state, record);
@@ -625,25 +847,57 @@ export class ExchangesService {
         const user = await this.users.requireActive(actor);
         const record = this.requireReservation(state, id);
         const admin = user.roles.includes(Role.ADMIN);
+        const now = Date.now();
         if (!admin) this.requireParticipant(record, actor);
         if (record.estado === ReservationStatus.CANCELADA)
-          return this.reservationView(state, record);
+          throw new ConflictException(
+            'La reserva ya fue cancelada; solo se admite el replay con la misma Idempotency-Key',
+          );
         if (record.estado === ReservationStatus.COMPLETADA)
           throw new ConflictException(
             'Una reserva completada no se puede cancelar',
           );
-        if (!admin && Date.now() >= record.fecha_inicio.getTime())
+        if (!admin && now >= record.fecha_inicio.getTime())
           throw new ConflictException(
             'Despues del inicio la cancelacion requiere ADMIN',
           );
         const account = this.account(state, record.id_solicitante);
-        if (account.creditos_retenidos < record.creditos)
+        if (compareCredits(account.creditos_retenidos, record.creditos) < 0)
           throw new ConflictException('Retencion inconsistente');
+        const classification = classifyCancellation(
+          admin,
+          record.fecha_inicio,
+          now,
+        );
+        const payer =
+          classification === 'injustificada'
+            ? this.account(state, actor)
+            : null;
+        const availableBefore = payer
+          ? subtractCredits(payer.saldo, payer.creditos_retenidos)
+          : '0';
+        const penaltyType = payer
+          ? cancellationCharge(
+              availableBefore,
+              actor === record.id_solicitante
+                ? addCredits(availableBefore, record.creditos)
+                : availableBefore,
+            )
+          : null;
         this.movement(state, account, id, 'Liberacion', record.creditos);
+        if (payer && penaltyType)
+          this.movement(
+            state,
+            payer,
+            id,
+            penaltyType,
+            penaltyType === 'Penalizacion' ? '-0.5' : '0',
+            'Cancelacion injustificada con menos de 5 horas de anticipacion',
+          );
         record.estado = ReservationStatus.CANCELADA;
         record.cancelado_por = actor;
         record.motivo_cancelacion = reason.trim();
-        record.cancelled_at = new Date(Date.now());
+        record.cancelled_at = new Date(now);
         record.horas_anticipacion_cancelacion = Math.max(
           0,
           Math.floor(
@@ -652,11 +906,19 @@ export class ExchangesService {
           ),
         );
         const metadata = state.reservationMetadata.get(id);
-        if (metadata)
-          metadata.administrativa =
-            admin &&
-            actor !== record.id_solicitante &&
-            actor !== record.id_ofertante;
+        const offered =
+          record.id_solicitud &&
+          state.requests.get(record.id_solicitud)?.id_oferta;
+        if (offered && metadata?.availabilityId) {
+          const slot = state.availability.get(metadata.availabilityId);
+          if (slot?.estado === AvailabilityStatus.RESERVADO)
+            slot.estado = AvailabilityStatus.DISPONIBLE;
+        }
+        state.reservationMetadata.set(id, {
+          availabilityId: metadata?.availabilityId ?? null,
+          administrativa: admin,
+          clasificacionCancelacion: classification,
+        });
         const adminCancelledForOthers =
           admin &&
           actor !== record.id_solicitante &&
@@ -680,7 +942,7 @@ export class ExchangesService {
   async getAccount(actor: string) {
     await this.users.requirePublishedStudent(actor);
     return this.transaction((state) =>
-      this.accountView(this.account(state, actor)),
+      this.accountView(this.account(state, actor), state.creditSchema),
     );
   }
   async listMovements(actor: string) {
@@ -708,10 +970,14 @@ export class ExchangesService {
           );
         await this.users.requirePublishedStudent(input.userId);
         const amount = parseCredits(input.amount);
-        if (amount <= 0)
+        if (compareCredits(amount, '0') <= 0)
           throw new BadRequestException('La carga debe ser mayor que cero');
+        if (state.creditSchema === 'integer' && !isWholeCredits(amount))
+          throw new BadRequestException(
+            'La base actual admite cargas enteras; falta la migracion decimal',
+          );
         const account = this.account(state, input.userId);
-        if (account.saldo + amount > MAX_CREDITS)
+        if (wouldExceedCreditLimit(account.saldo, amount))
           throw new ConflictException('La cuenta excede el limite de creditos');
         const movement = this.movement(
           state,
@@ -722,7 +988,7 @@ export class ExchangesService {
           input.reason,
         );
         return {
-          cuenta: this.accountView(account),
+          cuenta: this.accountView(account, state.creditSchema),
           movimiento: this.movementView(movement),
         };
       },

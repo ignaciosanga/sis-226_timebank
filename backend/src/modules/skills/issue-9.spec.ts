@@ -94,19 +94,19 @@ describe('Issue #9: validaciones y operaciones focalizadas, sin BD', () => {
       const created = [...state.users.values()].find(
         (user) => user.correo === profile.correo,
       )!;
-      expect(created.saldo).toBe(8);
-      expect(state.users.get(existing.id)?.saldo).toBe(3);
+      expect(created.saldo).toBe('8');
+      expect(state.users.get(existing.id)?.saldo).toBe('3');
       const movements = [...state.movements.values()].filter(
         (entry) => entry.id_usuario === created.id_usuario,
       );
       expect(movements).toEqual([
         expect.objectContaining({
           tipo: 'BonoInicial',
-          cantidad: 8,
-          saldo_anterior: 0,
-          saldo_posterior: 8,
-          retenidos_anterior: 0,
-          retenidos_posterior: 0,
+          cantidad: '8',
+          saldo_anterior: '0',
+          saldo_posterior: '8',
+          retenidos_anterior: '0',
+          retenidos_posterior: '0',
         }),
       ]);
     });

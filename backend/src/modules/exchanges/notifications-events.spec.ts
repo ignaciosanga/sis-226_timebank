@@ -145,7 +145,7 @@ describe('notificaciones de solicitudes y reservas', () => {
     );
   });
 
-  it('notifies the other participant when a reservation is cancelled or completed', async () => {
+  it('notifies the other participant when a reservation is cancelled or awaits confirmation', async () => {
     const cancelled = await setupExchange();
     const request = await cancelled.createRequest('cancel-reservation');
     const reservation = await cancelled.service.acceptRequest(
@@ -191,14 +191,14 @@ describe('notificaciones de solicitudes y reservas', () => {
       completionReservation.id_reserva,
       'confirm-provider-0001',
     );
-    const completedNotifications = await completed.repository.read((state) => [
+    const confirmationNotifications = await completed.repository.read((state) => [
       ...state.notifications.values(),
     ]);
-    expect(completedNotifications).toEqual(
+    expect(confirmationNotifications).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          id_usuario: 'requester',
-          tipo: NotificationType.RESERVA_COMPLETADA,
+          id_usuario: 'provider',
+          tipo: NotificationType.CLASE_POR_CONFIRMAR,
         }),
       ]),
     );

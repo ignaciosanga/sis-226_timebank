@@ -1,8 +1,8 @@
 export const REGISTRATION_POLICY = Symbol('REGISTRATION_POLICY');
 
 export interface RegistrationPolicy {
-  // Solo desarrollo/pruebas v0.2: crear perfil sin cuentas ni politica de creditos.
+  // Compatibilidad de tests históricos; ya no permite omitir la verificación.
   profileOnly?: boolean;
-  // Decimal como texto para no introducir redondeo de creditos; null bloquea registro.
+  // Política interna como texto; actualmente entero. null bloquea nuevas altas/activaciones.
   initialCredits: string | null;
 }

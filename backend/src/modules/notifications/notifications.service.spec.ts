@@ -1,9 +1,13 @@
 import { NotFoundException } from '@nestjs/common';
+import { ListQueryDto } from '../../common/dto/list-query.dto';
 import { MemoryExchangeRepository } from '../exchanges/memory-exchange.repository';
 import { storedUser } from '../exchanges/test-fixtures';
 import { addNotification } from './notification.factory';
 import { NotificationsService } from './notifications.service';
 import { NotificationType } from './notification.types';
+
+const listQuery = (page = 1, limit = 20) =>
+  Object.assign(new ListQueryDto(), { page, limit });
 
 describe('NotificationsService', () => {
   let repository: MemoryExchangeRepository;
@@ -31,7 +35,7 @@ describe('NotificationsService', () => {
       addNotification(state, {
         eventId: 'newer',
         recipientId: 'student-a',
-        type: NotificationType.RESERVA_CONFIRMADA,
+        type: NotificationType.SOLICITUD_ACEPTADA,
         title: 'Reciente',
         message: 'Mensaje reciente',
         createdAt: newer,
@@ -45,14 +49,22 @@ describe('NotificationsService', () => {
       });
     });
 
-    const notifications = await service.listForUser('student-a');
+    const notifications = await service.listForUser('student-a', listQuery());
 
-    expect(notifications.map(({ titulo }) => titulo)).toEqual([
+    expect(notifications.data.map(({ titulo }) => titulo)).toEqual([
       'Reciente',
       'Anterior',
     ]);
-    expect(notifications.every(({ id_usuario }) => id_usuario === 'student-a'))
-      .toBe(true);
+    expect(
+      notifications.data.every(({ id_usuario }) => id_usuario === 'student-a'),
+    ).toBe(true);
+    expect(notifications.meta).toEqual({
+      page: 1,
+      limit: 20,
+      total: 2,
+      totalPages: 1,
+      noLeidas: 2,
+    });
   });
 
   it('marks one notification read and hides notifications belonging to others', async () => {
@@ -90,7 +102,7 @@ describe('NotificationsService', () => {
       const alreadyRead = addNotification(state, {
         eventId: 'a-read',
         recipientId: 'student-a',
-        type: NotificationType.RESERVA_CONFIRMADA,
+        type: NotificationType.SOLICITUD_ACEPTADA,
         title: 'Leída',
         message: 'Leída',
       });
@@ -104,27 +116,25 @@ describe('NotificationsService', () => {
       });
     });
 
+    const firstPage = await service.listForUser('student-a', listQuery(1, 1));
+    expect(firstPage.data).toHaveLength(1);
+    expect(firstPage.meta).toEqual({
+      page: 1,
+      limit: 1,
+      total: 2,
+      totalPages: 2,
+      noLeidas: 1,
+    });
+
     await expect(service.markAllRead('student-a')).resolves.toEqual({
       actualizadas: 1,
     });
     const [mine, other] = await Promise.all([
-      service.listForUser('student-a'),
-      service.listForUser('student-b'),
+      service.listForUser('student-a', listQuery()),
+      service.listForUser('student-b', listQuery()),
     ]);
-    expect(mine.every(({ leida }) => leida)).toBe(true);
-    expect(other[0]?.leida).toBe(false);
+    expect(mine.data.every(({ leida }) => leida)).toBe(true);
+    expect(other.data[0]?.leida).toBe(false);
   });
 
-  it('creates a single notification when an opinion event is retried', async () => {
-    await repository.transaction((state) => {
-      state.users.set('student-a', storedUser('student-a'));
-    });
-
-    const first = await service.notifyOpinionReceived('student-a', 'rating-1');
-    const retry = await service.notifyOpinionReceived('student-a', 'rating-1');
-
-    expect(retry.id_notificacion).toBe(first.id_notificacion);
-    expect(retry.tipo).toBe(NotificationType.OPINION_RECIBIDA);
-    expect(await service.listForUser('student-a')).toHaveLength(1);
-  });
 });

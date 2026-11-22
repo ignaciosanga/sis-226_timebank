@@ -21,6 +21,7 @@ import {
   ExchangeRepository,
 } from '../exchanges/exchange.repository';
 import { MemoryExchangeRepository } from '../exchanges/memory-exchange.repository';
+import { compareCredits, parseCredits } from '../exchanges/credits';
 import {
   AdminAuditEntry,
   ExchangeState,
@@ -49,6 +50,7 @@ function recordAdminAudit(
   });
 }
 import { adaptStoredUser, StoredUser, UserRecord } from './user.types';
+import { activateAccount, grantWelcomeBonus } from '../auth/account-activation';
 
 @Injectable()
 export class MemoryUsersRepository implements UsersRepository {
@@ -78,24 +80,23 @@ export class MemoryUsersRepository implements UsersRepository {
       throw new NotFoundException('Carrera activa no encontrada');
   }
   createStudentProfile(input: CreateStudentProfile): Promise<UserRecord> {
-    return this.create(input, 0);
+    return this.create(input, '0');
   }
   createStudentWithAccount(input: CreateStudent): Promise<UserRecord> {
-    const initial = Number(input.initialCredits);
     if (
-      !/^\d+$/.test(input.initialCredits) ||
-      !Number.isInteger(initial) ||
-      initial < 0 ||
-      initial > 2147483647
+      typeof input.initialCredits !== 'string' ||
+      !/^\d+$/.test(input.initialCredits)
     )
       throw new BadRequestException(
         'El saldo inicial debe ser un entero PostgreSQL no negativo',
       );
-    return this.create(input, initial);
+    const initial = parseCredits(input.initialCredits);
+    return this.create(input, initial, input);
   }
   private async create(
     input: CreateStudentProfile,
-    initial: number,
+    initial: string,
+    authentication?: Pick<CreateStudent, 'verification' | 'googleSubject'>,
   ): Promise<UserRecord> {
     await this.requireCareer(input.idCarrera);
     return this.persistence.transaction((state) => {
@@ -111,28 +112,39 @@ export class MemoryUsersRepository implements UsersRepository {
         rol: DatabaseRole.ESTUDIANTE,
         id_carrera: input.idCarrera,
         semestre: input.semestre,
-        saldo: initial,
-        creditos_retenidos: 0,
+        saldo: '0',
+        creditos_retenidos: '0',
         fecha_registro: new Date(),
         ultimo_acceso: null,
-        estado: UserStatus.ACTIVO,
+        estado:
+          authentication?.verification || authentication?.googleSubject
+            ? UserStatus.PENDIENTE
+            : UserStatus.ACTIVO,
+        cuenta_previa: false,
+        email_verificado_at: null,
+        metodo_verificacion: null,
+        bono_decidido_at: null,
+        google_sub: null,
       };
       state.users.set(row.id_usuario, row);
-      if (initial > 0) {
-        const movement = {
-          id_movimiento: randomUUID(),
+      if (authentication?.verification) {
+        const challenge = authentication.verification;
+        state.verifications.set(challenge.token_hash, {
+          ...challenge,
           id_usuario: row.id_usuario,
-          id_reserva: null,
-          tipo: 'BonoInicial' as const,
-          cantidad: initial,
-          saldo_anterior: 0,
-          saldo_posterior: initial,
-          retenidos_anterior: 0,
-          retenidos_posterior: 0,
-          created_at: new Date(),
-          descripcion: 'Politica interna de registro',
-        };
-        state.movements.set(movement.id_movimiento, movement);
+        });
+      } else if (authentication?.googleSubject) {
+        activateAccount(
+          state,
+          row,
+          initial,
+          'google',
+          new Date(),
+          authentication.googleSubject,
+        );
+      } else {
+        // Alta interna de fixtures/perfiles de confianza. El registro HTTP usa verification.
+        grantWelcomeBonus(state, row, initial, new Date());
       }
       if (input.createdBy)
         recordAdminAudit(state, {
@@ -211,7 +223,7 @@ export class MemoryUsersRepository implements UsersRepository {
           throw new ConflictException(
             `El usuario tiene ${activeReservations} reserva(s) confirmada(s) pendientes de resolucion`,
           );
-        if (row.creditos_retenidos > 0)
+        if (compareCredits(row.creditos_retenidos, '0') > 0)
           throw new ConflictException(
             'El usuario tiene creditos retenidos pendientes de liberacion',
           );

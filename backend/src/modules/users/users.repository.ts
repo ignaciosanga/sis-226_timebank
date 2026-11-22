@@ -2,6 +2,7 @@ import { DatabaseRole, Role } from '../../common/enums/role.enum';
 import { UserStatus } from '../../common/enums/record-status.enum';
 import { UserRecord } from './user.types';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { EmailVerification } from '../exchanges/exchange.types';
 
 export const USERS_REPOSITORY = Symbol('USERS_REPOSITORY');
 
@@ -14,13 +15,19 @@ export interface CreateStudent {
   semestre: number;
   role: Role.ESTUDIANTE;
   initialCredits: string;
+  /** Datos internos de autenticación, nunca copiados del DTO HTTP. */
+  verification?: Omit<EmailVerification, 'id_usuario'>;
+  googleSubject?: string;
   /** ID del ADMIN que da de alta; registra ADMIN_USER_CREATE en la misma transaccion. */
   createdBy?: string;
 }
 
 export class EmailAlreadyExistsError extends Error {}
 
-export type CreateStudentProfile = Omit<CreateStudent, 'initialCredits'>;
+export type CreateStudentProfile = Omit<
+  CreateStudent,
+  'initialCredits' | 'verification' | 'googleSubject'
+>;
 
 export interface AdminUsersFilter {
   search?: string;

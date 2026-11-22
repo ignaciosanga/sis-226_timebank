@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main]
+    branches: [main, apis/integracion-parcial3]
 
 permissions:
   contents: read
@@ -46,3 +46,67 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm test
       - run: npm run build -- --base=/
+
+  e2e:
+    name: Flujo completo E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16.15-alpine
+        env:
+          POSTGRES_USER: timebank
+          POSTGRES_PASSWORD: timebank
+          POSTGRES_DB: timebank_e2e
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U timebank -d timebank_e2e"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      mailpit:
+        image: axllent/mailpit:v1.27.8
+        ports: ['1025:1025', '8025:8025']
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: development
+      PERSISTENCE_MODE: prisma
+      DATABASE_ENABLED: 'true'
+      DATABASE_URL: postgresql://timebank:timebank@localhost:5432/timebank_e2e
+      JWT_SECRET: ci-flujo-completo-e2e-0123456789abcdef
+      MAIL_TRANSPORT: smtp
+      SMTP_HOST: 127.0.0.1
+      SMTP_PORT: '1025'
+      SMTP_REQUIRE_TLS: 'false'
+      PUBLIC_API_URL: http://localhost:4000
+      RATE_LIMIT_MAX: '1000'
+      LOCAL_DEVELOPMENT_SEED: 'true'
+      API_URL: http://localhost:4000
+      MAILPIT_URL: http://localhost:8025
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: backend/package.json
+      - run: npm ci
+      - run: npm run build
+      - name: Aplicar todas las migraciones
+        run: npx prisma migrate deploy
+      - name: Cargar catálogos y malla académica
+        run: |
+          node scripts/seed-local.cjs
+          node scripts/seed-academic.cjs
+      - name: Levantar la API
+        run: |
+          node dist/main.js > api.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:4000/health/ready && exit 0
+            sleep 1
+          done
+          cat api.log
+          exit 1
+      - name: Recorrer el flujo completo
+        run: node scripts/e2e-flujo-completo.mjs
+      - name: Log de la API si falla
+        if: failure()
+        run: cat api.log

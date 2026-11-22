@@ -1,10 +1,10 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ListQueryDto, paginate } from '../../common/dto/list-query.dto';
 import {
   EXCHANGE_REPOSITORY,
   ExchangeRepository,
 } from '../exchanges/exchange.repository';
-import { addNotification } from './notification.factory';
-import { NotificationRecord, NotificationType } from './notification.types';
+import { NotificationRecord } from './notification.types';
 
 @Injectable()
 export class NotificationsService {
@@ -13,16 +13,24 @@ export class NotificationsService {
     private readonly persistence: ExchangeRepository,
   ) {}
 
-  listForUser(userId: string): Promise<NotificationRecord[]> {
-    return this.persistence.read((state) =>
-      [...state.notifications.values()]
+  listForUser(userId: string, query: ListQueryDto) {
+    return this.persistence.read((state) => {
+      const ownNotifications = [...state.notifications.values()]
         .filter((notification) => notification.id_usuario === userId)
         .sort(
           (left, right) =>
             right.created_at.getTime() - left.created_at.getTime() ||
             right.id_notificacion.localeCompare(left.id_notificacion),
-        ),
-    );
+        );
+      const page = paginate(ownNotifications, query);
+      return {
+        ...page,
+        meta: {
+          ...page.meta,
+          noLeidas: ownNotifications.filter(({ leida }) => !leida).length,
+        },
+      };
+    });
   }
 
   markRead(
@@ -48,23 +56,6 @@ export class NotificationsService {
         }
       }
       return { actualizadas };
-    });
-  }
-
-  notifyOpinionReceived(
-    recipientId: string,
-    ratingId: string,
-  ): Promise<NotificationRecord> {
-    return this.persistence.transaction((state) => {
-      if (!state.users.has(recipientId))
-        throw new NotFoundException('Usuario no encontrado');
-      return addNotification(state, {
-        eventId: `opinion:${ratingId}`,
-        recipientId,
-        type: NotificationType.OPINION_RECIBIDA,
-        title: 'Recibiste una nueva opinión',
-        message: 'Un estudiante dejó una opinión sobre un intercambio contigo.',
-      });
     });
   }
 }

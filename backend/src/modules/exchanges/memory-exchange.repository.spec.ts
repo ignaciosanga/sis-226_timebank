@@ -2,6 +2,7 @@ import { AvailabilityStatus } from '../../common/enums/record-status.enum';
 import { ExchangeState } from './exchange.types';
 import { storedUser } from './test-fixtures';
 import { MemoryExchangeRepository } from './memory-exchange.repository';
+import { addCredits, subtractCredits } from './credits';
 
 describe('MemoryExchangeRepository', () => {
   let repository: MemoryExchangeRepository;
@@ -11,7 +12,7 @@ describe('MemoryExchangeRepository', () => {
     repository = new MemoryExchangeRepository();
   });
 
-  it('confirma los datos y devuelve Map, Date y creditos INTEGER preservados', async () => {
+  it('confirma los datos y devuelve Map, Date y créditos exactos preservados', async () => {
     const now = new Date('2030-01-01T10:00:00Z');
     const result = await repository.transaction((state) => {
       state.users.set('student', account());
@@ -44,8 +45,14 @@ describe('MemoryExchangeRepository', () => {
     const before = await repository.read((state) => state);
     await expect(
       repository.transaction((state) => {
-        state.users.get('student')!.saldo -= 100;
-        state.users.get('student')!.creditos_retenidos += 100;
+        state.users.get('student')!.saldo = subtractCredits(
+          state.users.get('student')!.saldo,
+          '100',
+        );
+        state.users.get('student')!.creditos_retenidos = addCredits(
+          state.users.get('student')!.creditos_retenidos,
+          '100',
+        );
         state.users.set('provider', account('provider'));
         state.movements.set('hold', {
           id_movimiento: 'hold',
@@ -96,13 +103,13 @@ describe('MemoryExchangeRepository', () => {
           const current = state.users.get('student')!;
           const priorBalance = current.saldo;
           await Promise.resolve();
-          current.saldo = priorBalance + 1;
+          current.saldo = addCredits(priorBalance, '1');
         }),
       ),
     );
     expect(
       await repository.read((state) => state.users.get('student')?.saldo),
-    ).toBe(1050);
+    ).toBe('1050');
   });
 
   it('consulta solamente datos confirmados durante una transaccion pendiente', async () => {

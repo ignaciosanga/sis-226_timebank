@@ -17,6 +17,9 @@ import { ReservationsModule } from './modules/reservations/reservations.module';
 import { CreditsModule } from './modules/credits/credits.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
+import { TutoringModule } from './modules/tutoring/tutoring.module';
+import { AcademicModule } from './modules/academic/academic.module';
+import { AssistantModule } from './modules/assistant/assistant.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
@@ -47,6 +50,9 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     CreditsModule,
     AnalyticsModule,
     CalendarModule,
+    TutoringModule,
+    AcademicModule,
+    AssistantModule,
     NotificationsModule,
   ],
   providers: [

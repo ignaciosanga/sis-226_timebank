@@ -4,7 +4,9 @@ require('dotenv/config');
 const assert = require('node:assert/strict');
 const { randomBytes, randomUUID } = require('node:crypto');
 const { execFileSync } = require('node:child_process');
-const { resolve } = require('node:path');
+const { resolve, dirname } = require('node:path');
+const { mkdtempSync, rmSync } = require('node:fs');
+const { tmpdir } = require('node:os');
 const { Client } = require('pg');
 const request = require('supertest');
 const { seedLocal } = require('./seed-local.cjs');
@@ -22,6 +24,17 @@ async function main() {
       'Usar Compose local o TEST_DATABASE_URL explicita de un servidor de pruebas con permiso CREATE DATABASE.',
     );
   const database = `timebank_test_${randomBytes(8).toString('hex')}`;
+  const bannerDirectory = mkdtempSync(
+    resolve(tmpdir(), 'nexo-u-postgres-banners-'),
+  );
+  // Validar el destino absoluto antes de autorizar su limpieza recursiva.
+  assert.equal(dirname(bannerDirectory), resolve(tmpdir()));
+  assert.ok(
+    bannerDirectory
+      .split(/[\\/]/)
+      .at(-1)
+      .startsWith('nexo-u-postgres-banners-'),
+  );
   const admin = new Client({ connectionString: url.href });
   let created = false;
   const apps = [];
@@ -39,6 +52,8 @@ async function main() {
       JWT_SECRET: randomBytes(48).toString('hex'),
       RATE_LIMIT_MAX: '10000',
       JWT_EXPIRES_IN_SECONDS: '86400',
+      REGISTRATION_INITIAL_CREDITS: '0',
+      BANNER_STORAGE_DIR: bannerDirectory,
     });
     const migrate = () =>
       execFileSync(
@@ -54,10 +69,10 @@ async function main() {
       await seedLocal(db);
       await seedLocal(db);
       const counts = await db.query(
-        'SELECT (SELECT count(*) FROM "CARRERAS")::int AS careers, (SELECT count(*) FROM "CATEGORIAS")::int AS categories, (SELECT count(*) FROM "HABILIDADES")::int AS skills',
+        'SELECT EXISTS(SELECT 1 FROM "CARRERAS" WHERE id_carrera = \'30000000-0000-4000-8000-000000000001\' AND estado = \'activo\') AS known_career, (SELECT count(*) FROM "CATEGORIAS")::int AS categories, (SELECT count(*) FROM "HABILIDADES")::int AS skills',
       );
       assert.deepEqual(counts.rows[0], {
-        careers: 1,
+        known_career: true,
         categories: 4,
         skills: 5,
       });
@@ -65,7 +80,17 @@ async function main() {
       await db.end();
     }
 
-    const { NestFactory } = require('@nestjs/core');
+    const { Test } = require('@nestjs/testing');
+    const {
+      VerificationMailer,
+    } = require('../dist/modules/auth/verification-mailer');
+    const mailbox = [];
+    const mailer = {
+      assertConfigured() {},
+      async send(correo, token) {
+        mailbox.push({ correo, token });
+      },
+    };
     const { AppModule } = require('../dist/app.module');
     const { configureApp } = require('../dist/config/configure-app');
     const {
@@ -75,7 +100,11 @@ async function main() {
       EXCHANGE_REPOSITORY,
     } = require('../dist/modules/exchanges/exchange.repository');
     const open = async () => {
-      const app = await NestFactory.create(AppModule, {
+      const module = await Test.createTestingModule({ imports: [AppModule] })
+        .overrideProvider(VerificationMailer)
+        .useValue(mailer)
+        .compile();
+      const app = module.createNestApplication({
         logger: false,
         abortOnError: false,
       });
@@ -93,8 +122,8 @@ async function main() {
     const careerId = '30000000-0000-4000-8000-000000000001';
     const skillId = '20000000-0000-4000-8000-000000000001';
     const password = randomBytes(24).toString('base64url');
-    const register = async (correo) =>
-      (
+    const register = async (correo) => {
+      const user = (
         await api
           .post('/auth/register')
           .send({
@@ -107,9 +136,17 @@ async function main() {
           })
           .expect(201)
       ).body;
-    const provider = await register('provider@example.test');
-    const consumer = await register('consumer@example.test');
-    const administrator = await register('admin@example.test');
+      const message = mailbox.findLast((item) => item.correo === correo);
+      assert.ok(message);
+      await api
+        .post('/auth/verify-email')
+        .send({ token: message.token })
+        .expect(200);
+      return user;
+    };
+    const provider = await register('provider@ucb.edu.bo');
+    const consumer = await register('consumer@ucb.edu.bo');
+    const administrator = await register('admin@ucb.edu.bo');
     await first.get(USERS_REPOSITORY).grantDevelopmentAdmin(administrator.id);
     const login = async (correo) =>
       (await api.post('/auth/login').send({ correo, password }).expect(200))
@@ -254,9 +291,40 @@ async function main() {
     console.log(
       'PostgreSQL OK: migracion/semilla repetibles, HTTP/JWT, 2 instancias, reserva unica, cobro unico, idempotencia persistente, rollback y reinicio.',
     );
+    await require('./test-account-activation.cjs').verifyAccountLifecycle({
+      open,
+      first: restarted,
+      mailbox,
+      connectionString: url.href,
+    });
+    await require('./test-tutoring-offers.cjs').verifyTutoringOffers({
+      open,
+      mailbox,
+      connectionString: url.href,
+    });
+    // Los verificadores decimales usan las mismas migraciones oficiales.
+    // El fixture provisional se conserva solo como referencia histórica.
+    await require('./test-offer-requests.cjs').verifyOfferRequests({
+      open,
+      mailbox,
+      connectionString: url.href,
+    });
+    await require('./test-reservation-settlement.cjs').verifyReservationSettlement(
+      {
+        open,
+        mailbox,
+        connectionString: url.href,
+      },
+    );
+    await require('./test-cancellations.cjs').verifyCancellations({
+      open,
+      mailbox,
+      connectionString: url.href,
+    });
   } finally {
     Date.now = originalNow;
     await Promise.all(apps.map((app) => app.close().catch(() => undefined)));
+    rmSync(bannerDirectory, { recursive: true, force: true });
     if (created) await admin.query(`DROP DATABASE "${database}" WITH (FORCE)`);
     await admin.end();
   }

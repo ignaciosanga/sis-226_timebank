@@ -7,6 +7,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -19,16 +20,21 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { ListQueryDto, PaginationMeta } from '../../common/dto/list-query.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { EmptyBodyPipe } from '../../common/pipes/empty-body.pipe';
 import { PublicUser } from '../users/user.types';
+import { NotificationType } from './notification.types';
 import { NotificationsService } from './notifications.service';
 
 class NotificationResponse {
   @ApiProperty({ format: 'uuid' })
   id_notificacion!: string;
-  @ApiProperty({ example: 'SOLICITUD_RECIBIDA' })
+  @ApiProperty({
+    enum: Object.values(NotificationType),
+    example: NotificationType.SOLICITUD_RECIBIDA,
+  })
   tipo!: string;
   @ApiProperty()
   titulo!: string;
@@ -45,6 +51,18 @@ class MarkAllNotificationsResponse {
   actualizadas!: number;
 }
 
+class NotificationPageMeta extends PaginationMeta {
+  @ApiProperty()
+  noLeidas!: number;
+}
+
+class NotificationsPageResponse {
+  @ApiProperty({ type: NotificationResponse, isArray: true })
+  data!: NotificationResponse[];
+  @ApiProperty({ type: NotificationPageMeta })
+  meta!: NotificationPageMeta;
+}
+
 @ApiTags('Notificaciones')
 @ApiBearerAuth()
 @ApiUnauthorizedResponse()
@@ -54,12 +72,12 @@ export class NotificationsController {
   constructor(private readonly notifications: NotificationsService) {}
 
   @Get('me')
-  @ApiOkResponse({ type: NotificationResponse, isArray: true })
+  @ApiOkResponse({ type: NotificationsPageResponse })
   @ApiOperation({
     summary: 'Consultar las notificaciones propias, más recientes primero',
   })
-  list(@CurrentUser() user: PublicUser) {
-    return this.notifications.listForUser(user.id);
+  list(@CurrentUser() user: PublicUser, @Query() query: ListQueryDto) {
+    return this.notifications.listForUser(user.id, query);
   }
 
   @Patch(':id/read')

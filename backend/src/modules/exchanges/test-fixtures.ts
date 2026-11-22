@@ -5,13 +5,19 @@ import {
 } from '../../common/enums/record-status.enum';
 import { StoredUser } from '../users/user.types';
 import {
+  addCredits,
+  CreditValue,
+  formatCredits,
+  subtractCredits,
+} from './credits';
+import {
   ExchangeState,
   Movement,
   RequestStatus,
   ReservationStatus,
 } from './exchange.types';
 
-export function storedUser(id: string, saldo = 0): StoredUser {
+export function storedUser(id: string, saldo: CreditValue = '0'): StoredUser {
   return {
     id_usuario: id,
     nombre: id,
@@ -21,8 +27,8 @@ export function storedUser(id: string, saldo = 0): StoredUser {
     rol: DatabaseRole.ESTUDIANTE,
     id_carrera: null,
     semestre: null,
-    saldo,
-    creditos_retenidos: 0,
+    saldo: formatCredits(saldo),
+    creditos_retenidos: '0',
     fecha_registro: new Date('2029-01-01T00:00:00Z'),
     ultimo_acceso: null,
     estado: UserStatus.ACTIVO,
@@ -34,7 +40,7 @@ export function addMovement(
   id: string,
   userId: string,
   tipo: Movement['tipo'],
-  amount: number,
+  amount: CreditValue,
   reservationId: string | null = null,
   at = new Date('2029-12-31T00:00:00Z'),
 ): void {
@@ -44,7 +50,7 @@ export function addMovement(
     id_usuario: userId,
     id_reserva: reservationId,
     tipo,
-    cantidad: amount,
+    cantidad: formatCredits(amount),
     saldo_anterior: user.saldo,
     saldo_posterior: user.saldo,
     retenidos_anterior: user.creditos_retenidos,
@@ -52,11 +58,14 @@ export function addMovement(
     created_at: at,
     descripcion: null,
   };
-  if (tipo === 'Retencion') user.creditos_retenidos += amount;
-  else if (tipo === 'Liberacion') user.creditos_retenidos -= amount;
+  if (tipo === 'Retencion')
+    user.creditos_retenidos = addCredits(user.creditos_retenidos, amount);
+  else if (tipo === 'Liberacion')
+    user.creditos_retenidos = subtractCredits(user.creditos_retenidos, amount);
   else {
-    user.saldo += amount;
-    if (tipo === 'Consumo') user.creditos_retenidos += amount;
+    user.saldo = addCredits(user.saldo, amount);
+    if (tipo === 'Consumo')
+      user.creditos_retenidos = addCredits(user.creditos_retenidos, amount);
   }
   record.saldo_posterior = user.saldo;
   record.retenidos_posterior = user.creditos_retenidos;
@@ -104,7 +113,7 @@ export function addReservation(
     id_habilidad: 'skill',
     fecha_inicio_propuesta: start,
     fecha_fin_propuesta: end,
-    creditos_requeridos: 4,
+    creditos_requeridos: '4',
     estado: RequestStatus.ACEPTADA,
     created_at: new Date('2029-12-31T00:00:00Z'),
     respondida_at: new Date('2029-12-31T00:00:00Z'),
@@ -121,7 +130,7 @@ export function addReservation(
     id_habilidad: 'skill',
     fecha_inicio: start,
     fecha_fin: end,
-    creditos: 4,
+    creditos: '4',
     modalidad: 'Virtual' as const,
     lugar: 'Por coordinar',
     estado: status,

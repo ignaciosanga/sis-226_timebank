@@ -1,6 +1,11 @@
 import type { Availability } from '../availability/availability.types';
 import type { UserSkill } from '../user-skills/user-skill.types';
 import type { StoredUser } from '../users/user.types';
+import type { TutoringOffer } from '../tutoring/offer.types';
+import type { TutoringBanner } from '../tutoring/banners/banner.types';
+import type { OfferRating } from '../tutoring/offer-metrics';
+import type { CreditValue } from './credits';
+import type { CancellationClassification } from './cancellation-policy';
 import type { NotificationRecord } from '../notifications/notification.types';
 
 export enum RequestStatus {
@@ -17,13 +22,14 @@ export enum ReservationStatus {
 }
 
 export interface ExchangeRequest {
+  id_oferta?: string | null;
   id_solicitud: string;
   id_solicitante: string;
   id_ofertante: string;
   id_habilidad: string;
   fecha_inicio_propuesta: Date;
   fecha_fin_propuesta: Date;
-  creditos_requeridos: number;
+  creditos_requeridos: CreditValue;
   estado: RequestStatus;
   created_at: Date;
   respondida_at: Date | null;
@@ -37,7 +43,7 @@ export interface Reservation {
   id_habilidad: string;
   fecha_inicio: Date;
   fecha_fin: Date;
-  creditos: number;
+  creditos: CreditValue;
   modalidad: 'Presencial' | 'Virtual' | 'Hibrida';
   lugar: string;
   estado: ReservationStatus;
@@ -59,16 +65,17 @@ export interface Movement {
     | 'BonoInicial'
     | 'Recompensa'
     | 'Penalizacion'
+    | 'penalizacion_sin_saldo'
     | 'Transferencia'
     | 'Ajuste'
     | 'Retencion'
     | 'Liberacion'
     | 'Consumo';
-  cantidad: number;
-  saldo_anterior: number;
-  saldo_posterior: number;
-  retenidos_anterior: number;
-  retenidos_posterior: number;
+  cantidad: CreditValue;
+  saldo_anterior: CreditValue;
+  saldo_posterior: CreditValue;
+  retenidos_anterior: CreditValue;
+  retenidos_posterior: CreditValue;
   created_at: Date;
   descripcion: string | null;
 }
@@ -83,9 +90,7 @@ export interface AdminAuditEntry {
   id_auditoria: string;
   id_usuario: string;
   accion:
-    | 'ADMIN_USER_CREATE'
-    | 'ADMIN_USER_DEACTIVATE'
-    | 'ADMIN_USER_REACTIVATE';
+    'ADMIN_USER_CREATE' | 'ADMIN_USER_DEACTIVATE' | 'ADMIN_USER_REACTIVATE';
   entidad: 'USUARIOS';
   entidad_id: string;
   datos_anteriores: Record<string, unknown> | null;
@@ -95,6 +100,13 @@ export interface AdminAuditEntry {
 
 /** Las entidades centrales reflejan las 12 tablas oficiales optimizadas. */
 export interface ExchangeState {
+  /** Capacidad verificada del esquema; no es una bandera configurable por HTTP. */
+  creditSchema: 'integer' | 'decimal';
+  offers: Map<string, TutoringOffer>;
+  banners: Map<string, TutoringBanner>;
+  /** Opiniones inmutables; escritura por el solicitante de una reserva completada. */
+  ratings: Map<string, OfferRating>;
+  verifications: Map<string, EmailVerification>;
   users: Map<string, StoredUser>;
   availability: Map<string, Availability>;
   userSkills: Map<string, UserSkill>;
@@ -105,10 +117,23 @@ export interface ExchangeState {
   requestMetadata: Map<string, { availabilityId: string; descripcion: string }>;
   reservationMetadata: Map<
     string,
-    { availabilityId: string; administrativa: boolean }
+    {
+      availabilityId: string | null;
+      administrativa: boolean;
+      clasificacionCancelacion?: CancellationClassification;
+    }
   >;
   idempotency: Map<string, IdempotencyRecord>;
   /** Solo escritura: acciones ADMIN sobre usuarios registradas en AUDITORIA. */
   adminAudit: Map<string, AdminAuditEntry>;
   notifications: Map<string, NotificationRecord>;
+}
+
+export interface EmailVerification {
+  id_verificacion: string;
+  id_usuario: string;
+  token_hash: string;
+  created_at: Date;
+  expires_at: Date;
+  consumed_at: Date | null;
 }

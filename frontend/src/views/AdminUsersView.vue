@@ -141,7 +141,7 @@ async function confirmDeactivate() {
 async function confirmGrant() {
   operationError.value = ''
   const amount = grantAmount.value.trim(), why = grantReason.value.trim(), user = selectedUser.value
-  if (!/^\d+$/.test(amount) || Number(amount) < 1) { operationError.value = 'Escribe una cantidad entera de créditos (1 crédito = 15 minutos).'; return }
+  if (!/^\d+$/.test(amount) || Number(amount) < 1) { operationError.value = 'Escribe una cantidad entera de créditos.'; return }
   if (!why || why.length > 500) { operationError.value = 'Escribe el motivo de la carga (hasta 500 caracteres).'; return }
   busy.value = true
   try {
@@ -226,7 +226,7 @@ async function confirmGrant() {
       <template v-else-if="dialogMode === 'grant' && selectedUser">
         <div class="admin-dialog-symbol"><Coins :size="24" aria-hidden="true" /></div>
         <h2 id="admin-dialog-title">Cargar créditos</h2>
-        <p id="admin-dialog-description" class="admin-dialog-description">Suma créditos de tiempo a la cuenta del estudiante. 1 crédito equivale a 15 minutos.</p>
+        <p id="admin-dialog-description" class="admin-dialog-description">Suma créditos a la cuenta del estudiante para que pueda solicitar tutorías.</p>
         <div class="admin-selected-user"><span class="avatar" aria-hidden="true">{{ initials(selectedUser) }}</span><div><strong>{{ selectedUser.nombre }} {{ selectedUser.apellido }}</strong><span>{{ selectedUser.correo }}</span></div></div>
         <form class="admin-user-form" @submit.prevent="confirmGrant">
           <div class="admin-form-field"><label for="admin-grant-amount">Créditos</label><input id="admin-grant-amount" v-model="grantAmount" name="amount" inputmode="numeric" maxlength="16" required data-autofocus /></div>
