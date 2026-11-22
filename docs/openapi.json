@@ -3740,6 +3740,153 @@
           "Asistente IA"
         ]
       }
+    },
+    "/notifications/me": {
+      "get": {
+        "operationId": "NotificationsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationsPageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Consultar las notificaciones propias, más recientes primero",
+        "tags": [
+          "Notificaciones"
+        ]
+      }
+    },
+    "/notifications/{id}/read": {
+      "patch": {
+        "operationId": "NotificationsController_markRead",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": ""
+          },
+          "401": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Marcar una notificación propia como leída",
+        "tags": [
+          "Notificaciones"
+        ]
+      }
+    },
+    "/notifications/read-all": {
+      "post": {
+        "operationId": "NotificationsController_markAllRead",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarkAllNotificationsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": ""
+          },
+          "401": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Marcar como leídas todas las notificaciones propias",
+        "tags": [
+          "Notificaciones"
+        ]
+      }
     }
   },
   "info": {
@@ -4901,6 +5048,16 @@
           },
           "administrativa": {
             "type": "boolean"
+          },
+          "clasificacion": {
+            "type": "string",
+            "enum": [
+              "sin_multa",
+              "injustificada",
+              "administrativa"
+            ],
+            "nullable": true,
+            "description": "Clasificacion persistida en AUDITORIA; NULL en historial sin clasificar"
           }
         },
         "required": [
@@ -4908,7 +5065,8 @@
           "id_usuario",
           "motivo",
           "fecha",
-          "administrativa"
+          "administrativa",
+          "clasificacion"
         ]
       },
       "ReservationResponse": {
@@ -5034,7 +5192,7 @@
           },
           "cancelacion": {
             "nullable": true,
-            "description": "Vista derivada de campos de RESERVAS",
+            "description": "Campos de RESERVAS y clasificacion persistida en AUDITORIA",
             "type": "object",
             "allOf": [
               {
@@ -5130,6 +5288,7 @@
           "BonoInicial",
           "Recompensa",
           "Penalizacion",
+          "penalizacion_sin_saldo",
           "Transferencia",
           "Ajuste",
           "Retencion",
@@ -5782,6 +5941,107 @@
         },
         "required": [
           "apiKey"
+        ]
+      },
+      "NotificationResponse": {
+        "type": "object",
+        "properties": {
+          "id_notificacion": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "SolicitudRecibida",
+              "SolicitudAceptada",
+              "SolicitudRechazada",
+              "SolicitudCancelada",
+              "ReservaCancelada",
+              "ClasePorConfirmar",
+              "OpinionRecibida"
+            ],
+            "example": "SolicitudRecibida"
+          },
+          "titulo": {
+            "type": "string"
+          },
+          "mensaje": {
+            "type": "string"
+          },
+          "leida": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id_notificacion",
+          "tipo",
+          "titulo",
+          "mensaje",
+          "leida",
+          "created_at"
+        ]
+      },
+      "NotificationPageMeta": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "totalPages": {
+            "type": "number"
+          },
+          "noLeidas": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "totalPages",
+          "noLeidas"
+        ]
+      },
+      "NotificationsPageResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationResponse"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/NotificationPageMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "MarkAllNotificationsResponse": {
+        "type": "object",
+        "properties": {
+          "actualizadas": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 3
+          }
+        },
+        "required": [
+          "actualizadas"
         ]
       }
     }

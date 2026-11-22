@@ -53,7 +53,7 @@ async function verifyAccountLifecycle({
   const snapshot = async (id) => {
     const row = (
       await db.query(
-        'SELECT estado,saldo,creditos_retenidos,cuenta_previa,email_verificado_at,bono_decidido_at,google_sub,(SELECT count(*)::int FROM "MOVIMIENTOS_CREDITO" m WHERE m.id_usuario=u.id_usuario AND tipo=\'BonoInicial\') AS bonos FROM "USUARIOS" u WHERE id_usuario=$1',
+        'SELECT estado,saldo::text,creditos_retenidos::text,cuenta_previa,email_verificado_at,bono_decidido_at,google_sub,(SELECT count(*)::int FROM "MOVIMIENTOS_CREDITO" m WHERE m.id_usuario=u.id_usuario AND tipo=\'BonoInicial\') AS bonos FROM "USUARIOS" u WHERE id_usuario=$1',
         [id],
       )
     ).rows[0];
@@ -80,7 +80,7 @@ async function verifyAccountLifecycle({
   };
   try {
     const concurrent = await create();
-    assert.equal((await snapshot(concurrent.id)).saldo, 0);
+    assert.equal((await snapshot(concurrent.id)).saldo, '0');
     await api
       .post('/auth/login')
       .send({ correo: concurrent.correo, password })
@@ -94,7 +94,7 @@ async function verifyAccountLifecycle({
       [200, 200],
     );
     let row = await snapshot(concurrent.id);
-    assert.equal(row.saldo, 8);
+    assert.equal(row.saldo, '8');
     assert.equal(row.bonos, 1);
     results.push({
       caso: 'dos confirmaciones/dos instancias',
@@ -113,7 +113,7 @@ async function verifyAccountLifecycle({
       .send({ correo: concurrent.correo, password })
       .expect(200);
     row = await snapshot(concurrent.id);
-    assert.equal(row.saldo, 8);
+    assert.equal(row.saldo, '8');
     assert.equal(row.bonos, 1);
     results.push({
       caso: 'reintento tras reapertura',
@@ -129,7 +129,7 @@ async function verifyAccountLifecycle({
     await confirm(api, zero.token).expect(200);
     await google(zero);
     row = await snapshot(zero.id);
-    assert.equal(row.saldo, 0);
+    assert.equal(row.saldo, '0');
     assert.equal(row.bonos, 0);
     assert.ok(row.bono_decidido_at);
     results.push({
@@ -141,37 +141,36 @@ async function verifyAccountLifecycle({
 
     const failed = await create();
     // Falla SQL después de persistir usuario y token: la misma transacción debe revertirlos.
-    const client = await current
-      .get(
-        require('../dist/infrastructure/prisma/prisma.service').PrismaService,
-      )
-      .connect();
-    const originalTransaction = client.$transaction.bind(client);
-    client.$transaction = async (work, options) =>
-      originalTransaction(async (tx) => {
-        const original = tx.movimientoCredito.create.bind(tx.movimientoCredito);
-        tx.movimientoCredito.create = async (args) => {
-          if (
-            args.data.tipo === 'BonoInicial' &&
-            args.data.id_usuario === failed.id
-          ) {
-            // Viola la FK dentro de PostgreSQL, sin insertar un movimiento inválido.
-            return original({
-              data: { ...args.data, id_usuario: randomUUID() },
-            });
-          }
-          return original(args);
-        };
-        return work(tx);
-      }, options);
+    // El escritor decimal usa SQL parametrizado. El trigger ejerce la FK real
+    // independientemente del método de persistencia y solo afecta este fixture.
+    const fault = `activation_fault_${randomBytes(6).toString('hex')}`;
+    const missingUser = randomUUID();
+    assert.equal(
+      (
+        await db.query(
+          'SELECT count(*)::int AS n FROM "USUARIOS" WHERE id_usuario=$1',
+          [missingUser],
+        )
+      ).rows[0].n,
+      0,
+    );
     try {
+      await db.query(
+        `CREATE FUNCTION ${fault}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN NEW.id_usuario='${missingUser}'::uuid; RETURN NEW; END $$`,
+      );
+      await db.query(
+        `CREATE TRIGGER ${fault} BEFORE INSERT ON "MOVIMIENTOS_CREDITO" FOR EACH ROW WHEN (NEW.id_usuario='${failed.id}'::uuid AND NEW.tipo='BonoInicial') EXECUTE FUNCTION ${fault}()`,
+      );
       await confirm(api, failed.token).expect(409);
     } finally {
-      client.$transaction = originalTransaction;
+      await db.query(
+        `DROP TRIGGER IF EXISTS ${fault} ON "MOVIMIENTOS_CREDITO"`,
+      );
+      await db.query(`DROP FUNCTION IF EXISTS ${fault}()`);
     }
     row = await snapshot(failed.id);
     assert.equal(row.estado, 'Pendiente');
-    assert.equal(row.saldo, 0);
+    assert.equal(row.saldo, '0');
     assert.equal(row.bonos, 0);
     assert.equal(row.bono_decidido_at, null);
     assert.equal(
@@ -195,7 +194,7 @@ async function verifyAccountLifecycle({
       google(mixed, other),
     ]);
     row = await snapshot(mixed.id);
-    assert.equal(row.saldo, 8);
+    assert.equal(row.saldo, '8');
     assert.equal(row.bonos, 1);
     results.push({
       caso: 'correo y Google concurrentes',

@@ -1,5 +1,5 @@
-// Integracion fase 4: llamada solo despues de preparar el esquema decimal
-// provisional en la BD desechable timebank_test_* del script oficial.
+// Integración de solicitudes sobre las migraciones oficiales decimales.
+// Solo usa la BD desechable timebank_test_* creada por test:postgres.
 const assert = require('node:assert/strict');
 const { randomBytes, randomUUID } = require('node:crypto');
 const { Client } = require('pg');
@@ -264,6 +264,68 @@ async function verifyOfferRequests({ open, mailbox, connectionString }) {
         id_movimiento: undefined,
         id_usuario: student.id,
         tipo: 'Retencion',
+        cantidad: '3.7',
+        saldo_anterior: '10',
+        saldo_posterior: '10',
+        retenidos_anterior: '0',
+        retenidos_posterior: '3.7',
+      },
+    );
+    // Prisma devuelve Decimal; SQL y el dominio/HTTP conservan texto exacto.
+    // La relación nueva debe leer la oferta 9.9 sin alterar el snapshot 3.7.
+    const {
+      PrismaService,
+    } = require('../dist/infrastructure/prisma/prisma.service');
+    const { Prisma } = require('../dist/generated/prisma/client');
+    const prisma = await current.get(PrismaService).connect();
+    const prismaUser = await prisma.usuario.findUniqueOrThrow({
+      where: { id_usuario: student.id },
+      select: { saldo: true, creditos_retenidos: true },
+    });
+    assert.ok(Prisma.Decimal.isDecimal(prismaUser.saldo));
+    assert.ok(Prisma.Decimal.isDecimal(prismaUser.creditos_retenidos));
+    assert.deepEqual(
+      [prismaUser.saldo.toString(), prismaUser.creditos_retenidos.toString()],
+      ['10', '3.7'],
+    );
+    const prismaRequest = await prisma.solicitudIntercambio.findUniqueOrThrow({
+      where: { id_solicitud: created.id_solicitud },
+      select: {
+        creditos_requeridos: true,
+        id_oferta: true,
+        oferta: { select: { costo_creditos: true } },
+      },
+    });
+    assert.ok(Prisma.Decimal.isDecimal(prismaRequest.creditos_requeridos));
+    assert.equal(prismaRequest.creditos_requeridos.toString(), '3.7');
+    assert.equal(prismaRequest.id_oferta, offer.id_oferta);
+    assert.equal(prismaRequest.oferta.costo_creditos.toString(), '9.9');
+    const prismaReservation = await prisma.reserva.findUniqueOrThrow({
+      where: { id_reserva: reservation.id_reserva },
+      select: { creditos: true },
+    });
+    assert.ok(Prisma.Decimal.isDecimal(prismaReservation.creditos));
+    assert.equal(prismaReservation.creditos.toString(), '3.7');
+    const prismaMovement = await prisma.movimientoCredito.findUniqueOrThrow({
+      where: { id_movimiento: held[0].id_movimiento },
+      select: {
+        cantidad: true,
+        saldo_anterior: true,
+        saldo_posterior: true,
+        retenidos_anterior: true,
+        retenidos_posterior: true,
+      },
+    });
+    for (const value of Object.values(prismaMovement))
+      assert.ok(Prisma.Decimal.isDecimal(value));
+    assert.deepEqual(
+      Object.fromEntries(
+        Object.entries(prismaMovement).map(([name, value]) => [
+          name,
+          value.toString(),
+        ]),
+      ),
+      {
         cantidad: '3.7',
         saldo_anterior: '10',
         saldo_posterior: '10',
@@ -685,7 +747,7 @@ async function verifyOfferRequests({ open, mailbox, connectionString }) {
       pagos: 1,
     });
     console.log(
-      'Solicitudes de ofertas PostgreSQL OK (esquema decimal provisional, no migracion oficial):',
+      'Solicitudes de ofertas PostgreSQL OK (migraciones oficiales; Prisma, SQL y HTTP exactos):',
       JSON.stringify(cases),
     );
     return cases;

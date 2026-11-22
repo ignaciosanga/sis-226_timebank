@@ -22,6 +22,7 @@ import {
 import { StoredUser } from '../../modules/users/user.types';
 import { SkillLevel } from '../../modules/user-skills/user-skill.types';
 import { TutoringOffer } from '../../modules/tutoring/offer.types';
+import type { NotificationRecord } from '../../modules/notifications/notification.types';
 import { PrismaService } from './prisma.service';
 import {
   detectCreditSchema,
@@ -69,6 +70,7 @@ export class PrismaExchangeRepository implements ExchangeRepository {
       offers,
       banners,
       ratings,
+      notifications,
     ] = await Promise.all([
       readCreditRows(tx, creditSchema),
       tx.disponibilidad.findMany(),
@@ -81,6 +83,7 @@ export class PrismaExchangeRepository implements ExchangeRepository {
       tx.ofertaTutoria.findMany(),
       tx.bannerTutoria.findMany(),
       tx.calificacion.findMany(),
+      tx.notificacion.findMany(),
     ]);
     const state: ExchangeState = {
       creditSchema,
@@ -108,6 +111,7 @@ export class PrismaExchangeRepository implements ExchangeRepository {
       reservationMetadata: new Map(),
       idempotency: new Map(),
       adminAudit: new Map(),
+      notifications: new Map(),
     };
     for (const row of users) {
       if (
@@ -145,6 +149,11 @@ export class PrismaExchangeRepository implements ExchangeRepository {
         ...row,
         tipo: row.tipo as Movement['tipo'],
       });
+    for (const row of notifications)
+      state.notifications.set(row.id_notificacion, {
+        ...row,
+        tipo: row.tipo as NotificationRecord['tipo'],
+      });
     for (const row of metadata) {
       const data = row.datos_nuevos;
       if (!data || typeof data !== 'object' || Array.isArray(data)) continue;
@@ -158,21 +167,34 @@ export class PrismaExchangeRepository implements ExchangeRepository {
           fingerprint: data.fingerprint,
           result: data.result,
         });
-      else if (
-        row.accion === 'BACKEND_METADATA' &&
-        typeof data.availabilityId === 'string'
-      ) {
-        if (row.entidad === 'SOLICITUDES_INTERCAMBIO')
+      else if (row.accion === 'BACKEND_METADATA') {
+        if (
+          row.entidad === 'SOLICITUDES_INTERCAMBIO' &&
+          typeof data.availabilityId === 'string'
+        )
           state.requestMetadata.set(row.entidad_id, {
             availabilityId: data.availabilityId,
             descripcion:
               typeof data.descripcion === 'string' ? data.descripcion : '',
           });
-        if (row.entidad === 'RESERVAS')
+        if (row.entidad === 'RESERVAS') {
+          const classification = data.clasificacionCancelacion;
           state.reservationMetadata.set(row.entidad_id, {
-            availabilityId: data.availabilityId,
+            availabilityId:
+              typeof data.availabilityId === 'string'
+                ? data.availabilityId
+                : null,
             administrativa: data.administrativa === true,
+            ...(['sin_multa', 'injustificada', 'administrativa'].includes(
+              String(classification),
+            )
+              ? {
+                  clasificacionCancelacion: classification as
+                    'sin_multa' | 'injustificada' | 'administrativa',
+                }
+              : {}),
           });
+        }
       }
     }
     // Datos creados por otros clientes pueden carecer de metadata de API.
@@ -238,6 +260,13 @@ export class PrismaExchangeRepository implements ExchangeRepository {
         throw new ConflictException('Las opiniones publicadas son inmutables');
       return tx.calificacion.create({ data: row });
     });
+    await write(before.notifications, after.notifications, (row) =>
+      tx.notificacion.upsert({
+        where: { id_notificacion: row.id_notificacion },
+        create: row,
+        update: row,
+      }),
+    );
     await write(before.users, after.users, (row) => {
       if (before.creditSchema === 'decimal') return persistDecimalUser(tx, row);
       const integerRow = {
@@ -318,6 +347,9 @@ export class PrismaExchangeRepository implements ExchangeRepository {
         where: { id_solicitud: row.id_solicitud },
         create: integerRow,
         update: integerRow,
+        // En el esquema previo a la migración todavía no existe id_oferta.
+        // No leer esa columna mediante RETURNING con el cliente ya actualizado.
+        select: { id_solicitud: true },
       });
     });
     await write(before.reservations, after.reservations, (row) => {

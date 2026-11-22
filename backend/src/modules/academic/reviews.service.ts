@@ -15,6 +15,8 @@ import {
 import { ExchangeState, ReservationStatus } from '../exchanges/exchange.types';
 import { OfferRating, offerMetrics } from '../tutoring/offer-metrics';
 import { ReviewDto, ReviewsQueryDto } from './academic.dto';
+import { addNotification } from '../notifications/notification.factory';
+import { NotificationType } from '../notifications/notification.types';
 
 export function validReviews(
   state: ExchangeState,
@@ -100,6 +102,13 @@ export class ReviewsService {
         created_at: new Date(),
       };
       state.ratings.set(review.id_calificacion, review);
+      addNotification(state, {
+        eventId: `opinion:${review.id_calificacion}`,
+        recipientId: review.id_evaluado,
+        type: NotificationType.OPINION_RECIBIDA,
+        title: 'Recibiste una nueva opinión',
+        message: 'Un estudiante dejó una opinión sobre una tutoría contigo.',
+      });
       const result = response(review);
       state.idempotency.set(scope, { fingerprint, result });
       return result;
@@ -134,7 +143,16 @@ export class ReviewsService {
       skillId: query.skillId,
       ...offerMetrics(state, query.tutorId, query.skillId),
       knowledge_score: null,
-      cancelaciones_injustificadas: null,
+      cancelaciones_injustificadas: [...state.reservations.values()].filter(
+        (reservation) =>
+          reservation.estado === ReservationStatus.CANCELADA &&
+          reservation.cancelado_por === query.tutorId &&
+          reservation.id_habilidad === query.skillId &&
+          state.reservationMetadata.get(reservation.id_reserva)
+            ?.clasificacionCancelacion === 'injustificada' &&
+          !state.reservationMetadata.get(reservation.id_reserva)
+            ?.administrativa,
+      ).length,
       formula_estado: 'pendiente_aprobacion_PO',
     }));
   }

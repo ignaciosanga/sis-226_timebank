@@ -6,6 +6,7 @@ import { ReviewsService } from './reviews.service';
 import { MemoryExchangeRepository } from '../exchanges/memory-exchange.repository';
 import { addReservation } from '../exchanges/test-fixtures';
 import { ReservationStatus } from '../exchanges/exchange.types';
+import { NotificationType } from '../notifications/notification.types';
 
 describe('Contrato académico y opiniones', () => {
   let repository: MemoryExchangeRepository;
@@ -56,6 +57,14 @@ describe('Contrato académico y opiniones', () => {
     ]);
     expect(results[0]).toEqual(results[1]);
     expect(await repository.read((s) => s.ratings.size)).toBe(1);
+    const notifications = await repository.read((s) => [
+      ...s.notifications.values(),
+    ]);
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]).toMatchObject({
+      id_usuario: 'provider',
+      tipo: NotificationType.OPINION_RECIBIDA,
+    });
     expect(await repository.read((s) => [...s.users.values()])).toEqual(before);
     await expect(
       reviews.create('student', 'r1', input, 'another-key-00001'),

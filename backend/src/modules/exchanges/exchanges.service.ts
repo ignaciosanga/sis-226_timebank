@@ -37,7 +37,13 @@ import {
   ReservationStatus,
 } from './exchange.types';
 import { inspectIntegrity } from './integrity';
+import {
+  cancellationCharge,
+  classifyCancellation,
+} from './cancellation-policy';
 import type { TutoringOffer } from '../tutoring/offer.types';
+import { addNotification } from '../notifications/notification.factory';
+import { NotificationType } from '../notifications/notification.types';
 
 @Injectable()
 export class ExchangesService {
@@ -47,6 +53,22 @@ export class ExchangesService {
     private readonly users: UsersService,
     private readonly skills: SkillsService,
   ) {}
+
+  private notify(
+    state: ExchangeState,
+    recipientId: string,
+    eventId: string,
+    type: NotificationType,
+    title: string,
+    message: string,
+  ): void {
+    addNotification(state, { recipientId, eventId, type, title, message });
+  }
+
+  private displayName(state: ExchangeState, userId: string): string {
+    const user = state.users.get(userId);
+    return user ? `${user.nombre} ${user.apellido}` : 'Un estudiante';
+  }
 
   private transaction<T>(
     work: (state: ExchangeState) => Promise<T> | T,
@@ -60,6 +82,43 @@ export class ExchangesService {
       return result;
     });
   }
+
+  private async enrichParticipants<T extends {
+    id_solicitante: string;
+    id_ofertante: string;
+  }>(records: T[]) {
+    const userIds = [
+      ...new Set(
+        records.flatMap((record) => [
+          record.id_solicitante,
+          record.id_ofertante,
+        ]),
+      ),
+    ];
+
+    const users = await Promise.all(
+      userIds.map(async (id) => [
+        id,
+        await this.users.repository.findById(id),
+      ] as const),
+    );
+
+    const usersById = new Map(users);
+
+    return records.map((record) => {
+      const requester = usersById.get(record.id_solicitante);
+      const provider = usersById.get(record.id_ofertante);
+
+      return {
+        ...record,
+        nombre_solicitante: requester?.nombre ?? '',
+        apellido_solicitante: requester?.apellido ?? '',
+        nombre_ofertante: provider?.nombre ?? '',
+        apellido_ofertante: provider?.apellido ?? '',
+      };
+    });
+  }
+
   private fingerprint(input: unknown): string {
     const canonical = (value: unknown): unknown => {
       if (isDate(value)) return value.toISOString();
@@ -260,6 +319,7 @@ export class ExchangesService {
             motivo: record.motivo_cancelacion,
             fecha: record.cancelled_at,
             administrativa: metadata?.administrativa ?? false,
+            clasificacion: metadata?.clasificacionCancelacion ?? null,
           }
         : null,
     };
@@ -410,7 +470,7 @@ export class ExchangesService {
       async (state) => {
         await this.users.requirePublishedStudent(actor);
         await this.users.requirePublishedStudent(input.providerId);
-        await this.skills.requireActive(input.skillId);
+        const skill = await this.skills.requireActive(input.skillId);
         const offer = this.requireAvailability(
           state,
           input.providerId,
@@ -442,13 +502,22 @@ export class ExchangesService {
           availabilityId: input.availabilityId,
           descripcion: input.descripcion ?? '',
         });
+        this.notify(
+          state,
+          input.providerId,
+          `solicitud:${record.id_solicitud}:recibida`,
+          NotificationType.SOLICITUD_RECIBIDA,
+          'Nueva solicitud de intercambio',
+          `${this.displayName(state, actor)} quiere aprender ${skill.nombre}.`,
+        );
         return this.requestView(state, record);
       },
     );
   }
   async listRequests(actor: string) {
     await this.users.requireActive(actor);
-    return this.persistence.read((state) =>
+
+    const records = await this.persistence.read((state) =>
       [...state.requests.values()]
         .filter(
           (record) =>
@@ -456,6 +525,8 @@ export class ExchangesService {
         )
         .map((record) => this.requestView(state, record)),
     );
+
+    return this.enrichParticipants(records);
   }
   acceptRequest(
     actor: string,
@@ -485,7 +556,7 @@ export class ExchangesService {
           throw new ConflictException('La solicitud ya no esta pendiente');
         await this.users.requirePublishedStudent(request.id_solicitante);
         await this.users.requirePublishedStudent(request.id_ofertante);
-        await this.skills.requireActive(request.id_habilidad);
+        const skill = await this.skills.requireActive(request.id_habilidad);
         this.requireFuture(request.fecha_inicio_propuesta);
         this.requireOffering(state, request.id_ofertante, request.id_habilidad);
         const metadata = state.requestMetadata.get(id);
@@ -560,6 +631,14 @@ export class ExchangesService {
         });
         request.estado = RequestStatus.ACEPTADA;
         request.respondida_at = new Date(Date.now());
+        this.notify(
+          state,
+          request.id_solicitante,
+          `solicitud:${request.id_solicitud}:aceptada`,
+          NotificationType.SOLICITUD_ACEPTADA,
+          'Tu solicitud fue aceptada',
+          `${this.displayName(state, actor)} aceptó tu solicitud de ${skill.nombre}. La reserva quedó confirmada.`,
+        );
         if (request.id_oferta)
           state.availability.get(metadata.availabilityId)!.estado =
             AvailabilityStatus.RESERVADO;
@@ -585,6 +664,14 @@ export class ExchangesService {
         throw new ConflictException('La solicitud ya no esta pendiente');
       record.estado = RequestStatus.RECHAZADA;
       record.respondida_at = new Date(Date.now());
+      this.notify(
+        state,
+        record.id_solicitante,
+        `solicitud:${record.id_solicitud}:rechazada`,
+        NotificationType.SOLICITUD_RECHAZADA,
+        'Tu solicitud no fue aceptada',
+        `${this.displayName(state, actor)} no pudo aceptar tu solicitud de intercambio.`,
+      );
       return this.requestView(state, record);
     });
   }
@@ -603,12 +690,21 @@ export class ExchangesService {
         );
       record.estado = RequestStatus.CANCELADA;
       record.respondida_at = new Date(Date.now());
+      this.notify(
+        state,
+        record.id_ofertante,
+        `solicitud:${record.id_solicitud}:cancelada`,
+        NotificationType.SOLICITUD_CANCELADA,
+        'Una solicitud fue cancelada',
+        `${this.displayName(state, actor)} canceló una solicitud pendiente.`,
+      );
       return this.requestView(state, record);
     });
   }
   async listReservations(actor: string) {
     await this.users.requireActive(actor);
-    return this.persistence.read((state) =>
+
+    const records = await this.persistence.read((state) =>
       [...state.reservations.values()]
         .filter(
           (record) =>
@@ -616,6 +712,8 @@ export class ExchangesService {
         )
         .map((record) => this.reservationView(state, record)),
     );
+
+    return this.enrichParticipants(records);
   }
   async getReservation(actor: string, id: string) {
     await this.users.requireActive(actor);
@@ -719,6 +817,19 @@ export class ExchangesService {
           this.movement(state, provider, id, 'Transferencia', amount);
           record.estado = ReservationStatus.COMPLETADA;
           record.completed_at = new Date(Date.now());
+        } else {
+          const otherParticipant =
+            actor === record.id_solicitante
+              ? record.id_ofertante
+              : record.id_solicitante;
+          this.notify(
+            state,
+            otherParticipant,
+            `reserva:${id}:confirmacion:${actor}`,
+            NotificationType.CLASE_POR_CONFIRMAR,
+            'Falta confirmar la tutoría',
+            `${this.displayName(state, actor)} confirmó la tutoría. Confirma para completar el intercambio.`,
+          );
         }
         return this.reservationView(state, record);
       },
@@ -736,25 +847,57 @@ export class ExchangesService {
         const user = await this.users.requireActive(actor);
         const record = this.requireReservation(state, id);
         const admin = user.roles.includes(Role.ADMIN);
+        const now = Date.now();
         if (!admin) this.requireParticipant(record, actor);
         if (record.estado === ReservationStatus.CANCELADA)
-            throw new ConflictException('La reserva ya fue cancelada; solo se admite el replay con la misma Idempotency-Key');
+          throw new ConflictException(
+            'La reserva ya fue cancelada; solo se admite el replay con la misma Idempotency-Key',
+          );
         if (record.estado === ReservationStatus.COMPLETADA)
           throw new ConflictException(
             'Una reserva completada no se puede cancelar',
           );
-        if (!admin && Date.now() >= record.fecha_inicio.getTime())
+        if (!admin && now >= record.fecha_inicio.getTime())
           throw new ConflictException(
             'Despues del inicio la cancelacion requiere ADMIN',
           );
         const account = this.account(state, record.id_solicitante);
         if (compareCredits(account.creditos_retenidos, record.creditos) < 0)
           throw new ConflictException('Retencion inconsistente');
+        const classification = classifyCancellation(
+          admin,
+          record.fecha_inicio,
+          now,
+        );
+        const payer =
+          classification === 'injustificada'
+            ? this.account(state, actor)
+            : null;
+        const availableBefore = payer
+          ? subtractCredits(payer.saldo, payer.creditos_retenidos)
+          : '0';
+        const penaltyType = payer
+          ? cancellationCharge(
+              availableBefore,
+              actor === record.id_solicitante
+                ? addCredits(availableBefore, record.creditos)
+                : availableBefore,
+            )
+          : null;
         this.movement(state, account, id, 'Liberacion', record.creditos);
+        if (payer && penaltyType)
+          this.movement(
+            state,
+            payer,
+            id,
+            penaltyType,
+            penaltyType === 'Penalizacion' ? '-0.5' : '0',
+            'Cancelacion injustificada con menos de 5 horas de anticipacion',
+          );
         record.estado = ReservationStatus.CANCELADA;
         record.cancelado_por = actor;
         record.motivo_cancelacion = reason.trim();
-        record.cancelled_at = new Date(Date.now());
+        record.cancelled_at = new Date(now);
         record.horas_anticipacion_cancelacion = Math.max(
           0,
           Math.floor(
@@ -766,16 +909,32 @@ export class ExchangesService {
         const offered =
           record.id_solicitud &&
           state.requests.get(record.id_solicitud)?.id_oferta;
-        if (offered && metadata) {
+        if (offered && metadata?.availabilityId) {
           const slot = state.availability.get(metadata.availabilityId);
           if (slot?.estado === AvailabilityStatus.RESERVADO)
             slot.estado = AvailabilityStatus.DISPONIBLE;
         }
-        if (metadata)
-          metadata.administrativa =
-            admin &&
-            actor !== record.id_solicitante &&
-            actor !== record.id_ofertante;
+        state.reservationMetadata.set(id, {
+          availabilityId: metadata?.availabilityId ?? null,
+          administrativa: admin,
+          clasificacionCancelacion: classification,
+        });
+        const adminCancelledForOthers =
+          admin &&
+          actor !== record.id_solicitante &&
+          actor !== record.id_ofertante;
+        const recipients = [record.id_solicitante, record.id_ofertante].filter(
+          (userId) => adminCancelledForOthers || userId !== actor,
+        );
+        for (const recipientId of recipients)
+          this.notify(
+            state,
+            recipientId,
+            `reserva:${id}:cancelada`,
+            NotificationType.RESERVA_CANCELADA,
+            'Una reserva fue cancelada',
+            `${this.displayName(state, actor)} canceló la reserva. Motivo: ${reason.trim()}`,
+          );
         return this.reservationView(state, record);
       },
     );

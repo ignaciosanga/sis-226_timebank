@@ -16,6 +16,7 @@ import {
   Reservation,
   ReservationStatus,
 } from './exchange.types';
+import { classifyCancellation } from './cancellation-policy';
 
 export interface IntegrityIssue {
   code: string;
@@ -128,6 +129,7 @@ export function inspectIntegrity(state: ExchangeState): IntegrityIssue[] {
     'BonoInicial',
     'Recompensa',
     'Penalizacion',
+    'penalizacion_sin_saldo',
     'Transferencia',
     'Ajuste',
     'Retencion',
@@ -174,7 +176,10 @@ export function inspectIntegrity(state: ExchangeState): IntegrityIssue[] {
     if (!state.users.has(movement.id_usuario))
       report('MOVEMENT_USER_NOT_FOUND', id, movement.id_usuario);
     const amountSign = creditComparison(movement.cantidad, '0');
-    if (amountSign === null || amountSign === 0)
+    if (
+      amountSign === null ||
+      (amountSign === 0 && movement.tipo !== 'penalizacion_sin_saldo')
+    )
       report('MOVEMENT_INVALID_AMOUNT', id);
     if (!movementTypes.has(movement.tipo)) report('MOVEMENT_INVALID_TYPE', id);
     if (!validDate(movement.created_at)) report('MOVEMENT_INVALID_DATE', id);
@@ -231,14 +236,20 @@ export function inspectIntegrity(state: ExchangeState): IntegrityIssue[] {
         'Transferencia',
       ].includes(movement.tipo) &&
         amountSign !== 1) ||
-      (['Consumo', 'Penalizacion'].includes(movement.tipo) && amountSign !== -1)
+      (['Consumo', 'Penalizacion'].includes(movement.tipo) &&
+        amountSign !== -1) ||
+      (movement.tipo === 'penalizacion_sin_saldo' && amountSign !== 0)
     )
       report('MOVEMENT_INVALID_SIGN', id);
     if (movement.id_reserva === null) {
       if (
-        ['Retencion', 'Liberacion', 'Consumo', 'Transferencia'].includes(
-          movement.tipo,
-        )
+        [
+          'Retencion',
+          'Liberacion',
+          'Consumo',
+          'Transferencia',
+          'penalizacion_sin_saldo',
+        ].includes(movement.tipo)
       )
         report('MOVEMENT_RESERVATION_REQUIRED', id);
       continue;
@@ -370,7 +381,7 @@ export function inspectIntegrity(state: ExchangeState): IntegrityIssue[] {
       if (!state.users.has(userId))
         report('RESERVATION_USER_NOT_FOUND', id, userId);
     const metadata = state.reservationMetadata.get(id);
-    if (metadata) {
+    if (metadata?.availabilityId) {
       const availability = state.availability.get(metadata.availabilityId);
       if (!availability)
         report(
@@ -507,6 +518,38 @@ export function inspectIntegrity(state: ExchangeState): IntegrityIssue[] {
         item.tipo,
       ),
     );
+    // No se reconstruye ni se reclasifica el historial anterior a HU-08.
+    if (metadata?.clasificacionCancelacion) {
+      const classification = metadata.clasificacionCancelacion;
+      const penalties = (byReservation.get(id) ?? []).filter((item) =>
+        ['Penalizacion', 'penalizacion_sin_saldo'].includes(item.tipo),
+      );
+      if (
+        reservation.estado !== ReservationStatus.CANCELADA ||
+        !validDate(reservation.cancelled_at) ||
+        classifyCancellation(
+          metadata.administrativa,
+          reservation.fecha_inicio,
+          reservation.cancelled_at.getTime(),
+        ) !== classification
+      )
+        report('CANCELLATION_CLASSIFICATION_MISMATCH', id);
+      if (classification === 'injustificada') {
+        if (
+          penalties.length !== 1 ||
+          penalties.some(
+            (item) =>
+              item.id_usuario !== reservation.cancelado_por ||
+              !sameCredits(
+                item.cantidad,
+                item.tipo === 'Penalizacion' ? '-0.5' : '0',
+              ),
+          )
+        )
+          report('CANCELLATION_PENALTY_MISMATCH', id);
+      } else if (penalties.length)
+        report('CANCELLATION_UNEXPECTED_PENALTY', id);
+    }
     if (
       events.length !== expected.length ||
       expected.some((type) => !events.some((event) => event.tipo === type))

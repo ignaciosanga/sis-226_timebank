@@ -20,6 +20,7 @@ import { CalendarModule } from './modules/calendar/calendar.module';
 import { TutoringModule } from './modules/tutoring/tutoring.module';
 import { AcademicModule } from './modules/academic/academic.module';
 import { AssistantModule } from './modules/assistant/assistant.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { AssistantModule } from './modules/assistant/assistant.module';
     TutoringModule,
     AcademicModule,
     AssistantModule,
+    NotificationsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

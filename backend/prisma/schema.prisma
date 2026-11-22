@@ -44,8 +44,8 @@ model Usuario {
   rol                 String               @db.VarChar
   id_carrera          String?              @db.Uuid
   semestre            Int?
-  saldo               Int                  @default(0)
-  creditos_retenidos  Int                  @default(0)
+  saldo               Decimal              @default(0) @db.Decimal
+  creditos_retenidos  Decimal              @default(0) @db.Decimal
   fecha_registro      DateTime             @default(now()) @db.Timestamptz(6)
   ultimo_acceso       DateTime?            @db.Timestamptz(6)
   estado              String               @db.VarChar
@@ -132,7 +132,7 @@ model Disponibilidad {
   @@map("DISPONIBILIDADES")
 }
 
-// Precio publicado independiente de los nueve créditos INTEGER históricos.
+// Precio total publicado independiente de la duración de la clase.
 // NUMERIC sin typmod: los CHECK SQL rechazan exceso de escala sin redondear.
 model OfertaTutoria {
   id_oferta         String         @id @default(uuid()) @db.Uuid
@@ -150,6 +150,7 @@ model OfertaTutoria {
   habilidad         Habilidad      @relation(fields: [id_habilidad], references: [id_habilidad], onDelete: Restrict)
   disponibilidad    Disponibilidad @relation(fields: [id_disponibilidad], references: [id_disponibilidad], onDelete: Restrict)
   banner            BannerTutoria? @relation(fields: [id_banner], references: [id_banner], onDelete: Restrict)
+  solicitudes       SolicitudIntercambio[]
 
   @@index([estado, created_at])
   @@map("OFERTAS")
@@ -178,20 +179,23 @@ model SolicitudIntercambio {
   id_solicitante         String    @db.Uuid
   id_ofertante           String    @db.Uuid
   id_habilidad           String    @db.Uuid
+  id_oferta              String?   @db.Uuid
   fecha_inicio_propuesta DateTime  @db.Timestamptz(6)
   fecha_fin_propuesta    DateTime  @db.Timestamptz(6)
-  creditos_requeridos    Int
+  creditos_requeridos    Decimal   @db.Decimal
   estado                 String    @db.VarChar
   created_at             DateTime  @default(now()) @db.Timestamptz(6)
   respondida_at          DateTime? @db.Timestamptz(6)
   solicitante            Usuario   @relation("SolicitudSolicitante", fields: [id_solicitante], references: [id_usuario], onDelete: Restrict)
   ofertante              Usuario   @relation("SolicitudOfertante", fields: [id_ofertante], references: [id_usuario], onDelete: Restrict)
   habilidad              Habilidad @relation(fields: [id_habilidad], references: [id_habilidad], onDelete: Restrict)
+  oferta                 OfertaTutoria? @relation(fields: [id_oferta], references: [id_oferta], onDelete: Restrict, onUpdate: NoAction)
   reserva                Reserva?
 
   @@index([id_solicitante, estado, created_at])
   @@index([id_ofertante, estado, created_at])
   @@index([id_habilidad])
+  @@index([id_oferta])
   @@map("SOLICITUDES_INTERCAMBIO")
 }
 
@@ -203,7 +207,7 @@ model Reserva {
   id_habilidad                   String                @db.Uuid
   fecha_inicio                   DateTime              @db.Timestamptz(6)
   fecha_fin                      DateTime              @db.Timestamptz(6)
-  creditos                       Int
+  creditos                       Decimal               @db.Decimal
   modalidad                      String                @db.VarChar
   lugar                          String                @db.VarChar
   estado                         String                @db.VarChar
@@ -235,11 +239,11 @@ model MovimientoCredito {
   id_usuario          String   @db.Uuid
   id_reserva          String?  @db.Uuid
   tipo                String   @db.VarChar
-  cantidad            Int
-  saldo_anterior      Int
-  saldo_posterior     Int
-  retenidos_anterior  Int
-  retenidos_posterior Int
+  cantidad            Decimal  @db.Decimal
+  saldo_anterior      Decimal  @db.Decimal
+  saldo_posterior     Decimal  @db.Decimal
+  retenidos_anterior  Decimal  @db.Decimal
+  retenidos_posterior Decimal  @db.Decimal
   created_at          DateTime @default(now()) @db.Timestamptz(6)
   descripcion         String?  @db.VarChar
   usuario             Usuario  @relation(fields: [id_usuario], references: [id_usuario], onDelete: Restrict)

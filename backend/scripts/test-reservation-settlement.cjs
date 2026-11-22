@@ -540,6 +540,12 @@ async function verifyReservationSettlement({
       const row = await reservationRow(race.reservation.id_reserva);
       if (winner === 'cancelacion') {
         assert.equal(row.estado, 'Cancelada');
+        assert.equal(row.cancelado_por, administrator.id);
+        assert.equal(
+          results[0].body.cancelacion.clasificacion,
+          'administrativa',
+        );
+        assert.equal(results[0].body.cancelacion.administrativa, true);
         assert.equal(row.confirmacion_ofertante_at, null);
         assert.equal(row.completed_at, null);
         assert.equal(saved.length, 2);
@@ -782,7 +788,7 @@ async function verifyReservationSettlement({
       duplicadosLedger: [],
     });
     console.log(
-      'Liquidacion de reservas PostgreSQL OK (esquema decimal provisional):',
+      'Liquidacion de reservas PostgreSQL OK (migraciones oficiales):',
       JSON.stringify(cases),
     );
     return cases;

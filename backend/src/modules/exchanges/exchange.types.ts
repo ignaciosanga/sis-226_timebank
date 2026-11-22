@@ -5,6 +5,8 @@ import type { TutoringOffer } from '../tutoring/offer.types';
 import type { TutoringBanner } from '../tutoring/banners/banner.types';
 import type { OfferRating } from '../tutoring/offer-metrics';
 import type { CreditValue } from './credits';
+import type { CancellationClassification } from './cancellation-policy';
+import type { NotificationRecord } from '../notifications/notification.types';
 
 export enum RequestStatus {
   PENDIENTE = 'Solicitada',
@@ -63,6 +65,7 @@ export interface Movement {
     | 'BonoInicial'
     | 'Recompensa'
     | 'Penalizacion'
+    | 'penalizacion_sin_saldo'
     | 'Transferencia'
     | 'Ajuste'
     | 'Retencion'
@@ -114,11 +117,16 @@ export interface ExchangeState {
   requestMetadata: Map<string, { availabilityId: string; descripcion: string }>;
   reservationMetadata: Map<
     string,
-    { availabilityId: string; administrativa: boolean }
+    {
+      availabilityId: string | null;
+      administrativa: boolean;
+      clasificacionCancelacion?: CancellationClassification;
+    }
   >;
   idempotency: Map<string, IdempotencyRecord>;
   /** Solo escritura: acciones ADMIN sobre usuarios registradas en AUDITORIA. */
   adminAudit: Map<string, AdminAuditEntry>;
+  notifications: Map<string, NotificationRecord>;
 }
 
 export interface EmailVerification {

@@ -12,7 +12,7 @@ Este documento fija el contrato único entre **frontend, backend, base de datos 
 | Frontend (Vue 3) | `front_end_parcial_3` | `0e577a9` |
 | Base de datos y dashboards | `main` (`database/`, `dashboards/`) | `18f3ccc` |
 
-- La referencia **máquina-legible** es [`docs/openapi.json`](openapi.json), generado desde `/docs-json` del backend integrado en `apis/integracion-parcial3` con las ramas de Gonzalo y Kevin y el asistente (63 rutas). Si este documento y el OpenAPI difieren, manda el OpenAPI.
+- La referencia **máquina-legible** es [`docs/openapi.json`](openapi.json), regenerado desde `/docs-json` tras integrar `apis/integracion-parcial3` y las rutas RF-36/RF-37 en `api/notificaciones` (66 rutas). Si este documento y el OpenAPI difieren, manda el OpenAPI.
 - Este documento reemplaza a [`api-contract.md`](api-contract.md) en lo que cambió en el parcial 3 (ver sección 9). Los PDF y documentos anteriores quedan como historia.
 - El CI comprueba que el frontend solo use rutas del OpenAPI (sección 8).
 
@@ -140,7 +140,8 @@ Acceso: **Público** · **JWT** (cualquier cuenta activa) · **EST** (rol ESTUDI
 
 - `NotificationResponse`: `{ id_notificacion, tipo, titulo, mensaje, leida, created_at }`.
 - `NotificationsPage`: `{ data: [NotificationResponse], meta: { page, limit, total, totalPages, noLeidas } }`. Es la paginación de la sección 2 más `noLeidas`.
-- `tipo`: `SolicitudRecibida | SolicitudAceptada | SolicitudRechazada | ReservaCancelada | ClasePorConfirmar | OpinionRecibida`.
+- `tipo`: `SolicitudRecibida | SolicitudAceptada | SolicitudRechazada | SolicitudCancelada | ReservaCancelada | ClasePorConfirmar | OpinionRecibida`.
+- Eventos: solicitud recibida/aceptada/rechazada/cancelada; reserva cancelada; una persona confirmó y falta la confirmación de la otra; y opinión válida recibida. Cada aviso se escribe en la misma transacción del evento.
 - Ejemplo de `POST /notifications/read-all`: `{ "actualizadas": 3 }`.
 
 ## 4. Estados
