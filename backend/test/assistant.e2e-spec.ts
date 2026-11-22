@@ -64,7 +64,12 @@ describe('Asistente IA HTTP', () => {
       .set('authorization', `Bearer ${token}`)
       .expect(200);
     expect(response.body).toMatchObject({
-      avatar: { estilo: 'orbe', color: 'azul', nombre: 'Nexo' },
+      avatar: {
+        estilo: 'bolita',
+        color: 'azul',
+        accesorio: 'chispa',
+        nombre: 'Nexo',
+      },
       llavePista: null,
       quota: { llavePropia: false, limite: 5, usados: 0, restantes: 5 },
     });
@@ -74,16 +79,37 @@ describe('Asistente IA HTTP', () => {
     await api()
       .put('/assistant/me/avatar')
       .set('authorization', `Bearer ${token}`)
-      .send({ estilo: 'robot', color: 'azul', nombre: 'Nexo' })
+      .send({
+        estilo: 'robot',
+        color: 'azul',
+        accesorio: 'chispa',
+        nombre: 'Nexo',
+      })
+      .expect(400);
+    await api()
+      .put('/assistant/me/avatar')
+      .set('authorization', `Bearer ${token}`)
+      .send({
+        estilo: 'gota',
+        color: 'lila',
+        accesorio: 'corona',
+        nombre: 'Nexo',
+      })
       .expect(400);
     const saved = await api()
       .put('/assistant/me/avatar')
       .set('authorization', `Bearer ${token}`)
-      .send({ estilo: 'chispa', color: 'coral', nombre: ' Lumi ' })
+      .send({
+        estilo: 'burbuja',
+        color: 'lila',
+        accesorio: 'audifonos',
+        nombre: ' Lumi ',
+      })
       .expect(200);
     expect(saved.body.avatar).toEqual({
-      estilo: 'chispa',
-      color: 'coral',
+      estilo: 'burbuja',
+      color: 'lila',
+      accesorio: 'audifonos',
       nombre: 'Lumi',
     });
   });

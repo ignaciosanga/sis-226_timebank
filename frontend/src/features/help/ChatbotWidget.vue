@@ -7,27 +7,31 @@ import { askAssistant, deleteAssistantKey, getAssistantProfile, saveAssistantAva
 import { canAsk, historyFor, MAX_QUESTION_LENGTH } from './chat-history'
 import { highlightTarget, quotaLabel, safeAction, waitForTarget } from './screen-guide'
 import AssistantAvatar from './AssistantAvatar.vue'
+import { ACCESSORY_OPTIONS, avatarTone, COLOR_OPTIONS, DEFAULT_AVATAR, normalizeAvatar, STYLE_OPTIONS } from './avatar-options.js'
 import './chatbot.css'
 
 const props = defineProps({ sessionKey: { type: String, default: '' } })
 const store = useAppStore()
 const route = useRoute()
 const router = useRouter()
-const STYLE_OPTIONS = [['orbe', 'Orbe'], ['gota', 'Gota'], ['burbuja', 'Burbuja'], ['chispa', 'Chispa']]
-const COLOR_OPTIONS = [['azul', 'Azul UCB'], ['amarillo', 'Amarillo'], ['verde', 'Verde'], ['coral', 'Coral']]
-const DEFAULT_AVATAR = { estilo: 'orbe', color: 'azul', nombre: 'Nexo' }
 
 const open = ref(false), tab = ref('chat'), draft = ref(''), messages = ref([]), pending = ref(false)
 const launcher = ref(null), composer = ref(null), thread = ref(null)
 const profile = ref(null), avatarForm = reactive({ ...DEFAULT_AVATAR }), keyInput = ref('')
 const settingsState = reactive({ saving: false, message: '', error: '' })
-const talking = ref(false), dozing = ref(false)
+const talking = ref(false), dozing = ref(false), mood = ref('')
 const suggestions = ['Busca tutorías de programación', '¿Dónde ofrezco una materia?', '¿Cuántos créditos tengo?']
-const avatar = computed(() => profile.value?.avatar ?? DEFAULT_AVATAR)
-const avatarState = computed(() => pending.value ? 'thinking' : talking.value ? 'talking' : !open.value && dozing.value ? 'sleeping' : 'idle')
+const avatar = computed(() => normalizeAvatar(profile.value?.avatar))
+const avatarState = computed(() => pending.value ? 'thinking' : mood.value || (talking.value ? 'talking' : !open.value && dozing.value ? 'sleeping' : 'idle'))
 const canSend = computed(() => store.authenticated && canAsk(draft.value, pending.value))
 const quotaText = computed(() => quotaLabel(profile.value?.quota))
-let nextMessageId = 0, conversation = 0, talkTimer, dozeTimer
+let nextMessageId = 0, conversation = 0, talkTimer, dozeTimer, moodTimer
+
+function showMood(value) {
+  clearTimeout(moodTimer)
+  mood.value = value
+  moodTimer = setTimeout(() => { mood.value = '' }, 1600)
+}
 
 function scheduleDoze() {
   clearTimeout(dozeTimer)
@@ -38,7 +42,7 @@ async function loadProfile() {
   if (!store.authenticated) { profile.value = null; return }
   try {
     profile.value = await getAssistantProfile()
-    Object.assign(avatarForm, profile.value.avatar)
+    Object.assign(avatarForm, normalizeAvatar(profile.value.avatar))
   } catch { profile.value = null }
 }
 async function toggle() {
@@ -103,6 +107,7 @@ async function send() {
           ? error.message
           : 'No pude responder ahora. Intenta de nuevo en unos segundos.'
     messages.value.push({ id: ++nextMessageId, role: 'assistant', text, error: true, needsKey: quotaExceeded })
+    showMood('error')
     if (quotaExceeded) loadProfile()
   } finally {
     if (current === conversation) {
@@ -120,7 +125,7 @@ function onComposerKeydown(event) {
 }
 function resetState() {
   conversation++
-  messages.value = []; draft.value = ''; pending.value = false; talking.value = false
+  messages.value = []; draft.value = ''; pending.value = false; talking.value = false; mood.value = ''
 }
 async function resetConversation() {
   resetState()
@@ -131,16 +136,18 @@ async function settingsCall(task, success) {
   settingsState.saving = true; settingsState.message = ''; settingsState.error = ''
   try {
     profile.value = await task()
-    Object.assign(avatarForm, profile.value.avatar)
+    Object.assign(avatarForm, normalizeAvatar(profile.value.avatar))
     settingsState.message = success
+    showMood('happy')
     return true
   } catch (error) {
     settingsState.error = error?.message || 'No se pudo guardar. Intenta de nuevo.'
+    showMood('error')
     return false
   } finally { settingsState.saving = false }
 }
 function saveAvatar() {
-  return settingsCall(() => saveAssistantAvatar({ estilo: avatarForm.estilo, color: avatarForm.color, nombre: avatarForm.nombre.trim() }), 'Listo, tu asistente cambió de look.')
+  return settingsCall(() => saveAssistantAvatar({ estilo: avatarForm.estilo, color: avatarForm.color, accesorio: avatarForm.accesorio, nombre: avatarForm.nombre.trim() }), 'Listo, tu asistente cambió de look.')
 }
 async function saveKey() {
   const value = keyInput.value.trim()
@@ -158,7 +165,7 @@ watch(() => props.sessionKey, () => {
   if (store.authenticated) loadProfile()
 })
 onMounted(() => { scheduleDoze(); if (store.authenticated) loadProfile() })
-onBeforeUnmount(() => { clearTimeout(talkTimer); clearTimeout(dozeTimer) })
+onBeforeUnmount(() => { clearTimeout(talkTimer); clearTimeout(dozeTimer); clearTimeout(moodTimer) })
 </script>
 
 <template>
@@ -166,7 +173,7 @@ onBeforeUnmount(() => { clearTimeout(talkTimer); clearTimeout(dozeTimer) })
     <Transition name="nexo-chat">
       <section v-if="open" id="nexo-help-panel" class="nexo-chat-panel" role="dialog" aria-modal="false" aria-labelledby="nexo-help-title" aria-describedby="nexo-help-notice" @keydown.esc.stop.prevent="close">
         <header class="nexo-chat-header">
-          <AssistantAvatar :estilo="avatar.estilo" :color="avatar.color" :state="avatarState" :size="42" />
+          <AssistantAvatar :estilo="avatar.estilo" :color="avatar.color" :accesorio="avatar.accesorio" :state="avatarState" :size="48" />
           <div><h2 id="nexo-help-title">{{ avatar.nombre }}</h2><p>{{ pending ? 'Pensando…' : 'Tu asistente en Nexo U' }}</p></div>
           <div class="nexo-chat-actions">
             <button v-if="tab === 'chat' && (messages.length || draft)" type="button" aria-label="Empezar una conversación nueva" @click="resetConversation"><RotateCcw :size="17" aria-hidden="true" /></button>
@@ -207,9 +214,11 @@ onBeforeUnmount(() => { clearTimeout(talkTimer); clearTimeout(dozeTimer) })
         <div v-else class="nexo-chat-settings">
           <section aria-labelledby="nexo-settings-avatar">
             <h3 id="nexo-settings-avatar">Tu asistente</h3>
-            <div class="nexo-settings-preview"><AssistantAvatar :estilo="avatarForm.estilo" :color="avatarForm.color" state="talking" :size="64" /><label for="nexo-avatar-name">Nombre<input id="nexo-avatar-name" v-model="avatarForm.nombre" maxlength="24" autocomplete="off" /></label></div>
-            <fieldset><legend>Forma</legend><div class="nexo-settings-options"><label v-for="[value, label] in STYLE_OPTIONS" :key="value" :class="{ selected: avatarForm.estilo === value }"><input v-model="avatarForm.estilo" type="radio" name="nexo-avatar-style" :value="value" /><AssistantAvatar :estilo="value" :color="avatarForm.color" :size="34" /><span>{{ label }}</span></label></div></fieldset>
-            <fieldset><legend>Color</legend><div class="nexo-settings-colors"><label v-for="[value, label] in COLOR_OPTIONS" :key="value" :class="[`swatch-${value}`, { selected: avatarForm.color === value }]"><input v-model="avatarForm.color" type="radio" name="nexo-avatar-color" :value="value" /><span class="sr-only">{{ label }}</span></label></div></fieldset>
+            <div class="nexo-settings-stage"><AssistantAvatar :estilo="avatarForm.estilo" :color="avatarForm.color" :accesorio="avatarForm.accesorio" :state="mood || 'idle'" :size="96" /></div>
+            <label class="nexo-settings-name" for="nexo-avatar-name">Nombre<input id="nexo-avatar-name" v-model="avatarForm.nombre" maxlength="24" autocomplete="off" /></label>
+            <fieldset><legend>Forma</legend><div class="nexo-settings-options"><label v-for="[value, label] in STYLE_OPTIONS" :key="value" :class="{ selected: avatarForm.estilo === value }"><input v-model="avatarForm.estilo" type="radio" name="nexo-avatar-style" :value="value" /><AssistantAvatar :estilo="value" :color="avatarForm.color" accesorio="ninguno" :size="38" /><span>{{ label }}</span></label></div></fieldset>
+            <fieldset><legend>Color</legend><div class="nexo-settings-colors"><label v-for="[value, label] in COLOR_OPTIONS" :key="value" :class="{ selected: avatarForm.color === value }"><input v-model="avatarForm.color" type="radio" name="nexo-avatar-color" :value="value" /><i :style="{ background: avatarTone(value) }"></i><span>{{ label }}</span></label></div></fieldset>
+            <fieldset><legend>Accesorio</legend><div class="nexo-settings-options"><label v-for="[value, label] in ACCESSORY_OPTIONS" :key="value" :class="{ selected: avatarForm.accesorio === value }"><input v-model="avatarForm.accesorio" type="radio" name="nexo-avatar-accessory" :value="value" /><AssistantAvatar :estilo="avatarForm.estilo" :color="avatarForm.color" :accesorio="value" :size="38" /><span>{{ label }}</span></label></div></fieldset>
             <button class="button button-primary" type="button" :disabled="settingsState.saving || !avatarForm.nombre.trim()" @click="saveAvatar">Guardar estilo</button>
           </section>
           <section aria-labelledby="nexo-settings-key">
@@ -225,6 +234,6 @@ onBeforeUnmount(() => { clearTimeout(talkTimer); clearTimeout(dozeTimer) })
         </div>
       </section>
     </Transition>
-    <button ref="launcher" class="nexo-help-launcher" type="button" :aria-expanded="open" :aria-controls="open ? 'nexo-help-panel' : undefined" aria-haspopup="dialog" :aria-label="open ? `Cerrar ${avatar.nombre}` : `Abrir ${avatar.nombre}, el asistente de Nexo U`" @click="toggle"><ChevronDown v-if="open" :size="23" aria-hidden="true" /><AssistantAvatar v-else :estilo="avatar.estilo" :color="avatar.color" :state="avatarState" :size="30" /><span>{{ open ? 'Cerrar' : avatar.nombre }}</span></button>
+    <button ref="launcher" class="nexo-help-launcher" type="button" :aria-expanded="open" :aria-controls="open ? 'nexo-help-panel' : undefined" aria-haspopup="dialog" :aria-label="open ? `Cerrar ${avatar.nombre}` : `Abrir ${avatar.nombre}, el asistente de Nexo U`" @click="toggle"><ChevronDown v-if="open" :size="23" aria-hidden="true" /><AssistantAvatar v-else :estilo="avatar.estilo" :color="avatar.color" :accesorio="avatar.accesorio" :state="avatarState" :size="36" /><span>{{ open ? 'Cerrar' : avatar.nombre }}</span></button>
   </div>
 </template>
