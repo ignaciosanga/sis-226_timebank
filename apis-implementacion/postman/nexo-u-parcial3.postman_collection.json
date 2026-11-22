@@ -1,0 +1,2749 @@
+{
+  "info": {
+    "name": "Nexo U - Parcial 3 (ofertas, reservas, opiniones, notificaciones y asistente)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Flujo del parcial 3 con dos estudiantes: A es tutor y B es estudiante.\n\nCómo correrla:\n1. Importa esta colección y el environment 'Nexo U - Producción', y elígelo arriba a la derecha.\n2. En el environment llena (Current value) correoA, passwordA, correoB, passwordB, adminCorreo y adminPassword. A y B deben ser cuentas ya activadas: desde el parcial 3 el registro deja la cuenta Pendiente hasta confirmar el correo.\n3. Run collection con las carpetas 0, 1 (opcional), 2, 3 y 4a en orden.\n4. Espera a que termine la clase (unos 17 minutos desde el paso 3.9; la hora exacta sale en la consola).\n5. Corre 4b, 5, 6, 7 y 8 con 'Keep variable values' marcada.\n\nLos créditos viajan como string decimal (\"3.7\"). Las credenciales NO están en este archivo: escríbelas solo en tu Postman y no exportes el environment con ellas."
+  },
+  "item": [
+    {
+      "name": "0. Preparación",
+      "item": [
+        {
+          "name": "0.1 Despertar backend: GET /health/ready",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health/ready",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health",
+                "ready"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "El plan gratuito de Render duerme el servicio tras 15 minutos sin tráfico y tarda cerca de 1 minuto en despertar. Si da 502/503, espera y repite."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde', () => pm.expect(pm.response.code).to.be.below(500));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "0.2 Estado de la base: GET /health/ready (15 tablas)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health/ready",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health",
+                "ready"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.test('persistencia en PostgreSQL', () => pm.expect(d.persistence).to.eql('postgresql'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "0.3 GET /careers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/careers?limit=100",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "careers"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.test('hay carreras', () => pm.expect(d.data.length).to.be.above(0));",
+                  "pm.collectionVariables.set('idCarrera', d.data[0].id_carrera || d.data[0].id);"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Despierta el servicio y confirma que la base está lista."
+    },
+    {
+      "name": "1. Registro con verificación de correo (opcional)",
+      "item": [
+        {
+          "name": "1.1 POST /auth/register (cuenta Pendiente, sin sesión)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Desde el parcial 3 el registro NO devuelve sesión: la cuenta queda Pendiente hasta confirmar el correo. Usa un correo @ucb.edu.bo tuyo en correoNuevo; con correos inventados se envían correos que rebotan.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Prueba\",\n  \"apellido\": \"Postman\",\n  \"correo\": \"{{correoNuevo}}\",\n  \"password\": \"{{passwordNuevo}}\",\n  \"idCarrera\": \"{{idCarrera}}\",\n  \"semestre\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 o 409 (correo ya registrado)', () => pm.expect([201, 409]).to.include(pm.response.code));",
+                  "if (pm.response.code === 201) {",
+                  "  const d = pm.response.json();",
+                  "  pm.test('no devuelve token', () => pm.expect(d.access_token).to.be.undefined);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.2 POST /auth/login con cuenta Pendiente → 403 EMAIL_VERIFICATION_REQUIRED",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Da 200 si ya confirmaste el correo desde el enlace que llegó a tu bandeja.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"{{correoNuevo}}\",\n  \"password\": \"{{passwordNuevo}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 mientras no confirme el correo', () => pm.expect([403, 200]).to.include(pm.response.code));",
+                  "if (pm.response.code === 403) {",
+                  "  pm.test('code EMAIL_VERIFICATION_REQUIRED', () => pm.expect(pm.response.json().code).to.eql('EMAIL_VERIFICATION_REQUIRED'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.3 POST /auth/resend-verification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/resend-verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "resend-verification"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"{{correoNuevo}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde sin error de servidor', () => pm.expect(pm.response.code).to.be.below(500));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Opcional. Prueba el registro y el bloqueo de cuentas sin verificar. El resto de la colección usa cuentas ya activadas (carpeta 2), porque el enlace de verificación solo llega por correo."
+    },
+    {
+      "name": "2. Sesiones (cuentas ya activadas)",
+      "item": [
+        {
+          "name": "2.1 Login tutor (A)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"{{correoA}}\",\n  \"password\": \"{{passwordA}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.test('token Bearer', () => pm.expect(d.token_type).to.eql('Bearer'));",
+                  "pm.test('cuenta Activo', () => pm.expect(d.user.estado).to.eql('Activo'));",
+                  "pm.collectionVariables.set('tokenA', d.access_token);",
+                  "pm.collectionVariables.set('idA', d.user.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.2 Login estudiante (B)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"{{correoB}}\",\n  \"password\": \"{{passwordB}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.test('token Bearer', () => pm.expect(d.token_type).to.eql('Bearer'));",
+                  "pm.test('cuenta Activo', () => pm.expect(d.user.estado).to.eql('Activo'));",
+                  "pm.collectionVariables.set('tokenB', d.access_token);",
+                  "pm.collectionVariables.set('idB', d.user.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.3 Login admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"{{adminCorreo}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.test('token Bearer', () => pm.expect(d.token_type).to.eql('Bearer'));",
+                  "pm.test('cuenta Activo', () => pm.expect(d.user.estado).to.eql('Activo'));",
+                  "pm.collectionVariables.set('tokenAdmin', d.access_token);",
+                  "pm.test('rol ADMIN', () => pm.expect(d.user.roles).to.include('ADMIN'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.4 GET /users/me sin token → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Necesita en el environment: correoA/passwordA y correoB/passwordB (cuentas Activas), y adminCorreo/adminPassword. Las credenciales NO van en este archivo."
+    },
+    {
+      "name": "3. Ofertas con créditos decimales",
+      "item": [
+        {
+          "name": "3.1 GET /skills",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/skills?limit=100",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "skills"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenA}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.test('hay habilidades', () => pm.expect(d.data.length).to.be.above(0));",
+                  "pm.collectionVariables.set('skillId', d.data[0].id_habilidad);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.2 A agrega la habilidad: POST /users/me/skills",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/skills",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "skills"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenA}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"skillId\": \"{{skillId}}\",\n  \"nivel\": \"Intermedio\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 o 409 (ya la tenía)', () => pm.expect([201, 409]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.3 Admin carga 10 créditos a B: POST /credits/grants",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/credits/grants",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "credits",
+                "grants"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "POST /credits/grants solo funciona en desarrollo y pruebas (403 con NODE_ENV=production). Si da 403, B necesita al menos el precio de la oferta (3.7) en su saldo disponible.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{idB}}\",\n  \"amount\": \"10\",\n  \"reason\": \"Carga de prueba parcial 3\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201, o 403 si el servidor está en producción', () => pm.expect([201, 403]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.4 B ve su saldo: GET /credits/me (string decimal)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/credits/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "credits",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenB}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const esDecimal = (v) => typeof v === 'string' && /^\\d+(\\.\\d)?$/.test(v);",
+                  "const decimas = (v) => Math.round(parseFloat(v) * 10);",
+                  "const d = pm.response.json();",
+                  "pm.test('saldo, retenidos y disponibles son string decimal', () => {",
+                  "  pm.expect(esDecimal(d.saldo)).to.be.true;",
+                  "  pm.expect(esDecimal(d.creditos_retenidos)).to.be.true;",
+                  "  pm.expect(esDecimal(d.disponibles)).to.be.true;",
+                  "});",
+                  "pm.test('disponibles = saldo - retenidos', () => pm.expect(decimas(d.disponibles)).to.eql(decimas(d.saldo) - decimas(d.creditos_retenidos)));",
+                  "pm.collectionVariables.set('saldoB0', d.saldo);",
+                  "pm.collectionVariables.set('retenidosB0', d.creditos_retenidos);",
+                  "pm.test('B tiene al menos 3.7 disponibles', () => pm.expect(decimas(d.disponibles)).to.be.at.least(37));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.5 A saldo inicial: GET /credits/me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/credits/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "credits",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenA}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('saldoA0', pm.response.json().saldo);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.6 Precio como número JSON → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tutoring/offers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tutoring",
+                "offers"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenA}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fechaInicio\": \"{{fechaInicio}}\",\n  \"fechaFin\": \"{{fechaFin}}\",\n  \"skillId\": \"{{skillId}}\",\n  \"nivel\": \"Intermedio\",\n  \"titulo\": \"Prueba de precio\",\n  \"descripcion\": \"Debe fallar: el precio va como texto\",\n  \"costoCreditos\": 3.7\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.to.have.status(400));",
+                  "const d = pm.response.json();",
+                  "pm.test('formato de error único', () => { pm.expect(d.statusCode).to.eql(400); pm.expect(d).to.have.property('message'); });"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = new Date(Date.now() + 2 * 60 * 1000);",
+                  "d.setUTCSeconds(0, 0);",
+                  "const end = new Date(d.getTime() + 15 * 60 * 1000);",
+                  "pm.collectionVariables.set('fechaInicio', d.toISOString());",
+                  "pm.collectionVariables.set('fechaFin', end.toISOString());"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.7 Precio con dos decimales \"3.75\" → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tutoring/offers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tutoring",
+                "offers"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenA}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fechaInicio\": \"{{fechaInicio}}\",\n  \"fechaFin\": \"{{fechaFin}}\",\n  \"skillId\": \"{{skillId}}\",\n  \"nivel\": \"Intermedio\",\n  \"titulo\": \"Prueba de precio\",\n  \"descripcion\": \"Debe fallar: solo una décima\",\n  \"costoCreditos\": \"3.75\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.8 Precio cero \"0\" → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tutoring/offers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tutoring",
+                "offers"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenA}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fechaInicio\": \"{{fechaInicio}}\",\n  \"fechaFin\": \"{{fechaFin}}\",\n  \"skillId\": \"{{skillId}}\",\n  \"nivel\": \"Intermedio\",\n  \"titulo\": \"Prueba de precio\",\n  \"descripcion\": \"Debe fallar: precio mayor a cero\",\n  \"costoCreditos\": \"0\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.9 A publica la oferta a 3.7 créditos: POST /tutoring/offers",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tutoring/offers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tutoring",
+                "offers"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenA}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "El horario empieza 2 minutos después de correr este paso y dura 15 minutos: la reserva solo se puede confirmar cuando termina. Publicar no mueve créditos.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fechaInicio\": \"{{fechaInicio}}\",\n  \"fechaFin\": \"{{fechaFin}}\",\n  \"skillId\": \"{{skillId}}\",\n  \"nivel\": \"Intermedio\",\n  \"titulo\": \"Tutoría de prueba Postman\",\n  \"descripcion\": \"Oferta creada por la colección del parcial 3\",\n  \"costoCreditos\": \"3.7\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201, o 409 si A ya tiene una oferta activa de esa materia', () => pm.expect([201, 409]).to.include(pm.response.code));",
+                  "if (pm.response.code === 201) {",
+                  "  const d = pm.response.json();",
+                  "  pm.test('costo_creditos viaja como string \"3.7\"', () => pm.expect(d.costo_creditos).to.eql('3.7'));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = new Date(Date.now() + 2 * 60 * 1000);",
+                  "d.setUTCSeconds(0, 0);",
+                  "const end = new Date(d.getTime() + 15 * 60 * 1000);",
+                  "pm.collectionVariables.set('fechaInicio', d.toISOString());",
+                  "pm.collectionVariables.set('fechaFin', end.toISOString());"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.10 Leer la oferta de A: GET /tutoring/offers?tutorId&skillId",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tutoring/offers?tutorId={{idA}}&skillId={{skillId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tutoring",
+                "offers"
+              ],
+              "query": [
+                {
+                  "key": "tutorId",
+                  "value": "{{idA}}"
+                },
+                {
+                  "key": "skillId",
+                  "value": "{{skillId}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenB}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.test('hay una oferta vigente de A', () => pm.expect(d.data.length).to.be.above(0));",
+                  "const o = d.data[0];",
+                  "pm.test('costo_creditos es string decimal', () => pm.expect(/^\\d+(\\.\\d)?$/.test(o.costo_creditos)).to.be.true);",
+                  "pm.collectionVariables.set('offerId', o.id_oferta);",
+                  "pm.collectionVariables.set('availabilityId', o.id_disponibilidad);",
+                  "pm.collectionVariables.set('precio', o.costo_creditos);",
+                  "pm.collectionVariables.set('fechaInicio', o.fecha_inicio);",
+                  "pm.collectionVariables.set('fechaFin', o.fecha_fin);",
+                  "console.log('La clase termina:', o.fecha_fin, '- confirma la reserva solo después de esa hora');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.11 Publicar sin token → 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tutoring/offers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tutoring",
+                "offers"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fechaInicio\": \"{{fechaInicio}}\",\n  \"fechaFin\": \"{{fechaFin}}\",\n  \"skillId\": \"{{skillId}}\",\n  \"nivel\": \"Intermedio\",\n  \"titulo\": \"x\",\n  \"descripcion\": \"x\",\n  \"costoCreditos\": \"3.7\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Los créditos viajan siempre como string decimal (\"3.7\"), con una décima como máximo. El precio es total por clase y lo fija el servidor al contratar."
+    },
+    {
+      "name": "4a. Solicitud, aceptación y retención (correr junto con 0 a 3)",
+      "item": [
+        {
+          "name": "4.1 B solicita al precio publicado: POST /exchanges",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/exchanges",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exchanges"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenB}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "El cliente nunca envía el importe: el servidor copia el precio de la oferta.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"providerId\": \"{{idA}}\",\n  \"skillId\": \"{{skillId}}\",\n  \"availabilityId\": \"{{availabilityId}}\",\n  \"offerId\": \"{{offerId}}\",\n  \"fechaInicio\": \"{{fechaInicio}}\",\n  \"fechaFin\": \"{{fechaFin}}\",\n  \"descripcion\": \"Solicitud de prueba parcial 3\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json();",
+                  "pm.test('estado Solicitada', () => pm.expect(d.estado).to.eql('Solicitada'));",
+                  "pm.test('creditos_requeridos = precio publicado (string)', () => pm.expect(d.creditos_requeridos).to.eql(pm.collectionVariables.get('precio')));",
+                  "pm.collectionVariables.set('exchangeId', d.id_solicitud);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.2 Solicitar no retiene créditos: GET /credits/me (B)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/credits/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "credits",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenB}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.test('retenidos no cambió', () => pm.expect(d.creditos_retenidos).to.eql(pm.collectionVariables.get('retenidosB0')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.3 Solicitar sin Idempotency-Key → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/exchanges",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exchanges"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenB}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Las operaciones que mueven créditos exigen Idempotency-Key (16 a 128 caracteres). Sin ella el backend responde 400.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"providerId\": \"{{idA}}\",\n  \"skillId\": \"{{skillId}}\",\n  \"availabilityId\": \"{{availabilityId}}\",\n  \"offerId\": \"{{offerId}}\",\n  \"fechaInicio\": \"{{fechaInicio}}\",\n  \"fechaFin\": \"{{fechaFin}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.4 A acepta: POST /exchanges/:id/accept (retiene el importe exacto)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/exchanges/{{exchangeId}}/accept",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exchanges",
+                "{{exchangeId}}",
+                "accept"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenA}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.test('estado Confirmada', () => pm.expect(d.estado).to.eql('Confirmada'));",
+                  "pm.test('creditos = precio (string)', () => pm.expect(d.creditos).to.eql(pm.collectionVariables.get('precio')));",
+                  "pm.collectionVariables.set('reservaId', d.id_reserva);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.5 B tiene el importe retenido: GET /credits/me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/credits/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "credits",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenB}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const esDecimal = (v) => typeof v === 'string' && /^\\d+(\\.\\d)?$/.test(v);",
+                  "const decimas = (v) => Math.round(parseFloat(v) * 10);",
+                  "const d = pm.response.json();",
+                  "pm.test('retenidos = retenidos previos + precio', () => pm.expect(decimas(d.creditos_retenidos)).to.eql(decimas(pm.collectionVariables.get('retenidosB0')) + decimas(pm.collectionVariables.get('precio'))));",
+                  "pm.test('el saldo aún no se movió', () => pm.expect(d.saldo).to.eql(pm.collectionVariables.get('saldoB0')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.6 A intenta confirmar antes de que termine → 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reservations/{{reservaId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reservations",
+                "{{reservaId}}",
+                "confirm"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenA}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Solo se puede confirmar a partir de la hora de fin. Esto debe correrse apenas aceptas.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409', () => pm.response.to.have.status(409));",
+                  "pm.test('mensaje: la reserva aún no terminó', () => pm.expect(String(pm.response.json().message)).to.match(/aun no termino|aún no terminó/i));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Corre los pasos 0 a 4a seguidos con Run collection. Después espera hasta que termine la clase (unos 17 minutos desde el paso 3.9; la hora exacta sale en la consola de Postman) y corre desde la carpeta 4b con 'Keep variable values' marcada."
+    },
+    {
+      "name": "4b. Doble confirmación y liquidación (después de que termina la clase)",
+      "item": [
+        {
+          "name": "4.7 A confirma (primera confirmación): POST /reservations/:id/confirm",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reservations/{{reservaId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reservations",
+                "{{reservaId}}",
+                "confirm"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenA}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.test('sigue Confirmada: falta la otra parte', () => pm.expect(d.estado).to.eql('Confirmada'));",
+                  "pm.test('confirmó el ofertante', () => pm.expect(d.confirmacion_ofertante_at).to.not.be.null);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.8 La primera confirmación mantiene la retención: GET /credits/me (B)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/credits/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "credits",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenB}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const decimas = (v) => Math.round(parseFloat(v) * 10);",
+                  "const d = pm.response.json();",
+                  "pm.test('B aún tiene el importe retenido', () => pm.expect(decimas(d.creditos_retenidos)).to.eql(decimas(pm.collectionVariables.get('retenidosB0')) + decimas(pm.collectionVariables.get('precio'))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.9 B confirma (segunda confirmación): POST /reservations/:id/confirm",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reservations/{{reservaId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reservations",
+                "{{reservaId}}",
+                "confirm"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenB}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.test('estado Completada', () => pm.expect(d.estado).to.eql('Completada'));",
+                  "pm.test('ambas partes confirmaron', () => { pm.expect(d.confirmacion_solicitante_at).to.not.be.null; pm.expect(d.confirmacion_ofertante_at).to.not.be.null; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.10 B pagó una sola vez: GET /credits/me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/credits/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "credits",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenB}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const decimas = (v) => Math.round(parseFloat(v) * 10);",
+                  "const d = pm.response.json();",
+                  "pm.test('saldo = saldo previo - precio', () => pm.expect(decimas(d.saldo)).to.eql(decimas(pm.collectionVariables.get('saldoB0')) - decimas(pm.collectionVariables.get('precio'))));",
+                  "pm.test('retenidos vuelven al valor previo', () => pm.expect(d.creditos_retenidos).to.eql(pm.collectionVariables.get('retenidosB0')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.11 A recibió el pago: GET /credits/me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/credits/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "credits",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenA}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const decimas = (v) => Math.round(parseFloat(v) * 10);",
+                  "const d = pm.response.json();",
+                  "pm.test('saldo = saldo previo + precio', () => pm.expect(decimas(d.saldo)).to.eql(decimas(pm.collectionVariables.get('saldoA0')) + decimas(pm.collectionVariables.get('precio'))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.12 Movimientos de B: GET /credits/me/movements",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/credits/me/movements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "credits",
+                "me",
+                "movements"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenB}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "const lista = Array.isArray(d) ? d : d.data;",
+                  "pm.test('hay movimientos', () => pm.expect(lista.length).to.be.above(0));",
+                  "pm.test('los importes son string', () => pm.expect(typeof lista[0].monto).to.eql('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.13 Confirmar otra vez una reserva completada → no cambia nada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reservations/{{reservaId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reservations",
+                "{{reservaId}}",
+                "confirm"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenB}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('no responde error de servidor', () => pm.expect(pm.response.code).to.be.below(500));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "La primera confirmación mantiene la retención y la segunda transfiere los créditos una sola vez al tutor."
+    },
+    {
+      "name": "5. Opiniones",
+      "item": [
+        {
+          "name": "5.1 B califica al tutor: POST /tutoring/reservations/:id/review",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tutoring/reservations/{{reservaId}}/review",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tutoring",
+                "reservations",
+                "{{reservaId}}",
+                "review"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenB}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Solo el solicitante de una reserva completada puede opinar, una vez. Repetir la misma petición con la misma clave no duplica.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"calificacion\": 5,\n  \"comentario\": \"Muy buena explicación (prueba Postman)\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json();",
+                  "pm.test('calificación 5', () => pm.expect(d.calificacion).to.eql(5));",
+                  "pm.test('pertenece a la reserva', () => pm.expect(d.id_reserva).to.eql(pm.collectionVariables.get('reservaId')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.2 Calificación 6 → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tutoring/reservations/{{reservaId}}/review",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tutoring",
+                "reservations",
+                "{{reservaId}}",
+                "review"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenB}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"calificacion\": 6\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.3 El tutor no puede calificarse a sí mismo → 403 o 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tutoring/reservations/{{reservaId}}/review",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tutoring",
+                "reservations",
+                "{{reservaId}}",
+                "review"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenA}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"calificacion\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('rechazada', () => pm.expect([403, 409]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.4 Opiniones del tutor: GET /tutoring/reviews",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tutoring/reviews?tutorId={{idA}}&skillId={{skillId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tutoring",
+                "reviews"
+              ],
+              "query": [
+                {
+                  "key": "tutorId",
+                  "value": "{{idA}}"
+                },
+                {
+                  "key": "skillId",
+                  "value": "{{skillId}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenB}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.test('hay al menos una opinión', () => pm.expect(d.data.length).to.be.above(0));",
+                  "pm.test('no expone al evaluador', () => pm.expect(JSON.stringify(d.data[0])).to.not.include(pm.collectionVariables.get('idB')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.5 Mis opiniones: GET /tutoring/reviews/me (B)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tutoring/reviews/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tutoring",
+                "reviews",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenB}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('hay opiniones propias', () => pm.expect(pm.response.json().data.length).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.6 Reputación del tutor: GET /tutoring/reputation",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tutoring/reputation?tutorId={{idA}}&skillId={{skillId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tutoring",
+                "reputation"
+              ],
+              "query": [
+                {
+                  "key": "tutorId",
+                  "value": "{{idA}}"
+                },
+                {
+                  "key": "skillId",
+                  "value": "{{skillId}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenB}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('responde con datos', () => pm.expect(pm.response.text().length).to.be.above(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.7 Opiniones sin token → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tutoring/reviews/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tutoring",
+                "reviews",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Notificaciones",
+      "item": [
+        {
+          "name": "6.1 A lista sus notificaciones: GET /notifications/me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/me?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "me"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenA}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.test('forma { data, meta }', () => { pm.expect(d.data).to.be.an('array'); pm.expect(d.meta).to.include.keys('page', 'limit', 'total', 'totalPages', 'noLeidas'); });",
+                  "pm.test('A tiene notificaciones del flujo', () => pm.expect(d.data.length).to.be.above(0));",
+                  "pm.test('tipos válidos', () => d.data.forEach((n) => pm.expect(['SolicitudRecibida','SolicitudAceptada','SolicitudRechazada','ReservaCancelada','ClasePorConfirmar','OpinionRecibida']).to.include(n.tipo)));",
+                  "pm.test('campos de cada notificación', () => pm.expect(d.data[0]).to.include.keys('id_notificacion', 'tipo', 'titulo', 'mensaje', 'leida', 'created_at'));",
+                  "const sinLeer = d.data.find((n) => n.leida === false);",
+                  "pm.collectionVariables.set('notificacionId', (sinLeer || d.data[0]).id_notificacion);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.2 B no puede marcar una notificación ajena: PATCH /notifications/:id/read",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/{{notificacionId}}/read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "{{notificacionId}}",
+                "read"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenB}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('rechazada (solo el dueño)', () => pm.expect([403, 404]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.3 A marca una como leída: PATCH /notifications/:id/read",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/{{notificacionId}}/read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "{{notificacionId}}",
+                "read"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenA}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('leida: true', () => pm.expect(pm.response.json().leida).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.4 A marca todas: POST /notifications/read-all",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/read-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "read-all"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenA}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('actualizadas es un número', () => pm.expect(pm.response.json().actualizadas).to.be.a('number'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.5 Ya no quedan sin leer: GET /notifications/me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/me?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "me"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenA}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('noLeidas = 0', () => pm.expect(pm.response.json().meta.noLeidas).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.6 Sin token → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7. Asistente",
+      "item": [
+        {
+          "name": "7.1 Perfil del asistente: GET /assistant/me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/assistant/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "assistant",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenB}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.test('trae avatar y cuota', () => pm.expect(d).to.include.keys('avatar', 'quota'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7.2 Preguntar: POST /assistant/ask",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/assistant/ask",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "assistant",
+                "ask"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenB}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "429: se acabaron los mensajes gratis del día o más de 10 por minuto. 503: el asistente no está configurado en el servidor. Ninguno de los dos es un fallo de la colección.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"¿Cómo reservo una tutoría?\",\n  \"route\": \"/perfil\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200, o un error documentado (429, 502, 503)', () => pm.expect([200, 429, 502, 503]).to.include(pm.response.code));",
+                  "if (pm.response.code === 200) {",
+                  "  const d = pm.response.json();",
+                  "  pm.test('responde con texto y cuota', () => { pm.expect(d.answer).to.be.a('string').and.not.empty; pm.expect(d).to.have.property('quota'); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7.3 Pregunta de más de 500 caracteres → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/assistant/ask",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "assistant",
+                "ask"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenB}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7.4 Sin token → 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/assistant/ask",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "assistant",
+                "ask"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"hola\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8. Búsqueda de ofertas y ofertantes",
+      "item": [
+        {
+          "name": "8.1 Catálogo para B sin sus propias ofertas: GET /tutoring/offers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tutoring/offers?skillId={{skillId}}&excludeTutorId={{idB}}&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tutoring",
+                "offers"
+              ],
+              "query": [
+                {
+                  "key": "skillId",
+                  "value": "{{skillId}}"
+                },
+                {
+                  "key": "excludeTutorId",
+                  "value": "{{idB}}"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenB}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.test('ninguna oferta es de B', () => d.data.forEach((o) => pm.expect(o.id_tutor).to.not.eql(pm.collectionVariables.get('idB'))));",
+                  "pm.test('precios como string', () => d.data.forEach((o) => pm.expect(typeof o.costo_creditos).to.eql('string')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8.2 Ofertantes de la materia: GET /skills/:id/providers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/skills/{{skillId}}/providers?limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "skills",
+                "{{skillId}}",
+                "providers"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenB}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('devuelve página', () => pm.expect(pm.response.json()).to.have.property('data'));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Rutas con las que el estudiante encuentra tutores. El motor de matching de la base de datos (HU-07) todavía no tiene una ruta HTTP, por eso no se prueba aquí."
+    }
+  ],
+  "variable": [
+    {
+      "key": "idCarrera",
+      "value": ""
+    },
+    {
+      "key": "tokenA",
+      "value": ""
+    },
+    {
+      "key": "tokenB",
+      "value": ""
+    },
+    {
+      "key": "tokenAdmin",
+      "value": ""
+    },
+    {
+      "key": "idA",
+      "value": ""
+    },
+    {
+      "key": "idB",
+      "value": ""
+    },
+    {
+      "key": "skillId",
+      "value": ""
+    },
+    {
+      "key": "fechaInicio",
+      "value": ""
+    },
+    {
+      "key": "fechaFin",
+      "value": ""
+    },
+    {
+      "key": "offerId",
+      "value": ""
+    },
+    {
+      "key": "availabilityId",
+      "value": ""
+    },
+    {
+      "key": "precio",
+      "value": ""
+    },
+    {
+      "key": "exchangeId",
+      "value": ""
+    },
+    {
+      "key": "reservaId",
+      "value": ""
+    },
+    {
+      "key": "notificacionId",
+      "value": ""
+    },
+    {
+      "key": "saldoA0",
+      "value": ""
+    },
+    {
+      "key": "saldoB0",
+      "value": ""
+    },
+    {
+      "key": "retenidosB0",
+      "value": ""
+    }
+  ]
+}
