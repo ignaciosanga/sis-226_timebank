@@ -36,7 +36,10 @@ export class HealthController {
   }
 
   @Get('ready')
-  @ApiOperation({ summary: 'Comprueba conexion y presencia de las 12 tablas' })
+  @ApiOperation({
+    summary:
+      'Comprueba conexion y presencia del esquema, verificacion, ofertas y banners',
+  })
   @ApiOkResponse({ type: ReadinessResponse })
   @ApiServiceUnavailableResponse({
     description: 'PostgreSQL o esquema no disponible',
@@ -54,9 +57,10 @@ export class HealthController {
           'USUARIO_HABILIDADES', 'DISPONIBILIDADES', 'SOLICITUDES_INTERCAMBIO',
           'RESERVAS', 'MOVIMIENTOS_CREDITO', 'CALIFICACIONES',
           'NOTIFICACIONES', 'AUDITORIA'
+          , 'VERIFICACIONES_CORREO', 'OFERTAS', 'BANNERS_TUTORIA'
         )
       `;
-      if (result?.total !== 12) throw new Error('Esquema incompleto');
+      if (result?.total !== 15) throw new Error('Esquema incompleto');
       return { status: 'ok', persistence: 'postgresql' };
     } catch {
       throw new ServiceUnavailableException(

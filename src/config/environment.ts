@@ -29,7 +29,8 @@ export class Environment {
   PORT = 4000;
 
   @IsString()
-  CORS_ORIGINS = 'http://localhost:3000,http://localhost:5173';
+  CORS_ORIGINS =
+    'http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173';
 
   @IsInt()
   @Min(1)
@@ -59,12 +60,73 @@ export class Environment {
   @IsOptional()
   @IsString()
   DATABASE_URL?: string;
+  @IsOptional()
+  @IsString()
+  @MinLength(32)
+  APP_ENCRYPTION_KEY?: string;
+  @IsOptional()
+  @IsString()
+  @MinLength(32)
+  APP_HASH_PEPPER?: string;
 
   @IsBoolean()
   DATABASE_ENABLED = false;
 
   @IsBoolean()
   SWAGGER_ENABLED = true;
+
+  @IsIn(['disabled', 'smtp'])
+  MAIL_TRANSPORT = 'disabled';
+  @IsString()
+  PUBLIC_API_URL = 'http://localhost:4000';
+  @IsString()
+  SMTP_HOST = '127.0.0.1';
+  @IsInt()
+  @Min(1)
+  @Max(65535)
+  SMTP_PORT = 1025;
+  @IsBoolean()
+  SMTP_SECURE = false;
+  @IsBoolean()
+  SMTP_REQUIRE_TLS = true;
+  @IsOptional()
+  @IsString()
+  SMTP_USER?: string;
+  @IsOptional()
+  @IsString()
+  SMTP_PASSWORD?: string;
+  @IsString()
+  MAIL_FROM = 'Nexo U <no-reply@nexo-u.local>';
+  @IsInt()
+  @Min(1)
+  @Max(1440)
+  EMAIL_VERIFICATION_TTL_MINUTES = 60;
+
+  @IsString()
+  @MinLength(1)
+  BANNER_STORAGE_DIR = '.local/tutoring-banners';
+
+  @IsBoolean()
+  GOOGLE_CALENDAR_ENABLED = false;
+
+  @IsOptional()
+  @IsString()
+  GOOGLE_CALENDAR_CLIENT_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  GOOGLE_CALENDAR_CLIENT_SECRET?: string;
+
+  @IsOptional()
+  @IsString()
+  GOOGLE_LOGIN_CLIENT_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  GOOGLE_CALENDAR_REDIRECT_URI?: string;
+
+  @IsString()
+  FRONTEND_URL = 'http://localhost:5173';
 }
 
 export function validateEnvironment(
@@ -77,10 +139,18 @@ export function validateEnvironment(
     'RATE_LIMIT_MAX',
     'JWT_EXPIRES_IN_SECONDS',
     'REGISTRATION_INITIAL_CREDITS',
+    'SMTP_PORT',
+    'EMAIL_VERIFICATION_TTL_MINUTES',
   ]) {
     if (input[key] !== undefined) parsed[key] = Number(input[key]);
   }
-  for (const key of ['DATABASE_ENABLED', 'SWAGGER_ENABLED']) {
+  for (const key of [
+    'DATABASE_ENABLED',
+    'SWAGGER_ENABLED',
+    'GOOGLE_CALENDAR_ENABLED',
+    'SMTP_SECURE',
+    'SMTP_REQUIRE_TLS',
+  ]) {
     if (input[key] === 'true') parsed[key] = true;
     else if (input[key] === 'false') parsed[key] = false;
   }
@@ -133,7 +203,44 @@ export function validateEnvironment(
   }
   if (config.DATABASE_ENABLED && !config.DATABASE_URL)
     throw new Error('Configuracion invalida: DATABASE_URL requerida');
+  if (config.GOOGLE_CALENDAR_ENABLED) {
+    if (
+      !config.GOOGLE_CALENDAR_CLIENT_ID ||
+      !config.GOOGLE_CALENDAR_CLIENT_SECRET ||
+      !config.GOOGLE_CALENDAR_REDIRECT_URI
+    )
+      throw new Error('Configuracion invalida: Google Calendar');
+  }
+  for (const [key, value] of [
+    ['PUBLIC_API_URL', config.PUBLIC_API_URL],
+    ['FRONTEND_URL', config.FRONTEND_URL],
+    ['GOOGLE_CALENDAR_REDIRECT_URI', config.GOOGLE_CALENDAR_REDIRECT_URI],
+  ] as const) {
+    if (!value) continue;
+    try {
+      const url = new URL(value);
+      if (
+        !['http:', 'https:'].includes(url.protocol) ||
+        (['FRONTEND_URL', 'PUBLIC_API_URL'].includes(key) &&
+          url.origin !== value)
+      )
+        throw new Error();
+    } catch {
+      throw new Error(`Configuracion invalida: ${key}`);
+    }
+  }
   if (/^(change|replace|example|secret|your[_-])/i.test(config.JWT_SECRET))
     throw new Error('Configuracion invalida: JWT_SECRET de ejemplo');
+  if (
+    config.NODE_ENV === 'production' &&
+    config.MAIL_TRANSPORT === 'smtp' &&
+    (!config.PUBLIC_API_URL.startsWith('https://') ||
+      (!config.SMTP_SECURE && !config.SMTP_REQUIRE_TLS))
+  )
+    throw new Error(
+      'Configuracion invalida: correo de produccion requiere HTTPS y TLS',
+    );
+  if (Boolean(config.SMTP_USER) !== Boolean(config.SMTP_PASSWORD))
+    throw new Error('Configuracion invalida: credenciales SMTP incompletas');
   return config;
 }

@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool, ClientBase } from 'pg';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { Environment } from '../../config/environment';
@@ -16,6 +17,7 @@ interface GeneratedClientModule {
 
 @Injectable()
 export class PrismaService implements OnModuleDestroy {
+  creditDivisor = 1;
   private client?: PrismaClient;
   private connecting?: Promise<PrismaClient>;
 
@@ -48,15 +50,45 @@ export class PrismaService implements OnModuleDestroy {
         'Cliente Prisma no disponible; ejecutar prisma generate y compilar',
       );
     }
-    const adapter = new PrismaPg({
+    const poolConfig = {
       connectionString: this.config.get('DATABASE_URL', { infer: true }),
       connectionTimeoutMillis: 5000,
       max: 10,
       idleTimeoutMillis: 30000,
+      onConnect: async (connection: ClientBase) => {
+        const key = this.config.get('APP_ENCRYPTION_KEY', { infer: true });
+        const pepper = this.config.get('APP_HASH_PEPPER', { infer: true });
+        if (key || pepper) {
+          if (!key || !pepper)
+            throw new ServiceUnavailableException(
+              'Se requieren ambas claves criptográficas de BD',
+            );
+          await connection.query(
+            "SELECT set_config('app.encryption_key',$1,false), set_config('app.hash_pepper',$2,false)",
+            [key, pepper],
+          );
+        }
+      },
+    };
+    const adapter = new PrismaPg(new Pool(poolConfig), {
+      disposeExternalPool: true,
     });
     const client = new generated.PrismaClient({ adapter });
     try {
       await client.$connect();
+      const [scale] = await client.$queryRawUnsafe<{ scaled: boolean }[]>(
+        `SELECT to_regclass('public.config_economia') IS NOT NULL AND to_regclass('public."PENALIZACIONES_PENDIENTES"') IS NOT NULL AS scaled`,
+      );
+      this.creditDivisor = scale?.scaled ? 10 : 1;
+      if (
+        this.creditDivisor === 10 &&
+        (!this.config.get('APP_ENCRYPTION_KEY', { infer: true }) ||
+          !this.config.get('APP_HASH_PEPPER', { infer: true }))
+      ) {
+        throw new ServiceUnavailableException(
+          'BD v4 requiere ambas claves criptográficas',
+        );
+      }
     } catch {
       await client.$disconnect().catch(() => undefined);
       throw new ServiceUnavailableException('PostgreSQL no disponible');

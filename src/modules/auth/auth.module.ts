@@ -7,16 +7,21 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { UsersModule } from '../users/users.module';
 import { AuthService } from './auth.service';
+import { GoogleAuthService } from './google-auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { PasswordService } from './password.service';
 import { REGISTRATION_POLICY } from './registration-policy';
 import { AuthController } from './auth.controller';
 import { UsersController } from '../users/users.controller';
 import { AdminUsersController } from '../users/admin-users.controller';
+import { EmailVerificationService } from './email-verification.service';
+import { VerificationMailer } from './verification-mailer';
+import { ExchangePersistenceModule } from '../exchanges/exchange-persistence.module';
 
 @Module({
   imports: [
     UsersModule,
+    ExchangePersistenceModule,
     PassportModule.register({ defaultStrategy: 'jwt', session: false }),
     JwtModule.registerAsync({
       inject: [ConfigService],
@@ -39,6 +44,9 @@ import { AdminUsersController } from '../users/admin-users.controller';
   controllers: [AuthController, UsersController, AdminUsersController],
   providers: [
     AuthService,
+    EmailVerificationService,
+    VerificationMailer,
+    GoogleAuthService,
     PasswordService,
     JwtStrategy,
     JwtAuthGuard,

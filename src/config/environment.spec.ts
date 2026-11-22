@@ -7,6 +7,9 @@ describe('Validacion de entorno', () => {
     const config = validateEnvironment({ JWT_SECRET: secret });
     expect(config.PORT).toBe(4000);
     expect(config.DATABASE_ENABLED).toBe(false);
+    expect(config.CORS_ORIGINS.split(',')).toContain(
+      'http://127.0.0.1:5173',
+    );
   });
 
   it('convierte numeros y booleanos de forma estricta', () => {
@@ -33,6 +36,7 @@ describe('Validacion de entorno', () => {
     { CORS_ORIGINS: 'https://example.test/path' },
     { PERSISTENCE_MODE: 'prisma' },
     { NODE_ENV: 'production', PERSISTENCE_MODE: 'memory' },
+    { GOOGLE_CALENDAR_ENABLED: 'true' },
   ])('rechaza configuracion invalida %j', (values) => {
     expect(() =>
       validateEnvironment({ JWT_SECRET: secret, ...values }),
@@ -48,5 +52,16 @@ describe('Validacion de entorno', () => {
       expect(String(error)).toContain('DATABASE_URL');
       expect(String(error)).not.toContain(value);
     }
+  });
+
+  it('requiere la configuracion completa al habilitar Google Calendar', () => {
+    const config = validateEnvironment({
+      JWT_SECRET: secret,
+      GOOGLE_CALENDAR_ENABLED: 'true',
+      GOOGLE_CALENDAR_CLIENT_ID: 'client-id',
+      GOOGLE_CALENDAR_CLIENT_SECRET: 'client-secret',
+      GOOGLE_CALENDAR_REDIRECT_URI: 'http://localhost:4000/calendar/callback',
+    });
+    expect(config.GOOGLE_CALENDAR_ENABLED).toBe(true);
   });
 });

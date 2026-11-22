@@ -1,19 +1,17 @@
-# credits
+﻿# Créditos
 
-v0.3.0: cuentas, retenciones, liberaciones, transferencias y movimientos de créditos de tiempo. Los efectos se coordinan en la misma transacción de memoria de `ExchangesService`.
+Las operaciones de cuenta, reserva y ledger comparten la transacción de `ExchangesService`. PostgreSQL conserva la idempotencia y coordina instancias mediante el bloqueo asesor común. Memoria es efímera.
 
-| Método | Ruta                    | Acceso / resultado                                                            |
+| Método | Ruta                    | Acceso                                                                        |
 | ------ | ----------------------- | ----------------------------------------------------------------------------- |
-| GET    | `/credits/me`           | ESTUDIANTE; cuenta propia, creada en cero si falta                            |
-| GET    | `/credits/me/movements` | ESTUDIANTE; historial propio                                                  |
-| POST   | `/credits/grants`       | ADMIN en desarrollo/pruebas; `{ userId, amount, reason }` y `Idempotency-Key` |
+| GET    | `/credits/me`           | ESTUDIANTE activo, cuenta propia                                              |
+| GET    | `/credits/me/movements` | ESTUDIANTE activo, historial propio                                           |
+| POST   | `/credits/grants`       | ADMIN en desarrollo/pruebas; `{ userId, amount, reason }` e `Idempotency-Key` |
 
-Reglas provisionales autorizadas: saldo inicial `0.00`, sin bienvenida; una hora = `1.00` crédito y 15 minutos = `0.25`. La reserva dura múltiplos de 15 minutos, de 15 minutos a 8 horas. Los importes HTTP son strings decimales de hasta dos cifras; el almacenamiento usa centavos exactos `bigint`.
+Los importes de HTTP y del dominio se normalizan a strings enteros o con una décima. La aritmética usa décimas enteras `bigint`, sin flotantes. Se conserva el límite técnico de `2147483647` por importe. La cuenta cumple `saldo >= creditos_retenidos >= 0`; disponible es la resta exacta. El bono se decide una sola vez al activar la cuenta institucional, con la política configurada; no se concede al crear una solicitud.
 
-`disponibles = saldo - creditos_retenidos` y `saldo >= creditos_retenidos >= 0`. Una solicitud pendiente no cambia la cuenta. Su aceptación crea las cuentas faltantes de ambos participantes y retiene el importe una sola vez. Cancelar libera una vez; las dos confirmaciones después del fin generan una única transferencia con débito/abono atómicos.
+En el ensayo decimal, una oferta de 45 minutos por `"3.7"` guarda ese precio al solicitar. Aceptarla crea una reserva y una retención por `"3.7"`; cancelar libera el mismo importe sin pagar al tutor. La fase 5 habilita la confirmación después del fin de la clase: la primera persona registra solo su marca; la segunda consume `"-3.7"` del estudiante y transfiere `"3.7"` al tutor en un commit único, usando exclusivamente `RESERVAS.creditos`. El disponible del estudiante no se descuenta dos veces. Otras retenciones se conservan y el ledger anterior es inmutable. Los horarios históricos sin oferta conservan un crédito por 15 minutos y el flujo anterior de doble confirmación.
 
-Las cargas exigen ADMIN activo, destino estudiante activo, monto positivo, motivo y clave de idempotencia; están bloqueadas en producción. Monto y saldo final no pueden superar `10000000000.00`. La misma clave y contenido no cargan otra vez. Los movimientos conservan fecha, cuenta, reserva cuando corresponda, tipo e importe; la carga conserva además su motivo.
+La base habitual sigue usando nueve INTEGER. Allí, contratar ofertas devuelve `409 OFFER_PRICE_FLOW_PENDING`, las cargas fraccionarias se rechazan y liquidar reservas de oferta o fraccionarias mantiene `409 DECIMAL_SETTLEMENT_PENDING`. El esquema decimal provisional solo se aplicó a una copia aislada y a bases desechables de pruebas, fuera de las migraciones oficiales. Una bandera de Frontend no habilita esa capacidad.
 
-Un fallo antes del commit descarta todas las escrituras y el resultado de idempotencia. Una respuesta perdida después del commit se recupera repitiendo la misma clave; no se vuelve a cobrar. La auditoría ADMIN está en `GET /exchanges/integrity` y no repara datos.
-
-Son créditos de tiempo, sin pasarela monetaria. Las reglas/campos pertenecen al adaptador provisional, no a un esquema SQL validado. Datos e idempotencia se pierden al reiniciar y no coordinan instancias. Ver [contrato API](../../../docs/api-contract.md) y [reglas de negocio](../../../docs/business-rules.md).
+Una excepción revierte cuenta, solicitud, reserva, horario, ledger e idempotencia del intento actual; conserva una primera confirmación ya comprometida. Un reintento con la misma clave y cuerpo recupera el resultado confirmado. Cancelación y liquidación compiten bajo el mismo bloqueo: solo una puede comprometer sus efectos. `GET /exchanges/integrity` permite auditoría ADMIN sin reparar datos. Ver [fase 5](../../../docs/fase5-confirmacion-liquidacion.md) y [contrato de Frontend](../../../docs/frontend-integration.md).

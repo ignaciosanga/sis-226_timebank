@@ -6,11 +6,9 @@ import {
   RecordStatus,
   UserStatus,
 } from '../../common/enums/record-status.enum';
-import {
-  RequestStatus,
-  ReservationStatus,
-} from '../exchanges/exchange.types';
+import { RequestStatus, ReservationStatus } from '../exchanges/exchange.types';
 import { GroupBy, Period } from './dto/analytics-query.dto';
+import { fromTenths } from '../exchanges/economy';
 
 export interface SeriesPoint {
   periodo: string;
@@ -24,7 +22,19 @@ export interface NamedCount {
 }
 
 const toNumber = (value: unknown): number => Number(value ?? 0);
-const toInt = (value: unknown): string => String(BigInt(String(value ?? 0)));
+/** SUM puede superar el límite de una cuenta. PostgreSQL devuelve texto exacto. */
+const toCreditTotal = (value: unknown): string => {
+  const text = String(value ?? '0');
+  const match = /^(-?)(\d+)(?:\.(\d)0*)?$/.exec(text);
+  if (!match)
+    throw new ServiceUnavailableException(
+      'Importe agregado incompatible con la política de décimas',
+    );
+  const whole = BigInt(match[2]!).toString();
+  const fraction = match[3] ?? '0';
+  const zero = whole === '0' && fraction === '0';
+  return `${zero ? '' : match[1]}${whole}${fraction === '0' ? '' : `.${fraction}`}`;
+};
 const range = (period: Period) => ({ gte: period.from, lt: period.to });
 
 /**
@@ -34,6 +44,11 @@ const range = (period: Period) => ({ gte: period.from, lt: period.to });
  */
 @Injectable()
 export class AnalyticsRepository {
+  private creditTotal(value: unknown): string {
+    return this.prisma.creditDivisor === 10
+      ? fromTenths(String(value ?? '0'))
+      : toCreditTotal(value);
+  }
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
@@ -59,10 +74,10 @@ export class AnalyticsRepository {
     const unit = groupBy === 'month' ? 'month' : 'day';
     const db = await this.client();
     const rows = await db.$queryRawUnsafe<
-      { periodo: Date; cantidad: bigint; creditos: bigint | null }[]
+      { periodo: Date; cantidad: bigint; creditos: string | null }[]
     >(
       `SELECT date_trunc('${unit}', "${column}") AS periodo, COUNT(*) AS cantidad,
-              ${sumColumn ? `SUM("${sumColumn}")` : 'NULL'} AS creditos
+              ${sumColumn ? `SUM("${sumColumn}")::text` : 'NULL'} AS creditos
        FROM "${table}" WHERE "${column}" >= $1 AND "${column}" < $2 ${extra}
        GROUP BY 1 ORDER BY 1`,
       period.from,
@@ -71,7 +86,7 @@ export class AnalyticsRepository {
     return rows.map((row) => ({
       periodo: row.periodo.toISOString(),
       cantidad: toNumber(row.cantidad),
-      ...(sumColumn ? { creditos: toInt(row.creditos) } : {}),
+      ...(sumColumn ? { creditos: this.creditTotal(row.creditos) } : {}),
     }));
   }
 
@@ -152,11 +167,11 @@ export class AnalyticsRepository {
   ): Promise<{ cantidad: number; minutos: number; creditos: string }> {
     const db = await this.client();
     const rows = await db.$queryRawUnsafe<
-      { cantidad: bigint; minutos: number | null; creditos: bigint | null }[]
+      { cantidad: bigint; minutos: number | null; creditos: string | null }[]
     >(
       `SELECT COUNT(*) AS cantidad,
               COALESCE(SUM(EXTRACT(EPOCH FROM ("fecha_fin" - "fecha_inicio")) / 60), 0)::float AS minutos,
-              SUM("creditos") AS creditos
+              SUM("creditos")::text AS creditos
        FROM "RESERVAS" WHERE "estado" = $3 AND "completed_at" >= $1 AND "completed_at" < $2`,
       period.from,
       period.to,
@@ -165,7 +180,7 @@ export class AnalyticsRepository {
     return {
       cantidad: toNumber(rows[0]?.cantidad),
       minutos: Math.round(toNumber(rows[0]?.minutos)),
-      creditos: toInt(rows[0]?.creditos),
+      creditos: this.creditTotal(rows[0]?.creditos),
     };
   }
   async cancelledReservations(period: Period): Promise<number> {
@@ -193,17 +208,20 @@ export class AnalyticsRepository {
     period: Period,
   ): Promise<Record<string, { cantidad: number; creditos: string }>> {
     const db = await this.client();
-    const rows = await db.movimientoCredito.groupBy({
-      by: ['tipo'],
-      where: { created_at: range(period) },
-      _count: true,
-      _sum: { cantidad: true },
-    });
+    const rows = await db.$queryRawUnsafe<
+      { tipo: string; cantidad: bigint; creditos: string | null }[]
+    >(
+      `SELECT "tipo", COUNT(*) AS cantidad, SUM("cantidad")::text AS creditos
+       FROM "MOVIMIENTOS_CREDITO" WHERE "created_at" >= $1 AND "created_at" < $2
+       GROUP BY "tipo"`,
+      period.from,
+      period.to,
+    );
     const result: Record<string, { cantidad: number; creditos: string }> = {};
     for (const row of rows)
       result[row.tipo] = {
-        cantidad: row._count,
-        creditos: toInt(row._sum.cantidad),
+        cantidad: toNumber(row.cantidad),
+        creditos: this.creditTotal(row.creditos),
       };
     return result;
   }
@@ -220,12 +238,14 @@ export class AnalyticsRepository {
   /** Saldos actuales de USUARIOS, no historicos. */
   async currentBalances(): Promise<{ saldo: string; retenidos: string }> {
     const db = await this.client();
-    const totals = await db.usuario.aggregate({
-      _sum: { saldo: true, creditos_retenidos: true },
-    });
+    const totals = await db.$queryRawUnsafe<
+      { saldo: string | null; retenidos: string | null }[]
+    >(
+      'SELECT SUM("saldo")::text AS saldo, SUM("creditos_retenidos")::text AS retenidos FROM "USUARIOS"',
+    );
     return {
-      saldo: toInt(totals._sum.saldo),
-      retenidos: toInt(totals._sum.creditos_retenidos),
+      saldo: this.creditTotal(totals[0]?.saldo),
+      retenidos: this.creditTotal(totals[0]?.retenidos),
     };
   }
 

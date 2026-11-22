@@ -6,7 +6,7 @@
   "license": "UNLICENSED",
   "type": "commonjs",
   "engines": {
-    "node": "26.8.2",
+    "node": ">=26.8.2 <27",
     "npm": ">=11 <12"
   },
   "scripts": {
@@ -18,6 +18,10 @@
     "db:init": "prisma migrate deploy && node scripts/seed-local.cjs",
     "db:migrate": "prisma migrate deploy",
     "db:seed:local": "node scripts/seed-local.cjs",
+    "db:seed:academic": "node scripts/seed-academic.cjs",
+    "db:prepare:skillswap": "node scripts/prepare-skillswap.cjs",
+    "test:skillswap": "npm run build && node scripts/test-skillswap.cjs",
+    "demo:academic": "npm run build && node scripts/prepare-academic-demo.cjs",
     "admin:local": "node scripts/create-dev-admin.cjs",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
@@ -50,11 +54,13 @@
     "class-validator": "^0.14.2",
     "dotenv": "^17.0.0",
     "helmet": "^8.0.0",
+    "nodemailer": "10.6.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.16.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "sharp": "0.35.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

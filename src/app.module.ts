@@ -16,6 +16,9 @@ import { ExchangesModule } from './modules/exchanges/exchanges.module';
 import { ReservationsModule } from './modules/reservations/reservations.module';
 import { CreditsModule } from './modules/credits/credits.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { CalendarModule } from './modules/calendar/calendar.module';
+import { TutoringModule } from './modules/tutoring/tutoring.module';
+import { AcademicModule } from './modules/academic/academic.module';
 
 @Module({
   imports: [
@@ -44,6 +47,9 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
     ReservationsModule,
     CreditsModule,
     AnalyticsModule,
+    CalendarModule,
+    TutoringModule,
+    AcademicModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

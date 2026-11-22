@@ -1,9 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { UserStatus } from '../../common/enums/record-status.enum';
-import {
-  RequestStatus,
-  ReservationStatus,
-} from '../exchanges/exchange.types';
+import { RequestStatus, ReservationStatus } from '../exchanges/exchange.types';
 import { AnalyticsRepository } from './analytics.repository';
 import { AnalyticsQueryDto, Period } from './dto/analytics-query.dto';
 
@@ -159,6 +156,8 @@ export class AnalyticsService {
       recompensas: sum('Recompensa'),
       ajustes: sum('Ajuste'),
       penalizaciones: sum('Penalizacion'),
+      penalizacionesBD: sum('penalizacion'),
+      cobrosPenalizacionesPendientes: sum('cobro_penalizacion_pendiente'),
       retenidosActuales: balances.retenidos,
       saldoTotalActual: balances.saldo,
       transferidosPorPeriodo: serie,

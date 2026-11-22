@@ -11,6 +11,7 @@ import { EmailAlreadyExistsError } from '../users/users.repository';
 import { AuthService } from './auth.service';
 import { PasswordService } from './password.service';
 import { RegisterDto } from './dto/register.dto';
+import { EmailVerificationService } from './email-verification.service';
 import {
   repositoryMock,
   userFixture,
@@ -35,10 +36,23 @@ describe('AuthService (repositorio aislado, Argon2id y JWT reales)', () => {
   let hash: string;
   let repository: ReturnType<typeof repositoryMock>;
   let service: AuthService;
+  const verification = {
+    challenge: jest.fn(() => ({
+      token: 't'.repeat(43),
+      stored: {
+        id_verificacion: 'verification-test',
+        token_hash: 'a'.repeat(64),
+        created_at: new Date(),
+        expires_at: new Date(Date.now() + 3600000),
+        consumed_at: null,
+      },
+    })),
+    deliver: jest.fn().mockResolvedValue(undefined),
+  } as unknown as EmailVerificationService;
   const input: RegisterDto = {
     nombre: 'Ana',
     apellido: 'Perez',
-    correo: 'Ana@EXAMPLE.test',
+    correo: 'Ana@UCB.EDU.BO',
     password: 'clave-segura-de-prueba',
     idCarrera: '30000000-0000-4000-8000-000000000001',
     semestre: 3,
@@ -50,9 +64,15 @@ describe('AuthService (repositorio aislado, Argon2id y JWT reales)', () => {
   beforeEach(() => {
     repository = repositoryMock();
     // Valor exclusivo del test, no constituye una politica del producto.
-    service = new AuthService(new UsersService(repository), passwords, jwt, {
-      initialCredits: '10',
-    });
+    service = new AuthService(
+      new UsersService(repository),
+      passwords,
+      jwt,
+      {
+        initialCredits: '10',
+      },
+      verification,
+    );
   });
 
   it('genera y verifica un JWT con sujeto, emisor, audiencia y expiracion', async () => {
@@ -70,7 +90,7 @@ describe('AuthService (repositorio aislado, Argon2id y JWT reales)', () => {
     expect(payload.exp - payload.iat).toBe(900);
     expect(result.user).not.toHaveProperty('passwordHash');
     expect(result.user).not.toHaveProperty('password_hash');
-    expect(repository.findByEmail).toHaveBeenCalledWith('ana@example.test');
+    expect(repository.findByEmail).toHaveBeenCalledWith('ana@ucb.edu.bo');
   });
 
   it.each(['missing', 'wrong', 'suspended'])(
@@ -123,6 +143,7 @@ describe('AuthService (repositorio aislado, Argon2id y JWT reales)', () => {
       passwords,
       jwt,
       { initialCredits: null },
+      verification,
     );
     await expect(pending.register(input)).rejects.toThrow(
       ServiceUnavailableException,
@@ -130,31 +151,35 @@ describe('AuthService (repositorio aislado, Argon2id y JWT reales)', () => {
     expect(repository.findByEmail).not.toHaveBeenCalled();
   });
 
-  it('registra solo el perfil en modo memoria sin aprobar ni crear creditos', async () => {
+  it('no permite omitir verificacion ni politica mediante profileOnly', async () => {
     const local = new AuthService(
       new UsersService(repository),
       passwords,
       jwt,
       { initialCredits: null, profileOnly: true },
+      verification,
     );
     repository.findByEmail.mockResolvedValue(null);
     repository.createStudentProfile.mockResolvedValue(
       userFixture({ passwordHash: hash }),
     );
-    expect((await local.register(input)).roles).toEqual([Role.ESTUDIANTE]);
-    expect(repository.createStudentProfile).toHaveBeenCalledWith(
-      expect.objectContaining({ role: Role.ESTUDIANTE }),
+    await expect(local.register(input)).rejects.toThrow(
+      ServiceUnavailableException,
     );
-    expect(
-      repository.createStudentProfile.mock.calls[0]![0],
-    ).not.toHaveProperty('initialCredits');
+    expect(repository.createStudentProfile).not.toHaveBeenCalled();
     expect(repository.createStudentWithAccount).not.toHaveBeenCalled();
   });
 
   it('bloquea acceso si no hay adaptador oficial', async () => {
-    const pending = new AuthService(new UsersService(), passwords, jwt, {
-      initialCredits: null,
-    });
+    const pending = new AuthService(
+      new UsersService(),
+      passwords,
+      jwt,
+      {
+        initialCredits: null,
+      },
+      verification,
+    );
     await expect(pending.login(input)).rejects.toThrow(
       ServiceUnavailableException,
     );
@@ -171,14 +196,17 @@ describe('AuthService (repositorio aislado, Argon2id y JWT reales)', () => {
     expect(repository.createStudentWithAccount).toHaveBeenCalledTimes(1);
     const created = repository.createStudentWithAccount.mock.calls[0]![0];
     expect(created.role).toBe(Role.ESTUDIANTE);
-    expect(created.initialCredits).toBe('10');
-    expect(created.correo).toBe('ana@example.test');
+    expect(created.initialCredits).toBe('0');
+    expect(created.verification?.token_hash).toBe('a'.repeat(64));
+    expect(created.correo).toBe('ana@ucb.edu.bo');
     expect(created).not.toHaveProperty('saldo');
     expect(created.passwordHash).not.toBe(input.password);
     expect(await passwords.verify(created.passwordHash, input.password)).toBe(
       true,
     );
     expect(result).not.toHaveProperty('passwordHash');
+    expect(result).not.toHaveProperty('token');
+    expect(result.verification_required).toBe(true);
   });
 
   it('rechaza correo existente antes de escribir', async () => {

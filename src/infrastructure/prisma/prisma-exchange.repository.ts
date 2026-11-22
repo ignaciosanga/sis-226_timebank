@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
 import type { Prisma } from '../../generated/prisma/client';
+import type { Auditoria } from '../../generated/prisma/client';
+import { subtractCredits } from '../../modules/exchanges/credits';
 import {
   AvailabilityStatus,
   UserStatus,
@@ -12,6 +14,7 @@ import {
 import { DatabaseRole } from '../../common/enums/role.enum';
 import { ExchangeRepository } from '../../modules/exchanges/exchange.repository';
 import {
+  ExchangeRequest,
   ExchangeState,
   Movement,
   RequestStatus,
@@ -20,7 +23,18 @@ import {
 } from '../../modules/exchanges/exchange.types';
 import { StoredUser } from '../../modules/users/user.types';
 import { SkillLevel } from '../../modules/user-skills/user-skill.types';
+import { TutoringOffer } from '../../modules/tutoring/offer.types';
 import { PrismaService } from './prisma.service';
+import {
+  detectCreditSchema,
+  legacyCredit,
+  persistDecimalMovement,
+  persistDecimalRequest,
+  persistDecimalReservation,
+  persistDecimalUser,
+  postgresErrorCode,
+  readCreditRows,
+} from './prisma-credit-sql';
 
 type Transaction = Prisma.TransactionClient;
 const json = (value: unknown): Prisma.InputJsonValue =>
@@ -47,27 +61,49 @@ export class PrismaExchangeRepository implements ExchangeRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   private async load(tx: Transaction): Promise<ExchangeState> {
+    const creditSchema = await detectCreditSchema(tx);
     const [
-      users,
+      { users, requests, reservations, movements },
       availability,
       skills,
-      requests,
-      reservations,
-      movements,
       metadata,
+      verifications,
+      offers,
+      banners,
+      ratings,
     ] = await Promise.all([
-      tx.usuario.findMany(),
+      readCreditRows(tx, creditSchema),
       tx.disponibilidad.findMany(),
       tx.usuarioHabilidad.findMany(),
-      tx.solicitudIntercambio.findMany(),
-      tx.reserva.findMany(),
-      tx.movimientoCredito.findMany(),
-      tx.auditoria.findMany({
-        where: { accion: { in: ['BACKEND_METADATA', 'IDEMPOTENCY'] } },
-        orderBy: { created_at: 'asc' },
-      }),
+      creditSchema === 'scaled'
+        ? tx.$queryRawUnsafe<Auditoria[]>(
+            `SELECT * FROM v_auditoria_desencriptada WHERE accion IN ('BACKEND_METADATA','IDEMPOTENCY') ORDER BY created_at`,
+          )
+        : tx.auditoria.findMany({
+            where: { accion: { in: ['BACKEND_METADATA', 'IDEMPOTENCY'] } },
+            orderBy: { created_at: 'asc' },
+          }),
+      tx.verificacionCorreo.findMany(),
+      tx.ofertaTutoria.findMany(),
+      tx.bannerTutoria.findMany(),
+      tx.calificacion.findMany(),
     ]);
     const state: ExchangeState = {
+      creditSchema,
+      offers: new Map(
+        offers.map((row) => [
+          row.id_oferta,
+          {
+            ...row,
+            costo_creditos: row.costo_creditos.toString(),
+            nivel: row.nivel as SkillLevel,
+            estado: row.estado as TutoringOffer['estado'],
+          },
+        ]),
+      ),
+      banners: new Map(banners.map((row) => [row.id_banner, row])),
+      ratings: new Map(ratings.map((row) => [row.id_calificacion, row])),
+      verifications: new Map(verifications.map((row) => [row.token_hash, row])),
       users: new Map(),
       availability: new Map(),
       userSkills: new Map(),
@@ -79,6 +115,28 @@ export class PrismaExchangeRepository implements ExchangeRepository {
       idempotency: new Map(),
       adminAudit: new Map(),
     };
+    if (creditSchema === 'scaled') {
+      const config = await tx.$queryRawUnsafe<
+        { clave: string; valor: number }[]
+      >('SELECT clave,valor FROM config_economia');
+      state.economy = Object.fromEntries(config.map((r) => [r.clave, r.valor]));
+      for (const key of [
+        'costo_base',
+        'mult_escasez',
+        'mult_demanda',
+        'mult_impacto',
+        'umbral_tutores_escasez',
+        'horas_minimas_cancelacion',
+        'penalizacion_creditos',
+      ])
+        if (
+          !Number.isSafeInteger(state.economy[key]) ||
+          state.economy[key]! < 0
+        )
+          throw new ServiceUnavailableException(
+            'Configuración económica BD incompleta',
+          );
+    }
     for (const row of users) {
       if (
         !Object.values(DatabaseRole).includes(row.rol as DatabaseRole) ||
@@ -203,9 +261,28 @@ export class PrismaExchangeRepository implements ExchangeRepository {
       for (const [id, row] of next)
         if (!same(previous.get(id), row)) await save(row);
     };
-    await write(before.users, after.users, (row) =>
-      tx.usuario.upsert({
+    await write(before.ratings, after.ratings, (row) => {
+      if (before.ratings.has(row.id_calificacion))
+        throw new ConflictException('Las opiniones publicadas son inmutables');
+      return tx.calificacion.create({ data: row });
+    });
+    await write(before.users, after.users, (row) => {
+      if (before.creditSchema !== 'integer')
+        return persistDecimalUser(tx, row, before.creditSchema === 'scaled');
+      const integerRow = {
+        ...row,
+        saldo: legacyCredit(row.saldo),
+        creditos_retenidos: legacyCredit(row.creditos_retenidos),
+      };
+      return tx.usuario.upsert({
         where: { id_usuario: row.id_usuario },
+        create: integerRow,
+        update: integerRow,
+      });
+    });
+    await write(before.verifications, after.verifications, (row) =>
+      tx.verificacionCorreo.upsert({
+        where: { token_hash: row.token_hash },
         create: row,
         update: row,
       }),
@@ -213,6 +290,20 @@ export class PrismaExchangeRepository implements ExchangeRepository {
     await write(before.availability, after.availability, (row) =>
       tx.disponibilidad.upsert({
         where: { id_disponibilidad: row.id_disponibilidad },
+        create: row,
+        update: row,
+      }),
+    );
+    await write(before.banners, after.banners, (row) =>
+      tx.bannerTutoria.upsert({
+        where: { id_banner: row.id_banner },
+        create: row,
+        update: row,
+      }),
+    );
+    await write(before.offers, after.offers, (row) =>
+      tx.ofertaTutoria.upsert({
+        where: { id_oferta: row.id_oferta },
         create: row,
         update: row,
       }),
@@ -239,27 +330,113 @@ export class PrismaExchangeRepository implements ExchangeRepository {
           create: row,
           update: row,
         });
-    await write(before.requests, after.requests, (row) =>
-      tx.solicitudIntercambio.upsert({
+    await write(before.requests, after.requests, (row) => {
+      if (before.creditSchema !== 'integer')
+        return persistDecimalRequest(tx, row, before.creditSchema === 'scaled');
+      const { id_oferta, ...fields } = row as ExchangeRequest;
+      if (id_oferta)
+        throw new ConflictException({
+          code: 'OFFER_PRICE_FLOW_PENDING',
+          message: 'La base INTEGER no admite solicitudes vinculadas a ofertas',
+        });
+      const integerRow = {
+        ...fields,
+        creditos_requeridos: legacyCredit(row.creditos_requeridos),
+      };
+      return tx.solicitudIntercambio.upsert({
         where: { id_solicitud: row.id_solicitud },
-        create: row,
-        update: row,
-      }),
-    );
-    await write(before.reservations, after.reservations, (row) =>
-      tx.reserva.upsert({
+        create: integerRow,
+        update: integerRow,
+      });
+    });
+    await write(before.reservations, after.reservations, (row) => {
+      if (before.creditSchema !== 'integer')
+        return persistDecimalReservation(
+          tx,
+          row,
+          before.creditSchema === 'scaled',
+        );
+      const integerRow = { ...row, creditos: legacyCredit(row.creditos) };
+      return tx.reserva.upsert({
         where: { id_reserva: row.id_reserva },
-        create: row,
-        update: row,
-      }),
-    );
+        create: integerRow,
+        update: integerRow,
+      });
+    });
     for (const [id, row] of before.movements)
       if (!same(after.movements.get(id), row))
         throw new ConflictException('El libro de movimientos es inmutable');
     for (const [id, row] of after.movements)
-      if (!before.movements.has(id))
-        await tx.movimientoCredito.create({ data: row });
+      if (!before.movements.has(id)) {
+        if (before.creditSchema !== 'integer')
+          await persistDecimalMovement(
+            tx,
+            row,
+            before.creditSchema === 'scaled',
+          );
+        else
+          await tx.movimientoCredito.create({
+            data: {
+              ...row,
+              cantidad: legacyCredit(row.cantidad),
+              saldo_anterior: legacyCredit(row.saldo_anterior),
+              saldo_posterior: legacyCredit(row.saldo_posterior),
+              retenidos_anterior: legacyCredit(row.retenidos_anterior),
+              retenidos_posterior: legacyCredit(row.retenidos_posterior),
+            },
+          });
+      }
 
+    // BD es el único escritor de penalizaciones. Sus triggers pueden cambiar
+    // los saldos después del pago/liberación: responder y guardar replay del estado real.
+    if (before.creditSchema === 'scaled') {
+      const actual = await readCreditRows(tx, 'scaled');
+      const accounts = new Map(actual.users.map((u) => [u.id_usuario, u]));
+      for (const [scope, value] of after.idempotency) {
+        if (
+          before.idempotency.has(scope) ||
+          !value.result ||
+          typeof value.result !== 'object'
+        )
+          continue;
+        const result = value.result as Record<string, unknown>;
+        if (result.cuenta && typeof result.cuenta === 'object') {
+          const account = result.cuenta as Record<string, unknown>;
+          const fresh = accounts.get(String(account.id_usuario));
+          if (fresh)
+            Object.assign(account, {
+              saldo: fresh.saldo,
+              creditos_retenidos: fresh.creditos_retenidos,
+              disponibles: subtractCredits(
+                fresh.saldo,
+                fresh.creditos_retenidos,
+              ),
+            });
+        }
+        if (result.id_reserva) {
+          const fresh = actual.reservations.find(
+            (r) => r.id_reserva === result.id_reserva,
+          );
+          if (fresh?.cancelled_at) {
+            Object.assign(result, {
+              cancelled_at: fresh.cancelled_at,
+              horas_anticipacion_cancelacion:
+                fresh.horas_anticipacion_cancelacion,
+            });
+            if (result.cancelacion && typeof result.cancelacion === 'object')
+              Object.assign(result.cancelacion, { fecha: fresh.cancelled_at });
+          }
+        }
+      }
+    }
+    const writeAudit = async (data: Prisma.AuditoriaUncheckedCreateInput) => {
+      if (before.creditSchema === 'scaled')
+        await tx.$queryRawUnsafe(
+          'SELECT fn_backend_audit($1::jsonb,false)::text AS saved',
+          JSON.stringify(data),
+        );
+      else await tx.auditoria.create({ data });
+    };
     const saveMetadata = async (
       entity: string,
       id: string,
@@ -274,6 +451,13 @@ export class PrismaExchangeRepository implements ExchangeRepository {
         id_usuario: actor,
         datos_nuevos: json(value),
       };
+      if (before.creditSchema === 'scaled') {
+        await tx.$queryRawUnsafe(
+          'SELECT fn_backend_audit($1::jsonb,true)::text AS saved',
+          JSON.stringify({ id_auditoria, ...payload }),
+        );
+        return;
+      }
       await tx.auditoria.upsert({
         where: { id_auditoria },
         create: { id_auditoria, ...payload },
@@ -301,33 +485,30 @@ export class PrismaExchangeRepository implements ExchangeRepository {
     for (const [scope, value] of after.idempotency)
       if (!before.idempotency.has(scope)) {
         const id_auditoria = stableId(`idempotency:${scope}`);
-        await tx.auditoria.create({
-          data: {
-            id_auditoria,
-            id_usuario: scope.split(':')[0],
-            accion: 'IDEMPOTENCY',
-            entidad: 'OPERACIONES_BACKEND',
-            entidad_id: id_auditoria,
-            datos_nuevos: json({ scope, ...value }),
-          },
+        await writeAudit({
+          id_auditoria,
+          id_usuario: scope.split(':')[0],
+          accion: 'IDEMPOTENCY',
+          entidad: 'OPERACIONES_BACKEND',
+          entidad_id: id_auditoria,
+          datos_nuevos: json({ scope, ...value }),
         });
       }
     for (const [id, entry] of after.adminAudit)
       if (!before.adminAudit.has(id))
-        await tx.auditoria.create({
-          data: {
-            id_auditoria: entry.id_auditoria,
-            id_usuario: entry.id_usuario,
-            accion: entry.accion,
-            entidad: entry.entidad,
-            entidad_id: entry.entidad_id,
-            ...(entry.datos_anteriores
-              ? { datos_anteriores: json(entry.datos_anteriores) }
-              : {}),
-            datos_nuevos: json(entry.datos_nuevos),
-            created_at: entry.created_at,
-          },
+        await writeAudit({
+          id_auditoria: entry.id_auditoria,
+          id_usuario: entry.id_usuario,
+          accion: entry.accion,
+          entidad: entry.entidad,
+          entidad_id: entry.entidad_id,
+          ...(entry.datos_anteriores
+            ? { datos_anteriores: json(entry.datos_anteriores) }
+            : {}),
+          datos_nuevos: json(entry.datos_nuevos),
+          created_at: entry.created_at,
         });
+    if (before.creditSchema === 'scaled') return; // BD ya audita mediante triggers.
     // Historial seguro del cambio de entidades: no registrar password_hash.
     const auditRows = async <T>(
       entity: string,
@@ -397,7 +578,12 @@ export class PrismaExchangeRepository implements ExchangeRepository {
             const draft = structuredClone(before);
             const result = structuredClone(await work(draft));
             await this.persist(tx, before, draft);
-            return result;
+            const saved = [...draft.idempotency].find(
+              ([scope]) => !before.idempotency.has(scope),
+            );
+            return before.creditSchema === 'scaled' && saved
+              ? (structuredClone(saved[1].result) as T)
+              : result;
           },
           { isolationLevel: 'ReadCommitted', timeout: 15000, maxWait: 5000 },
         );
@@ -406,10 +592,15 @@ export class PrismaExchangeRepository implements ExchangeRepository {
           typeof error === 'object' && error !== null && 'code' in error
             ? error.code
             : undefined;
-        if (code === 'P2034' && attempt < 2) continue;
-        if (code === 'P2002')
+        const sqlCode = postgresErrorCode(error);
+        if (
+          (code === 'P2034' || sqlCode === '40001' || sqlCode === '40P01') &&
+          attempt < 2
+        )
+          continue;
+        if (code === 'P2002' || sqlCode === '23505')
           throw new ConflictException('Un registro con esa clave ya existe');
-        if (code === 'P2003')
+        if (code === 'P2003' || sqlCode === '23503')
           throw new ConflictException(
             'La relacion de base de datos ya no es valida',
           );

@@ -12,7 +12,7 @@ export function configureApp(app: INestApplication): void {
       .get('CORS_ORIGINS', { infer: true })
       .split(',')
       .map((origin) => origin.trim()),
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key'],
     credentials: false,
   });
@@ -32,7 +32,7 @@ export function configureApp(app: INestApplication): void {
       new DocumentBuilder()
         .setTitle('Banco de Tiempo Universitario')
         .setDescription(
-          'v0.4: autenticacion JWT, catalogos, disponibilidad, solicitudes, reservas y creditos de tiempo transaccionales. PostgreSQL con modelo optimizado de 12 tablas y Docker Compose local.',
+          'Backend académico y SkillSwap v4: currículo, Mi ruta, opiniones, indicadores, precio dinámico pactado, retención, doble confirmación y cancelación auditada. BD v4 almacena décimas INTEGER; la API entrega créditos como strings exactos. Penalizaciones y deudas son ejecutadas por BD. Los esquemas anteriores conservan sus límites de contratación/liquidación.',
         )
         .setVersion('0.4.0')
         .addBearerAuth()

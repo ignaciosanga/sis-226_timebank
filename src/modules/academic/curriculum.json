@@ -1,0 +1,438 @@
+{
+  "curriculum": "systems",
+  "carrera": "Ingeniería de Sistemas",
+  "areas": [
+    {
+      "id": "basicas",
+      "nombre": "Asignaturas básicas",
+      "color": "#65768b"
+    },
+    {
+      "id": "software",
+      "nombre": "Ingeniería de software",
+      "color": "#005289"
+    },
+    {
+      "id": "ia",
+      "nombre": "Inteligencia artificial",
+      "color": "#7655a3"
+    },
+    {
+      "id": "informacion",
+      "nombre": "Sistemas de información",
+      "color": "#008578"
+    },
+    {
+      "id": "infraestructura",
+      "nombre": "Hardware, sistemas operativos y redes",
+      "color": "#a65b1b"
+    },
+    {
+      "id": "general",
+      "nombre": "Formación genérica",
+      "color": "#926936"
+    }
+  ],
+  "courses": [
+    {
+      "semestre": 1,
+      "codigo": "MAT-123",
+      "nombre": "Álgebra Lineal",
+      "area": "basicas",
+      "requisitos": [],
+      "externo": false
+    },
+    {
+      "semestre": 1,
+      "codigo": "MAT-122",
+      "nombre": "Matemáticas Discretas",
+      "area": "basicas",
+      "requisitos": [],
+      "externo": false
+    },
+    {
+      "semestre": 1,
+      "codigo": "SIS-111",
+      "nombre": "Introducción a la Programación",
+      "area": "software",
+      "requisitos": [],
+      "externo": false
+    },
+    {
+      "semestre": 1,
+      "codigo": "SIS-123",
+      "nombre": "Ingeniería de Sistemas",
+      "area": "informacion",
+      "requisitos": [],
+      "externo": false
+    },
+    {
+      "semestre": 1,
+      "codigo": "CAR-185",
+      "nombre": "Pensamiento Crítico",
+      "area": "general",
+      "requisitos": [],
+      "externo": false
+    },
+    {
+      "semestre": 2,
+      "codigo": "MAT-132",
+      "nombre": "Cálculo I",
+      "area": "basicas",
+      "requisitos": ["MAT-030"],
+      "externo": false
+    },
+    {
+      "semestre": 2,
+      "codigo": "MAT-251",
+      "nombre": "Investigación Operativa I",
+      "area": "basicas",
+      "requisitos": ["MAT-123"],
+      "externo": false
+    },
+    {
+      "semestre": 2,
+      "codigo": "MAT-142",
+      "nombre": "Probabilidad y Estadística I",
+      "area": "basicas",
+      "requisitos": ["MAT-123"],
+      "externo": false
+    },
+    {
+      "semestre": 2,
+      "codigo": "SIS-112",
+      "nombre": "Programación I",
+      "area": "software",
+      "requisitos": ["SIS-111"],
+      "externo": false
+    },
+    {
+      "semestre": 2,
+      "codigo": "SIS-133",
+      "nombre": "Arquitectura Computacional y Sistemas Operativos",
+      "area": "infraestructura",
+      "requisitos": ["MAT-122", "SIS-123"],
+      "externo": false
+    },
+    {
+      "semestre": 2,
+      "codigo": "FHC-140",
+      "nombre": "Formación Humano Cristiana I",
+      "area": "general",
+      "requisitos": [],
+      "externo": false
+    },
+    {
+      "semestre": 3,
+      "codigo": "MAT-133",
+      "nombre": "Cálculo II",
+      "area": "basicas",
+      "requisitos": ["MAT-132"],
+      "externo": false
+    },
+    {
+      "semestre": 3,
+      "codigo": "FIS-111",
+      "nombre": "Física I y Laboratorio",
+      "area": "basicas",
+      "requisitos": ["MAT-132"],
+      "externo": false
+    },
+    {
+      "semestre": 3,
+      "codigo": "MAT-143",
+      "nombre": "Probabilidad y Estadística II",
+      "area": "basicas",
+      "requisitos": ["MAT-142"],
+      "externo": false
+    },
+    {
+      "semestre": 3,
+      "codigo": "SIS-113",
+      "nombre": "Programación II",
+      "area": "software",
+      "requisitos": ["SIS-112"],
+      "externo": false
+    },
+    {
+      "semestre": 3,
+      "codigo": "SIS-122",
+      "nombre": "Bases de Datos I",
+      "area": "informacion",
+      "requisitos": ["SIS-112"],
+      "externo": false
+    },
+    {
+      "semestre": 3,
+      "codigo": "IND-260",
+      "nombre": "Metodología de la Investigación",
+      "area": "general",
+      "requisitos": [],
+      "externo": false
+    },
+    {
+      "semestre": 3,
+      "codigo": "CAR-189",
+      "nombre": "Epistemología",
+      "area": "general",
+      "requisitos": [],
+      "externo": false
+    },
+    {
+      "semestre": 4,
+      "codigo": "MAT-252",
+      "nombre": "Investigación Operativa II y Laboratorio",
+      "area": "basicas",
+      "requisitos": ["MAT-251"],
+      "externo": false
+    },
+    {
+      "semestre": 4,
+      "codigo": "SIS-211",
+      "nombre": "Estructuras de Datos",
+      "area": "software",
+      "requisitos": ["SIS-113"],
+      "externo": false
+    },
+    {
+      "semestre": 4,
+      "codigo": "SIS-214",
+      "nombre": "Tecnologías Web I",
+      "area": "software",
+      "requisitos": ["SIS-113", "SIS-122"],
+      "externo": false
+    },
+    {
+      "semestre": 4,
+      "codigo": "SIS-221",
+      "nombre": "Bases de Datos II",
+      "area": "informacion",
+      "requisitos": ["SIS-122"],
+      "externo": false
+    },
+    {
+      "semestre": 4,
+      "codigo": "SIS-225",
+      "nombre": "Sistemas de Información",
+      "area": "informacion",
+      "requisitos": ["SIS-122"],
+      "externo": false
+    },
+    {
+      "semestre": 4,
+      "codigo": "FHC-240",
+      "nombre": "Formación Humano Cristiana II",
+      "area": "general",
+      "requisitos": ["FHC-140"],
+      "externo": false
+    },
+    {
+      "semestre": 5,
+      "codigo": "MAT-361",
+      "nombre": "Análisis de Algoritmos",
+      "area": "basicas",
+      "requisitos": ["SIS-211"],
+      "externo": false
+    },
+    {
+      "semestre": 5,
+      "codigo": "SIS-212",
+      "nombre": "Programación de Dispositivos Móviles",
+      "area": "software",
+      "requisitos": ["SIS-113", "SIS-122"],
+      "externo": false
+    },
+    {
+      "semestre": 5,
+      "codigo": "SIS-215",
+      "nombre": "Tecnologías Web II",
+      "area": "software",
+      "requisitos": ["SIS-214", "SIS-221"],
+      "externo": false
+    },
+    {
+      "semestre": 5,
+      "codigo": "SIS-251",
+      "nombre": "Ingeniería de Datos",
+      "area": "ia",
+      "requisitos": ["MAT-133", "MAT-123"],
+      "externo": false
+    },
+    {
+      "semestre": 5,
+      "codigo": "SIS-226",
+      "nombre": "Sistemas de Soporte a las Decisiones Gerenciales",
+      "area": "informacion",
+      "requisitos": ["SIS-225", "SIS-221"],
+      "externo": false
+    },
+    {
+      "semestre": 5,
+      "codigo": "SIS-231",
+      "nombre": "Redes de Computadoras I",
+      "area": "infraestructura",
+      "requisitos": ["SIS-133"],
+      "externo": false
+    },
+    {
+      "semestre": 6,
+      "codigo": "SIS-213",
+      "nombre": "Ingeniería de Software",
+      "area": "software",
+      "requisitos": ["SIS-215", "SIS-225"],
+      "externo": false
+    },
+    {
+      "semestre": 6,
+      "codigo": "SIS-216",
+      "nombre": "Modelado, Dinámica de Sistemas y Simulación",
+      "area": "software",
+      "requisitos": ["MAT-252", "MAT-143"],
+      "externo": false
+    },
+    {
+      "semestre": 6,
+      "codigo": "SIS-252",
+      "nombre": "Inteligencia Artificial",
+      "area": "ia",
+      "requisitos": ["SIS-251"],
+      "externo": false
+    },
+    {
+      "semestre": 6,
+      "codigo": "DER-394",
+      "nombre": "Derecho de las TIC",
+      "area": "informacion",
+      "requisitos": ["SIS-226"],
+      "externo": false
+    },
+    {
+      "semestre": 6,
+      "codigo": "SIS-323",
+      "nombre": "Taller de Sistemas de Información",
+      "area": "informacion",
+      "requisitos": ["SIS-215", "SIS-226"],
+      "externo": false
+    },
+    {
+      "semestre": 6,
+      "codigo": "SIS-233",
+      "nombre": "Redes de Computadoras II",
+      "area": "infraestructura",
+      "requisitos": ["SIS-231"],
+      "externo": false
+    },
+    {
+      "semestre": 7,
+      "codigo": "SIS-311",
+      "nombre": "Arquitectura de Software",
+      "area": "software",
+      "requisitos": ["SIS-213"],
+      "externo": false
+    },
+    {
+      "semestre": 7,
+      "codigo": "SIS-312",
+      "nombre": "Gestión de Calidad de Sistemas",
+      "area": "software",
+      "requisitos": ["SIS-213"],
+      "externo": false
+    },
+    {
+      "semestre": 7,
+      "codigo": "SIS-351",
+      "nombre": "Machine Learning",
+      "area": "ia",
+      "requisitos": ["SIS-252"],
+      "externo": false
+    },
+    {
+      "semestre": 7,
+      "codigo": "SIS-325",
+      "nombre": "Ética y Seguridad de Sistemas",
+      "area": "informacion",
+      "requisitos": ["SIS-323"],
+      "externo": false
+    },
+    {
+      "semestre": 7,
+      "codigo": "SIS-331",
+      "nombre": "Computación en la Nube",
+      "area": "infraestructura",
+      "requisitos": ["SIS-233"],
+      "externo": false
+    },
+    {
+      "semestre": 7,
+      "codigo": "SIS-234",
+      "nombre": "Internet de las Cosas",
+      "area": "infraestructura",
+      "requisitos": ["SIS-233"],
+      "externo": false
+    },
+    {
+      "semestre": 7,
+      "codigo": "FHC-340",
+      "nombre": "Formación Humano Cristiana III",
+      "area": "general",
+      "requisitos": ["FHC-240"],
+      "externo": false
+    },
+    {
+      "semestre": 8,
+      "codigo": "SIS-313",
+      "nombre": "Gerencia de las TIC",
+      "area": "software",
+      "requisitos": ["SIS-226"],
+      "externo": false
+    },
+    {
+      "semestre": 8,
+      "codigo": "SIS-352",
+      "nombre": "Taller de Sistemas Inteligentes",
+      "area": "ia",
+      "requisitos": ["SIS-351"],
+      "externo": false
+    },
+    {
+      "semestre": 8,
+      "codigo": "SIS-324",
+      "nombre": "Auditoría de Sistemas",
+      "area": "informacion",
+      "requisitos": ["SIS-312"],
+      "externo": false
+    },
+    {
+      "semestre": 8,
+      "codigo": "SIS-361",
+      "nombre": "Práctica Preprofesional",
+      "area": "general",
+      "requisitos": ["SIS-312", "SIS-331"],
+      "externo": false
+    },
+    {
+      "semestre": 8,
+      "codigo": "SIS-362",
+      "nombre": "Taller de Grado I",
+      "area": "general",
+      "requisitos": ["SIS-312", "SIS-331"],
+      "externo": false
+    },
+    {
+      "semestre": 9,
+      "codigo": "SIS-363",
+      "nombre": "Taller de Grado II",
+      "area": "general",
+      "requisitos": ["SIS-362"],
+      "externo": false
+    },
+    {
+      "semestre": 0,
+      "codigo": "MAT-030",
+      "nombre": "MAT-030 (requisito externo)",
+      "area": "basicas",
+      "requisitos": [],
+      "externo": true
+    }
+  ]
+}

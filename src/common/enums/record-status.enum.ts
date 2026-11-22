@@ -5,6 +5,7 @@ export enum RecordStatus {
 }
 
 export enum UserStatus {
+  PENDIENTE = 'Pendiente',
   ACTIVO = 'Activo',
   INACTIVO = 'Inactivo',
   SUSPENDIDO = 'Suspendido',
