@@ -1,17 +1,49 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useAppStore } from '../../../stores/app'
+import { getReputation } from '../../../services/analytics'
+import { demoEnabled } from '../../demo/mode.js'
 import DonutChart from './charts/DonutChart.vue'
 import LineChart from './charts/LineChart.vue'
 import BarChart from './charts/BarChart.vue'
 import HeatmapChart from './charts/HeatmapChart.vue'
+import KnowledgeScorePanel from './KnowledgeScorePanel.vue'
 import { buildAdminSprint0Data } from './sprint0-data.js'
+import { buildSyntheticReputationPayload } from './knowledge-score.js'
 import './vue-dashboards.css'
 
+const store = useAppStore()
 const data = computed(() => buildAdminSprint0Data())
-const activeTab = ref('all')
+const activeTab = ref('reputation')
 const periodGranularity = ref('week')
 
+const reputationData = ref(null)
+const reputationLoading = ref(false)
+const reputationError = ref('')
+
+async function loadReputation() {
+  if (demoEnabled) {
+    reputationData.value = buildSyntheticReputationPayload()
+    reputationError.value = ''
+    reputationLoading.value = false
+    return
+  }
+  reputationLoading.value = true
+  reputationError.value = ''
+  try {
+    reputationData.value = await getReputation()
+  } catch (failure) {
+    reputationData.value = null
+    reputationError.value = failure?.message || 'No se pudieron cargar las métricas de reputación.'
+  } finally {
+    reputationLoading.value = false
+  }
+}
+
+onMounted(loadReputation)
+
 const tabs = [
+  { id: 'reputation', label: 'Reputación y tutores' },
   { id: 'all', label: 'Vista completa' },
   { id: 'hu04', label: 'Resumen general' },
   { id: 'hu05', label: 'Intercambios y horarios' },
@@ -41,6 +73,16 @@ const activitySeries = computed(() =>
         {{ tab.label }}
       </button>
     </div>
+
+    <!-- Reputación y reconocimiento de tutores (Knowledge Score) -->
+    <KnowledgeScorePanel
+      v-if="show('reputation')"
+      :reputation="reputationData"
+      :users="store.community"
+      :loading="reputationLoading"
+      :error="reputationError"
+      @retry="loadReputation"
+    />
 
     <!-- Dashboard general de la plataforma -->
     <section v-if="show('hu04')" class="vd-section" aria-labelledby="hu04-title">
