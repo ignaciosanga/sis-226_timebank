@@ -209,13 +209,13 @@ INSERT INTO public."SOLICITUDES_INTERCAMBIO" (
 ('84000000-0000-4000-8000-000000000001', '82000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000001', '81000000-0000-4000-8000-000000000001', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 7) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 7) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 38, 'Completada', clock_timestamp()),
 ('84000000-0000-4000-8000-000000000002', '82000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000001', '81000000-0000-4000-8000-000000000001', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 5) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 5) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 38, 'Completada', clock_timestamp()),
 ('84000000-0000-4000-8000-000000000003', '82000000-0000-4000-8000-000000000006', '82000000-0000-4000-8000-000000000003', '81000000-0000-4000-8000-000000000002', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 6) + TIME '16:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 6) + TIME '17:00') AT TIME ZONE 'America/La_Paz', 25, 'Completada', clock_timestamp()),
-('84000000-0000-4000-8000-000000000004', '82000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000001', '81000000-0000-4000-8000-000000000001', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 7) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 7) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 38, 'Aceptada', clock_timestamp()),
+('84000000-0000-4000-8000-000000000004', '82000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000001', '81000000-0000-4000-8000-000000000001', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 7) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 7) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 10, 'Aceptada', clock_timestamp()),
 ('84000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000006', '82000000-0000-4000-8000-000000000003', '81000000-0000-4000-8000-000000000002', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 10) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 10) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 25, 'Solicitada', NULL),
 ('84000000-0000-4000-8000-000000000006', '82000000-0000-4000-8000-000000000006', '82000000-0000-4000-8000-000000000004', '81000000-0000-4000-8000-000000000003', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 9) + TIME '14:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 9) + TIME '15:00') AT TIME ZONE 'America/La_Paz', 25, 'Solicitada', NULL),
 ('84000000-0000-4000-8000-000000000007', '82000000-0000-4000-8000-000000000006', '82000000-0000-4000-8000-000000000002', '81000000-0000-4000-8000-000000000001', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 7) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 7) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 38, 'Solicitada', NULL);
 
 -- ---------------------------------------------------------------------
--- 6) Reservas: 3 completadas, 1 confirmada y 2 canceladas.
+-- 6) Reservas: 3 completadas, 1 confirmada (10 decimas retenidas) y 2 canceladas.
 -- Las cancelaciones usan clock_timestamp() para probar los umbrales reales:
 -- R05 se cancela con 4 horas de anticipacion (<5) y R06 con 6 horas (>5).
 -- ---------------------------------------------------------------------
@@ -226,7 +226,7 @@ INSERT INTO public."RESERVAS" (
 ('85000000-0000-4000-8000-000000000001', '84000000-0000-4000-8000-000000000001', '82000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000001', '81000000-0000-4000-8000-000000000001', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 7) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 7) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 38, 'Virtual', 'Sesion DEMO Python 1', 'Completada', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 9) + TIME '10:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 7) + TIME '19:00') AT TIME ZONE 'America/La_Paz'),
 ('85000000-0000-4000-8000-000000000002', '84000000-0000-4000-8000-000000000002', '82000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000001', '81000000-0000-4000-8000-000000000001', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 5) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 5) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 38, 'Virtual', 'Sesion DEMO Python 2', 'Completada', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 7) + TIME '10:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 5) + TIME '19:00') AT TIME ZONE 'America/La_Paz'),
 ('85000000-0000-4000-8000-000000000003', '84000000-0000-4000-8000-000000000003', '82000000-0000-4000-8000-000000000006', '82000000-0000-4000-8000-000000000003', '81000000-0000-4000-8000-000000000002', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 6) + TIME '16:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 6) + TIME '17:00') AT TIME ZONE 'America/La_Paz', 25, 'Virtual', 'Sesion DEMO SQL', 'Completada', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 8) + TIME '10:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 6) + TIME '17:00') AT TIME ZONE 'America/La_Paz'),
-('85000000-0000-4000-8000-000000000004', '84000000-0000-4000-8000-000000000004', '82000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000001', '81000000-0000-4000-8000-000000000001', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 7) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 7) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 38, 'Virtual', 'Sesion DEMO Python futura', 'Confirmada', clock_timestamp(), NULL),
+('85000000-0000-4000-8000-000000000004', '84000000-0000-4000-8000-000000000004', '82000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000001', '81000000-0000-4000-8000-000000000001', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 7) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 7) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 10, 'Virtual', 'Sesion DEMO Python futura', 'Confirmada', clock_timestamp(), NULL),
 ('85000000-0000-4000-8000-000000000006', NULL, '82000000-0000-4000-8000-000000000006', '82000000-0000-4000-8000-000000000004', '81000000-0000-4000-8000-000000000003', clock_timestamp() + interval '6 hours', clock_timestamp() + interval '7 hours', 25, 'Virtual', 'Cancelacion DEMO sin penalizacion', 'Cancelada', clock_timestamp(), NULL);
 
 -- Historial de calificaciones: Ana = 4.5; Bruno = 4.0; Diego = sin notas.
@@ -290,12 +290,16 @@ DECLARE
     v_saldo_elena integer;
     v_saldo_bruno integer;
     v_penalizaciones integer;
+    v_retenidos_carla integer;
     v_notas_ana numeric;
 BEGIN
     SELECT "saldo" INTO v_saldo_carla FROM public."USUARIOS" WHERE "id_usuario" = '82000000-0000-4000-8000-000000000005';
     SELECT "saldo" INTO v_saldo_ana   FROM public."USUARIOS" WHERE "id_usuario" = '82000000-0000-4000-8000-000000000001';
     SELECT "saldo" INTO v_saldo_elena FROM public."USUARIOS" WHERE "id_usuario" = '82000000-0000-4000-8000-000000000006';
     SELECT "saldo" INTO v_saldo_bruno FROM public."USUARIOS" WHERE "id_usuario" = '82000000-0000-4000-8000-000000000003';
+    SELECT "creditos_retenidos" INTO v_retenidos_carla
+      FROM public."USUARIOS"
+      WHERE "id_usuario" = '82000000-0000-4000-8000-000000000005';
     SELECT COUNT(*) INTO v_penalizaciones FROM public."MOVIMIENTOS_CREDITO"
       WHERE "id_reserva" = '85000000-0000-4000-8000-000000000005' AND "tipo" = 'penalizacion' AND "cantidad" = -5;
     SELECT AVG("puntuacion") INTO v_notas_ana FROM public."CALIFICACIONES"
@@ -304,6 +308,9 @@ BEGIN
     IF v_saldo_carla <> 19 OR v_saldo_ana <> 76 OR v_saldo_elena <> 75 OR v_saldo_bruno <> 25 THEN
         RAISE EXCEPTION 'Saldos DEMO inesperados: Carla %, Ana %, Elena %, Bruno %.',
             v_saldo_carla, v_saldo_ana, v_saldo_elena, v_saldo_bruno;
+    END IF;
+    IF v_retenidos_carla <> 10 THEN
+        RAISE EXCEPTION 'La reserva futura R04 debia retener 10 decimas a Carla; se encontraron %.', v_retenidos_carla;
     END IF;
     IF v_penalizaciones <> 1 THEN
         RAISE EXCEPTION 'Se esperaba exactamente una penalizacion de 5 decimas para R05; se encontraron %.', v_penalizaciones;

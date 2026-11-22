@@ -129,7 +129,30 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.fn_calcular_costo_clase(uuid, uuid, timestamptz) IS
-  'Devuelve INTEGER en decimas de credito. La app divide el resultado entre 10 para mostrar el importe.';
+  'DEPRECADA COMO PRECIO DE COBRO. Devuelve una referencia calculada por reglas dinamicas; nunca reemplaza el precio elegido por el tutor ni la cotizacion guardada en SOLICITUDES_INTERCAMBIO.';
+
+-- Nombre explicito para el uso permitido desde la aplicacion: mostrar una
+-- sugerencia al tutor. El precio definitivo sigue siendo OFERTAS_TUTORIA.costo_decimas.
+CREATE OR REPLACE FUNCTION public.fn_sugerir_precio_clase(
+    p_id_habilidad uuid,
+    p_id_ofertante uuid,
+    p_fecha_inicio timestamptz
+) RETURNS integer
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+    SELECT public.fn_calcular_costo_clase(
+        p_id_habilidad, p_id_ofertante, p_fecha_inicio
+    );
+$$;
+
+COMMENT ON FUNCTION public.fn_sugerir_precio_clase(uuid, uuid, timestamptz) IS
+  'Devuelve un precio sugerido en decimas segun oferta/demanda/impacto. Es orientativo: no modifica ofertas, solicitudes ni reservas.';
+
+REVOKE ALL ON FUNCTION public.fn_sugerir_precio_clase(uuid, uuid, timestamptz) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.fn_calcular_costo_clase(uuid, uuid, timestamptz) FROM PUBLIC;
 
 -- Al cancelar, se fija la hora real del evento y se almacena el numero de
 -- horas completas en la columna INTEGER existente. El cobro usa el instante

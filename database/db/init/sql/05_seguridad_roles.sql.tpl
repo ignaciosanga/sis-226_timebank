@@ -46,14 +46,14 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON
   public."CARRERAS", public."CATEGORIAS", public."USUARIOS",
   public."HABILIDADES", public."USUARIO_HABILIDADES", public."DISPONIBILIDADES",
   public."SOLICITUDES_INTERCAMBIO", public."RESERVAS", public."CALIFICACIONES",
-  public."NOTIFICACIONES"
+  public."NOTIFICACIONES", public."OFERTAS_TUTORIA"
 TO rol_app;
 
 -- Libro de créditos: añadir/consultar, pero no alterar ni borrar movimientos.
 GRANT SELECT, INSERT ON public."MOVIMIENTOS_CREDITO" TO rol_app;
 -- La bitácora no se modifica desde el rol de aplicación; sólo la escribe el trigger.
 GRANT SELECT ON public."AUDITORIA" TO rol_app;
-GRANT SELECT ON public.config_economia TO rol_app;
+GRANT SELECT ON public.config_economia, public.v_ofertas_tutoria_app TO rol_app;
 -- Deudas de penalizacion: solo lectura; las escrituras pasan por funciones/triggers SECURITY DEFINER.
 GRANT SELECT ON public."PENALIZACIONES_PENDIENTES" TO rol_app;
 
@@ -75,7 +75,10 @@ GRANT EXECUTE ON FUNCTION public.fn_solicitudes_recibidas(uuid) TO rol_app;
 GRANT EXECUTE ON FUNCTION public.fn_solicitudes_enviadas(uuid) TO rol_app;
 GRANT EXECUTE ON FUNCTION public.fn_reservas_usuario(uuid) TO rol_app;
 GRANT EXECUTE ON FUNCTION public.fn_calificaciones_recibidas(uuid) TO rol_app;
-GRANT EXECUTE ON FUNCTION public.fn_calcular_costo_clase(uuid, uuid, timestamptz) TO rol_app;
+REVOKE EXECUTE ON FUNCTION public.fn_calcular_costo_clase(uuid, uuid, timestamptz) FROM rol_app;
+GRANT EXECUTE ON FUNCTION public.fn_sugerir_precio_clase(uuid, uuid, timestamptz) TO rol_app;
+GRANT EXECUTE ON FUNCTION public.fn_creditos_a_decimas(numeric) TO rol_app;
+GRANT EXECUTE ON FUNCTION public.fn_confirmar_reserva(uuid) TO rol_app;
 GRANT EXECUTE ON FUNCTION public.fn_cobrar_penalizaciones_pendientes(uuid) TO rol_app;
 GRANT EXECUTE ON FUNCTION public.fn_obtener_top_tutores(uuid, timestamptz, timestamptz, text) TO rol_app;
 

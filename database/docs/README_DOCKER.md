@@ -17,7 +17,7 @@
 
 Se agregan dos scripts al esquema original, sin cambiar los tipos de creditos de `01_base_a_schema.sql`:
 
-- `07_economia_dinamica.sql`: crea `config_economia`, la funcion `fn_calcular_costo_clase` y los triggers de cancelacion/penalizacion.
+- `07_economia_dinamica.sql`: crea `config_economia`, la sugerencia `fn_sugerir_precio_clase` y los triggers de cancelacion/penalizacion. La funcion legada `fn_calcular_costo_clase` ya no es el precio de cobro.
 - `08_impacto_match_brechas.sql`: crea `v_knowledge_score`, `fn_obtener_top_tutores`, `v_knowledge_gap_index` y `v_command_center_resumen`.
 - `09_vistas_bi_hu07.sql`: completa HU-07 con horarios pico en `America/La_Paz`, materias con oferta cero y Knowledge Score con promedio `NULL` cuando no hay calificaciones.
 - `tests/13_pruebas_bi_hu07.sql`: validaciones de aceptación para las vistas BI y sus permisos.
@@ -37,7 +37,7 @@ La regla es:
 
 Se aplica a todos estos campos: `USUARIOS.saldo`, `USUARIOS.creditos_retenidos`, `SOLICITUDES_INTERCAMBIO.creditos_requeridos`, `RESERVAS.creditos` y `MOVIMIENTOS_CREDITO.cantidad`, `saldo_anterior`, `saldo_posterior`, `retenidos_anterior`, `retenidos_posterior`.
 
-**No redondear el costo final a un credito entero.** `fn_calcular_costo_clase` devuelve un `INTEGER` ya escalado en decimas. La app divide entre 10 exclusivamente para mostrar. Para guardar o realizar operaciones de negocio, debe conservar el entero escalado.
+**No redondear los importes a un credito entero.** `fn_sugerir_precio_clase` devuelve una sugerencia `INTEGER` escalada en decimas, pero no define el precio definitivo de una clase. El precio de cobro es el que publica el tutor y acepta el estudiante, guardado en `OFERTAS_TUTORIA.costo_decimas` y copiado a `SOLICITUDES_INTERCAMBIO.creditos_requeridos` y `RESERVAS.creditos`. La app divide entre 10 exclusivamente para mostrar; las operaciones conservan el entero escalado.
 
 Ejemplo de la diapositiva:
 
@@ -121,6 +121,39 @@ docker compose exec -T db psql -U skillswap_admin -d skillswap < tests/13_prueba
 ```
 
 La prueba valida que existan las cinco vistas, que la vista horaria devuelva 24 filas, que la vista de mapa de calor devuelva 168 combinaciones, que las materias sin tutor tengan oferta cero, que el promedio de quien no tiene calificaciones sea `NULL` y que `rol_lectura` tenga permiso de consulta. Para demostrar visualmente los dos casos alternativos, deben existir en los datos de prueba al menos una materia sin tutor y un tutor sin calificaciones.
+
+
+### Precio de la oferta: regla acordada con Backend y Frontend
+
+El precio que publica el tutor en `OFERTAS_TUTORIA.costo_decimas` es el precio definitivo de esa oferta. La función `fn_sugerir_precio_clase` puede calcular una referencia dinamica (por ejemplo, por escasez, demanda o impacto), pero **no sustituye ni modifica** el precio escrito por el tutor.
+
+Flujo obligatorio:
+
+1. El tutor publica un precio, por ejemplo 3.7 creditos = 37 decimas.
+2. Al crear la solicitud, Backend copia ese importe a `SOLICITUDES_INTERCAMBIO.creditos_requeridos` (snapshot de la cotizacion aceptada por el estudiante).
+3. Si el tutor cambia despues el precio de la oferta a 4.2 (42 decimas), la solicitud existente sigue en 37.
+4. Al aceptar la solicitud y crear `RESERVAS`, `RESERVAS.creditos` debe coincidir con `SOLICITUDES_INTERCAMBIO.creditos_requeridos`.
+5. La retencion y el pago en dos confirmaciones usan el importe congelado de la reserva. No vuelven a consultar la oferta ni recalculan el precio.
+
+Los precios admiten una sola cifra decimal: 3, 3.5 y 3.7 son validos; 3.75 se rechaza. PostgreSQL almacena decimas como INTEGER (37 = 3.7). La conversion se realiza exactamente una vez en la frontera de API/Backend.
+
+`fn_calcular_costo_clase` queda como nombre legado, sin permiso de ejecución para `rol_app`; no debe usarse como precio de cobro. La aplicacion puede consultar `fn_sugerir_precio_clase` solamente para mostrar una recomendacion orientativa. El precio definitivo siempre es el elegido por el tutor y aceptado por el estudiante.
+
+### Pruebas de aceptación relacionadas
+
+- `tests/16_pruebas_auditoria_hu06.sql`: crea sus propios datos, comprueba la auditoría de cancelación y cambio de contraseña, las columnas JSON cifradas y la denegación de UPDATE/DELETE. Requiere pasar `enc_key` desde `APP_ENCRYPTION_KEY`.
+- `tests/17_pruebas_ofertas_hu04.sql`: prueba precio manual del tutor, sugerencia dinámica separada, snapshot de la solicitud, edición posterior de la oferta y rechazo de 3.75/costo cero/horario inválido.
+- `tests/18_pruebas_pago_clases_hu10.sql`: prueba retención al aceptar, primera confirmación sin pago, segunda confirmación con transferencia única, liberación tras cancelación antes de la segunda confirmación y rechazo por saldo insuficiente.
+
+Comandos de ejecución desde la raíz del proyecto (ajusta usuario/base si cambiaste los valores del Compose):
+
+```bash
+docker compose exec -T db psql -U skillswap_admin -d skillswap < tests/17_pruebas_ofertas_hu04.sql
+docker compose exec -T db psql -U skillswap_admin -d skillswap < tests/18_pruebas_pago_clases_hu10.sql
+docker compose exec -T db sh -lc 'psql --no-psqlrc -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v "enc_key=$APP_ENCRYPTION_KEY"' < tests/16_pruebas_auditoria_hu06.sql
+```
+
+Para una V4 ya inicializada, aplicar una vez `migrations/03_politica_precio_tutor_autoritativo.sql` como administrador. En una inicialización desde cero, los cambios ya están incorporados en `07_economia_dinamica.sql` y `05_seguridad_roles.sql.tpl`.
 
 ## Preparación
 
@@ -220,8 +253,9 @@ Despues de la migracion, aplica los modulos `07_economia_dinamica.sql`, `08_impa
 GRANT SELECT ON public.config_economia,
   public.v_cuentas_credito_app,
   public.v_movimientos_credito_app TO rol_app;
-GRANT EXECUTE ON FUNCTION public.fn_calcular_costo_clase(uuid, uuid, timestamptz),
+GRANT EXECUTE ON FUNCTION public.fn_sugerir_precio_clase(uuid, uuid, timestamptz),
   public.fn_obtener_top_tutores(uuid, timestamptz, timestamptz, text) TO rol_app;
+REVOKE EXECUTE ON FUNCTION public.fn_calcular_costo_clase(uuid, uuid, timestamptz) FROM rol_app;
 GRANT SELECT ON public.v_knowledge_gap_index,
   public.v_command_center_resumen,
   public.v_bi_reservas_por_hora,

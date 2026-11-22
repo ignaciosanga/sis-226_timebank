@@ -66,12 +66,12 @@ BEGIN
 
     -- La habilidad tiene un tutor: aplica escasez. A las 10:00 no aplica demanda.
     v_inicio_normal := ((CURRENT_DATE + 10) + TIME '10:00') AT TIME ZONE 'America/La_Paz';
-    v_costo := public.fn_calcular_costo_clase(v_habilidad, v_tutor, v_inicio_normal);
+    v_costo := public.fn_sugerir_precio_clase(v_habilidad, v_tutor, v_inicio_normal);
     IF v_costo IS DISTINCT FROM 25 THEN
         RAISE EXCEPTION 'FALLO escala de decimas: se esperaba 25 (2.5 creditos) y se obtuvo %.', v_costo;
     END IF;
     INSERT INTO resultados_prueba (prueba, resultado, detalle)
-    VALUES ('Costo base + escasez en decimas', 'OK',
+    VALUES ('Precio sugerido base + escasez en decimas', 'OK',
             '10 + 15 = 25 unidades internas; la app muestra 25 / 10 = 2.5 creditos.');
 
     -- Crear historial completado y calificacion 5 para activar el bono de impacto.
@@ -93,12 +93,12 @@ BEGIN
     -- A las 19:00 aplican escasez + demanda + alto impacto:
     -- 10 + 15 + 13 + 12 = 50 unidades internas = 5.0 creditos visibles.
     v_inicio_alta_demanda := ((CURRENT_DATE + 10) + TIME '19:00') AT TIME ZONE 'America/La_Paz';
-    v_costo := public.fn_calcular_costo_clase(v_habilidad, v_tutor, v_inicio_alta_demanda);
+    v_costo := public.fn_sugerir_precio_clase(v_habilidad, v_tutor, v_inicio_alta_demanda);
     IF v_costo IS DISTINCT FROM 50 THEN
         RAISE EXCEPTION 'FALLO suma de bonificaciones: se esperaba 50 (5.0 creditos) y se obtuvo %.', v_costo;
     END IF;
     INSERT INTO resultados_prueba (prueba, resultado, detalle)
-    VALUES ('Suma de las tres bonificaciones', 'OK',
+    VALUES ('Suma de los componentes del precio sugerido', 'OK',
             '10 + 15 + 13 + 12 = 50 unidades internas; la app muestra 50 / 10 = 5.0 creditos.');
 
     -- Disponibilidad y solicitud para probar match y Knowledge Gap.
@@ -174,6 +174,7 @@ BEGIN
     SELECT m."tipo", m."cantidad" INTO v_tipo_credito, v_cantidad
     FROM public."MOVIMIENTOS_CREDITO" m
     WHERE m."id_reserva" = v_reserva_corta
+    AND m."tipo" IN ('penalizacion', 'penalizacion_sin_saldo')
     ORDER BY m."created_at" DESC LIMIT 1;
 
     IF v_saldo IS DISTINCT FROM 45 OR v_horas IS NULL OR v_horas >= 5
@@ -233,7 +234,7 @@ BEGIN
     FROM public."USUARIOS" u WHERE u."id_usuario" = v_tutor;
     SELECT COUNT(*) INTO v_count
     FROM public."MOVIMIENTOS_CREDITO" m
-    WHERE m."id_reserva" = v_reserva_larga;
+    WHERE m."id_reserva" = v_reserva_larga AND m."tipo" IN ('penalizacion', 'penalizacion_sin_saldo');
     IF v_saldo IS DISTINCT FROM 45 OR v_count <> 0 THEN
         RAISE EXCEPTION 'FALLO umbral 5 horas: saldo %, movimientos %.', v_saldo, v_count;
     END IF;
