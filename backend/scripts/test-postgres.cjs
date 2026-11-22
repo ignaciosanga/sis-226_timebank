@@ -302,6 +302,9 @@ async function main() {
       mailbox,
       connectionString: url.href,
     });
+    await require('./test-banner-persistence.cjs').verifyBannerPersistence({
+      connectionString: url.href,
+    });
     // Los verificadores decimales usan las mismas migraciones oficiales.
     // El fixture provisional se conserva solo como referencia histórica.
     await require('./test-offer-requests.cjs').verifyOfferRequests({

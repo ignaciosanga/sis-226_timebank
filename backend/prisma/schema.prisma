@@ -163,6 +163,7 @@ model BannerTutoria {
   mime_type         String         @db.VarChar
   byte_size         Int
   sha256            String         @db.VarChar(64)
+  content_bytes     Bytes?         @db.ByteA
   created_at        DateTime       @default(now()) @db.Timestamptz(6)
   expires_at        DateTime       @db.Timestamptz(6)
   attached_offer_id String?        @db.Uuid
