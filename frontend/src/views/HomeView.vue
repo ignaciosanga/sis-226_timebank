@@ -8,7 +8,7 @@ import TutorOfferDialog from '../features/tutoring/TutorOfferDialog.vue'
 import TutorMetrics from '../features/tutoring/TutorMetrics.vue'
 import OfferBanner from '../features/tutoring/OfferBanner.vue'
 import { dateLabel, fullName, initials, timeLabel } from '../features/timebank/format'
-import { offerCreditCost } from '../features/offers/tutoring-model'
+import { isSingleCredit, offerCreditCost } from '../features/offers/tutoring-model'
 import { SYSTEMS_CURRICULUM } from '../features/curriculum/systems-curriculum'
 import { levelLabel } from '../features/timebank/catalogs'
 const store = useAppStore()
@@ -71,7 +71,7 @@ function openDetail(offer, tab = 'description') { detailTab.value = tab; selecte
           <p v-if="offer.detail?.titulo" class="tutor-card-focus">{{ offer.detail.titulo }}</p>
           <p v-if="offer.detail?.descripcion" class="tutor-card-description">{{ offer.detail.descripcion }}</p>
           <div class="skill-availability"><CalendarDays :size="17" aria-hidden="true" /><span v-if="offer.slots.length">{{ dateLabel(offer.slots[0].fecha_inicio) }}, {{ timeLabel(offer.slots[0].fecha_inicio) }}–{{ timeLabel(offer.slots[0].fecha_fin) }}</span><span v-else>{{ store.authenticated ? 'Sin horarios publicados' : 'Inicia sesión para ver sus horarios' }}</span></div>
-          <footer><span><Clock3 :size="16" aria-hidden="true" /><template v-if="offerCreditCost(offer.detail) !== null">{{ offerCreditCost(offer.detail) }} {{ offerCreditCost(offer.detail) === 1 ? 'crédito' : 'créditos' }} por clase</template><template v-else>Costo por definir</template></span><div class="tutor-card-actions"><button class="text-link" type="button" @click="openDetail(offer, 'others')">Otros tutores</button><button class="button button-primary" type="button" :aria-label="`Ver oferta de ${offer.skill.nombre} con ${fullName(offer.user)}`" @click="openDetail(offer)">Ver oferta</button></div></footer>
+          <footer><span><Clock3 :size="16" aria-hidden="true" /><template v-if="offerCreditCost(offer.detail) !== null">{{ offerCreditCost(offer.detail) }} {{ isSingleCredit(offerCreditCost(offer.detail)) ? 'crédito' : 'créditos' }} por clase</template><template v-else>Costo por definir</template></span><div class="tutor-card-actions"><button class="text-link" type="button" @click="openDetail(offer, 'others')">Otros tutores</button><button class="button button-primary" type="button" :aria-label="`Ver oferta de ${offer.skill.nombre} con ${fullName(offer.user)}`" @click="openDetail(offer)">Ver oferta</button></div></footer>
         </article>
       </div>
       <div v-else-if="store.communityLoading" class="skeleton-list" aria-busy="true" aria-label="Cargando habilidades"><div v-for="n in 3" :key="n" class="panel skeleton-card"><span class="skeleton skeleton-avatar"></span><span class="skeleton skeleton-line skeleton-short"></span><span class="skeleton skeleton-line skeleton-title"></span><span class="skeleton skeleton-line"></span></div></div>

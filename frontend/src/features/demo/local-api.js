@@ -60,7 +60,7 @@ export function createLocalDemoApi(now = () => Date.now()) {
         if (price === null) fail(409, 'Esta oferta aún no tiene un costo definido por el tutor.')
         const next = actions.sendExchange(state, actor, input, now())
         // Resolve the published price here; ignore client-supplied amounts.
-        next.requests[0].creditos_requeridos = price
+        next.requests[0].creditos_requeridos = Number(price)
         next.requests[0].id_oferta = offer.id_oferta
         state = next; return state.requests[0]
       }

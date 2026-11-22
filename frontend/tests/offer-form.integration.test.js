@@ -125,7 +125,7 @@ test('review keeps the selected published skill and dates without any HTTP call 
   assert.deepEqual(view.ownSkills.value.map(skill => skill.id_habilidad), ['excel'])
   fill(view); await view.review()
   assert.equal(view.draft.value.skillId, 'excel')
-  assert.equal(view.creditTotal.value, 7)
+  assert.equal(view.creditTotal.value, '7')
   assert.match(view.draft.value.fechaInicio, /T20:00:00\.000Z$/)
   assert.equal(calls.length, 0)
   props.open = false; await flush(); props.open = true; await flush()
@@ -138,16 +138,19 @@ test('the tutor chooses the total independently of duration and invalid prices b
   const view = setup(OfferSetup)
   assert.equal(view.creditTotal.value, null)
   fill(view)
-  assert.equal(view.creditTotal.value, 7)
+  assert.equal(view.creditTotal.value, '7')
   view.form.to = '16:15'
-  assert.equal(view.creditTotal.value, 7)
+  assert.equal(view.creditTotal.value, '7')
   await view.review()
-  assert.equal(view.draft.value.costoCreditos, 7)
+  assert.equal(view.draft.value.costoCreditos, '7')
   view.form.costoCreditos = '19'
   assert.equal(view.draft.value, null)
   await view.review()
-  assert.equal(view.draft.value.costoCreditos, 19)
-  for (const price of ['', '0', '-2', '2.5', 'invalid', '9007199254740992']) {
+  assert.equal(view.draft.value.costoCreditos, '19')
+  view.form.costoCreditos = '3,5'
+  await view.review()
+  assert.equal(view.draft.value.costoCreditos, '3.5')
+  for (const price of ['', '0', '-2', '2.55', 'invalid', '1e3', '99999999999']) {
     view.form.costoCreditos = price
     await view.review()
     assert.equal(view.creditTotal.value, null, price)

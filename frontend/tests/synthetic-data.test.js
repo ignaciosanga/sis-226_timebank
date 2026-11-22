@@ -49,7 +49,7 @@ test('local ratings update the specific subject, deduplicate and reset with a ne
 test('local publishing validates own subject and time atomically and supports image upload', async () => {
   const api = createLocalDemoApi(() => now), state = createSyntheticData(now)
   const body = { skillId: state.skills[0].id_habilidad, nivel: 'Avanzado', costoCreditos: 7, titulo: 'Práctica guiada', descripcion: 'Resolveremos ejercicios de recursividad.', fechaInicio: '2026-12-10T18:00:00Z', fechaFin: '2026-12-10T19:00:00Z' }
-  for (const costoCreditos of [undefined, 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+  for (const costoCreditos of [undefined, 0, -1, 1.55, Number.MAX_SAFE_INTEGER + 1]) {
     const result = await api('/tutoring/offers', { method: 'POST', body: { ...body, costoCreditos } })
     assert.equal(result.status, 400)
     assert.equal((await api('/tutoring/offers')).data.meta.total, 100)
@@ -62,7 +62,7 @@ test('local publishing validates own subject and time atomically and supports im
   assert.equal(image.status, 200); assert.match(image.data.url, /^data:image\/webp;base64,/)
   const input = { method: 'POST', body: { ...body, bannerUrl: image.data.url }, idempotencyKey: 'offer-once' }
   const offer = await api('/tutoring/offers', input)
-  assert.equal(offer.status, 200); assert.equal(offer.data.id_usuario, state.viewerId); assert.equal(offer.data.costo_creditos, 7)
+  assert.equal(offer.status, 200); assert.equal(offer.data.id_usuario, state.viewerId); assert.equal(offer.data.costo_creditos, '7')
   assert.equal((await api('/tutoring/offers')).data.meta.total, 101)
   assert.deepEqual(await api('/tutoring/offers', input), offer)
   assert.equal((await api('/tutoring/offers', { ...input, idempotencyKey: 'new' })).status, 409)

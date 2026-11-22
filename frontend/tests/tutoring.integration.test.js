@@ -184,7 +184,7 @@ test('the specialized offer sends only its content/level/skill/time and uploads 
     return json({ url: 'https://example.test/cover.webp' }, 201)
   })
   responses.set('POST /tutoring/offers', ({ body }) => json({ ...body, id_oferta: 'offer-one' }, 201))
-  const input = { skillId: 'programming', nivel: 'Avanzado', costoCreditos: 7, titulo: 'Práctica', descripcion: 'Ejercicios guiados', fechaInicio: slot.fecha_inicio, fechaFin: slot.fecha_fin }
+  const input = { skillId: 'programming', nivel: 'Avanzado', costoCreditos: '7', titulo: 'Práctica', descripcion: 'Ejercicios guiados', fechaInicio: slot.fecha_inicio, fechaFin: slot.fecha_fin }
   await tutoring.publishTutorOffer(input, new Blob(['test'], { type: 'image/webp' }), 'publish-idempotency-one')
   assert.deepEqual(calls[1].body, { ...input, bannerUrl: 'https://example.test/cover.webp' })
 })
@@ -218,11 +218,11 @@ test('Other tutors stays within the subject and switching offers resets the book
 
 test('booking uses the tutor price unchanged for different durations and blocks an unpriced offer', () => {
   const view = setup(DetailSetup, reactive({ offer: offer(), offers: [offer()], initialTab: 'description' }))
-  assert.equal(view.cost.value, 7)
+  assert.equal(view.cost.value, '7')
   view.from.value = '16:00'; view.to.value = '16:15'; view.reviewBooking()
-  assert.ok(view.draft.value); assert.equal(view.cost.value, 7)
+  assert.ok(view.draft.value); assert.equal(view.cost.value, '7')
   view.to.value = '18:00'; view.reviewBooking()
-  assert.ok(view.draft.value); assert.equal(view.cost.value, 7)
+  assert.ok(view.draft.value); assert.equal(view.cost.value, '7')
   store.offerDetails[0].costo_creditos = null
   view.reviewBooking()
   assert.equal(view.cost.value, null); assert.match(view.error.value, /costo definido/)

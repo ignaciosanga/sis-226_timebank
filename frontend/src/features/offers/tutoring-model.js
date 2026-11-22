@@ -2,11 +2,14 @@ export const MAX_BANNER_BYTES = 3 * 1024 * 1024
 export const BANNER_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
 export function tutorCreditCost(value) {
-  if (typeof value === 'string' && !/^\d+$/.test(value.trim())) return null
   if (typeof value !== 'string' && typeof value !== 'number') return null
-  const amount = Number(value)
-  return Number.isSafeInteger(amount) && amount > 0 ? amount : null
+  const text = String(value).trim().replace(',', '.')
+  if (!/^\d{1,10}(\.\d)?$/.test(text)) return null
+  const amount = Number(text)
+  if (!(amount > 0)) return null
+  return Number.isInteger(amount) ? String(amount) : amount.toFixed(1)
 }
+export const isSingleCredit = (value) => Number(value) === 1
 export const offerCreditCost = (offer) => tutorCreditCost(offer?.costo_creditos)
 
 export function validateOfferContent(form) {
@@ -15,7 +18,7 @@ export function validateOfferContent(form) {
   const description = String(form.descripcion ?? '').trim()
   if (!title || title.length > 100) errors.titulo = 'Escribe un enfoque para tu tutoría (hasta 100 caracteres).'
   if (!description || description.length > 1500) errors.descripcion = 'Describe qué harán en la tutoría (hasta 1500 caracteres).'
-  if (tutorCreditCost(form.costoCreditos) === null) errors.costoCreditos = 'Escribe un costo total en créditos enteros, mayor que cero.'
+  if (tutorCreditCost(form.costoCreditos) === null) errors.costoCreditos = 'Escribe un costo mayor que cero, entero o con una décima (por ejemplo 3.5).'
   return errors
 }
 
