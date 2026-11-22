@@ -11,14 +11,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomUUID } from 'node:crypto';
-import {
-  lstat,
-  mkdir,
-  readFile,
-  readdir,
-  rm,
-  writeFile,
-} from 'node:fs/promises';
+import { lstat, readFile, readdir, rm } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import {
   EXCHANGE_REPOSITORY,
@@ -54,12 +47,10 @@ export class TutoringBannerService implements OnModuleInit {
   }
 
   async onModuleInit(): Promise<void> {
-    await this.ensureDirectory();
     await this.cleanupExpired();
   }
 
-  private async ensureDirectory(): Promise<void> {
-    await mkdir(this.directory, { recursive: true, mode: 0o700 });
+  private async legacyDirectory(): Promise<void> {
     const directory = await lstat(this.directory);
     if (!directory.isDirectory() || directory.isSymbolicLink())
       throw new ServiceUnavailableException('Almacenamiento no disponible');
@@ -91,17 +82,23 @@ export class TutoringBannerService implements OnModuleInit {
         known.push(banner.storage_name);
         if (!banner.attached_offer_id && banner.expires_at <= now) {
           banner.deleted_at ??= now;
+          banner.content_bytes = null;
           discarded.push(banner.storage_name);
         }
       }
       return { discarded, known };
     });
+    // El disco legado es opcional: ni arranque ni nuevas cargas dependen de el.
+    try {
+      await this.legacyDirectory();
+    } catch {
+      return;
+    }
     for (const name of discarded)
       await rm(this.filePath(name), { force: true }).catch(() => undefined);
-    // Un cierre entre escribir el archivo y confirmar SQL puede dejar bytes sin
-    // metadata. El margen de 24h evita borrar una carga que sigue en curso.
+    // Retira tambien archivos huerfanos de la implementacion anterior.
     const knownNames = new Set(known);
-    for (const name of await readdir(this.directory)) {
+    for (const name of await readdir(this.directory).catch(() => [])) {
       if (!storageName.test(name) || knownNames.has(name)) continue;
       const path = this.filePath(name);
       const info = await lstat(path).catch(() => null);
@@ -128,67 +125,50 @@ export class TutoringBannerService implements OnModuleInit {
       .update('\0')
       .update(file!.buffer)
       .digest('hex');
-    await this.ensureDirectory();
     await this.cleanupExpired();
     const id = randomUUID();
     const name = `${id}.${decoded.extension}`;
-    const path = this.filePath(name);
-    try {
-      await writeFile(path, decoded.bytes, { flag: 'wx', mode: 0o600 });
-    } catch {
-      throw new ServiceUnavailableException('No se pudo guardar el banner');
-    }
-    let committed = false;
-    try {
-      const result = await this.persistence.transaction((state) => {
-        this.active(state, actor);
-        const scope = `${actor}:tutoring.banner:${key}`;
-        const previous = state.idempotency.get(scope);
-        if (previous) {
-          if (previous.fingerprint !== fingerprint)
-            throw new ConflictException(
-              'Idempotency-Key ya utilizada con otro contenido',
-            );
-          const result = previous.result as { url: string };
-          const previousBanner = [...state.banners.values()].find(
-            (banner) => this.url(banner.id_banner) === result.url,
+    return this.persistence.transaction(async (state) => {
+      this.active(state, actor);
+      const scope = `${actor}:tutoring.banner:${key}`;
+      const previous = state.idempotency.get(scope);
+      if (previous) {
+        if (previous.fingerprint !== fingerprint)
+          throw new ConflictException(
+            'Idempotency-Key ya utilizada con otro contenido',
           );
-          if (!previousBanner || previousBanner.deleted_at)
-            throw new GoneException(
-              'La carga pendiente vencio; usar otra Idempotency-Key para cargar nuevamente',
-            );
-          return structuredClone(result);
-        }
-        const now = new Date(Date.now());
-        const banner: TutoringBanner = {
-          id_banner: id,
-          id_tutor: actor,
-          storage_name: name,
-          mime_type: decoded.mime,
-          byte_size: decoded.bytes.length,
-          sha256: createHash('sha256').update(decoded.bytes).digest('hex'),
-          created_at: now,
-          expires_at: new Date(now.getTime() + BANNER_PENDING_TTL_MS),
-          attached_offer_id: null,
-          deleted_at: null,
-        };
-        state.banners.set(id, banner);
-        const result = { url: this.url(id) };
-        state.idempotency.set(scope, { fingerprint, result });
-        return result;
-      });
-      committed = result.url === this.url(id);
-      return result;
-    } finally {
-      if (!committed) {
-        // Ante una perdida de conexion tras COMMIT, consultar antes de borrar.
-        // Si SQL no responde se conserva el archivo para la limpieza posterior.
-        const referenced = await this.persistence
-          .read((state) => state.banners.has(id))
-          .catch(() => true);
-        if (!referenced) await rm(path, { force: true }).catch(() => undefined);
+        const result = previous.result as { url: string };
+        const previousBanner = [...state.banners.values()].find(
+          (banner) => this.url(banner.id_banner) === result.url,
+        );
+        if (!previousBanner || previousBanner.deleted_at)
+          throw new GoneException(
+            'La carga pendiente vencio; usar otra Idempotency-Key para cargar nuevamente',
+          );
+        // Un replay antiguo solo responde con exito si tambien conserva bytes.
+        const bytes = await this.readBytes(previousBanner);
+        previousBanner.content_bytes = new Uint8Array(bytes);
+        return structuredClone(result);
       }
-    }
+      const now = new Date(Date.now());
+      const banner: TutoringBanner = {
+        id_banner: id,
+        id_tutor: actor,
+        storage_name: name,
+        mime_type: decoded.mime,
+        byte_size: decoded.bytes.length,
+        sha256: createHash('sha256').update(decoded.bytes).digest('hex'),
+        content_bytes: new Uint8Array(decoded.bytes),
+        created_at: now,
+        expires_at: new Date(now.getTime() + BANNER_PENDING_TTL_MS),
+        attached_offer_id: null,
+        deleted_at: null,
+      };
+      state.banners.set(id, banner);
+      const result = { url: this.url(id) };
+      state.idempotency.set(scope, { fingerprint, result });
+      return result;
+    });
   }
 
   /** Ejecutar dentro de la misma transaccion que crea oferta y disponibilidad. */
@@ -220,10 +200,21 @@ export class TutoringBannerService implements OnModuleInit {
 
   private async readBytes(banner: TutoringBanner): Promise<Buffer> {
     try {
-      const path = this.filePath(banner.storage_name);
-      const info = await lstat(path);
-      if (!info.isFile() || info.isSymbolicLink()) throw new Error('Archivo');
-      const bytes = await readFile(path);
+      let bytes: Buffer;
+      if (banner.content_bytes != null) {
+        bytes = Buffer.from(banner.content_bytes);
+      } else {
+        await this.legacyDirectory();
+        const path = this.filePath(banner.storage_name);
+        const info = await lstat(path);
+        if (
+          !info.isFile() ||
+          info.isSymbolicLink() ||
+          info.size !== banner.byte_size
+        )
+          throw new Error('Archivo');
+        bytes = await readFile(path);
+      }
       if (
         bytes.length !== banner.byte_size ||
         createHash('sha256').update(bytes).digest('hex') !== banner.sha256

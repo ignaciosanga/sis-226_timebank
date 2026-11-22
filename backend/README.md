@@ -1,5 +1,102 @@
 # Banco de Tiempo Universitario — Backend v0.4.0
 
+## Issue #47 — Banners persistentes en PostgreSQL
+
+Las nuevas cargas guardan `BANNERS_TUTORIA.content_bytes` (`BYTEA`) y sus
+metadatos en la misma transacción PostgreSQL, antes de devolver 201. Conservan
+el UUID, `/tutoring/banners/:id`, MIME, SHA-256, idempotencia, permisos y límites
+de 3 MiB/16 megapíxeles (JPG, PNG o WebP real). El Frontend sigue usando el mismo
+`bannerUrl`. El arranque, las cargas y las imágenes migradas no necesitan un
+directorio local. Las pendientes vencidas pierden sus bytes, conservando su
+metadata y la respuesta de clave vencida; una imagen asociada no vence.
+
+La migración incremental
+`prisma/migrations/20261122020000_banner_bytes_postgres/migration.sql` agrega una
+columna nullable sin recrear tablas ni modificar ofertas. Las filas anteriores
+quedan con `NULL`; un `CHECK` verifica tamaño y SHA-256 de todo BYTEA no nulo.
+La API también verifica ambos al leer. Mientras un banner anterior no se haya
+recuperado, la lectura intenta su archivo validado en `BANNER_STORAGE_DIR`.
+Si falta o está corrupto, la imagen responde 503 y la oferta conserva su ID y
+referencia; no se sustituye ni elimina silenciosamente.
+
+### Procedimiento para Implementación
+
+**Recuperar mientras el disco anterior siga accesible, antes de retirar la
+instancia antigua, reiniciarla o desplegar un reemplazo.** La migración SQL no
+puede recuperar por sí sola un disco que ya desapareció. Preparar este código y
+el comando en un entorno que pueda leer el directorio antiguo, o conservar una
+copia segura de ese directorio antes de reemplazar la instancia. Este cambio no
+se ha desplegado ni se ha conectado a Neon o Render durante la verificación.
+
+1. Conservar un respaldo de la base. Usar la conexión del destino autorizado,
+   `PERSISTENCE_MODE=prisma`, `DATABASE_ENABLED=true` y mantener `PUBLIC_API_URL`
+   igual al origen público vigente. Apuntar `BANNER_STORAGE_DIR` al directorio
+   anterior o a su copia. No usar las credenciales locales de las pruebas.
+2. Desde `backend/`, instalar el artefacto con `npm ci` y ejecutar
+   `npm run db:migrate` (`prisma migrate deploy`). La columna adicional es
+   compatible con la instancia antigua durante la transición. No usar `db push`,
+   recrear la base ni modificar migraciones ya aplicadas.
+3. Ejecutar primero `npm run banners:recover -- --dry-run`. Después ejecutar
+   `npm run banners:recover`, conservar su reporte operativo y repetirlo. Cada
+   archivo se comprueba por nombre seguro, MIME de metadata, tamaño y SHA-256;
+   se copia sin recodificar. Se conservan UUID, URL, metadatos y asociación.
+   Cada actualización se confirma con el mismo bloqueo de la API y solo si la
+   fila sigue vigente y sin bytes. No se borran archivos ni se sobrescriben bytes
+   persistidos. El modo de simulación no escribe.
+4. Detener las nuevas cargas de la versión antigua durante la pasada final y
+   hasta activar la nueva, para evitar que el backend antiguo escriba otro
+   archivo después de la recuperación. Confirmar que la repetición no tiene
+   nuevos `recovered`. Resolver los `missing`/`invalid` antes de descartar la
+   última copia del disco. Si el proveedor no permite acceder al disco antiguo,
+   solo una copia previa o el archivo original permitirá recuperar esos bytes.
+5. Compilar con `npm run build` y activar el nuevo backend. Verificar una carga,
+   su publicación en una oferta y la descarga con la misma URL pública. Los
+   respaldos PostgreSQL deben incluir ahora también los BYTEA. El directorio
+   solo sirve para recuperación/lectura de pendientes legados.
+
+El reporte JSON contiene `id_banner`, `url` y `offer_ids` para localizar las
+ofertas afectadas: `recovered` (o candidatos con `dry_run`), `persisted`, `missing`,
+`invalid` con motivo, y `skipped` para vencidos/eliminados o cambios concurrentes.
+Salida 0: recorrido completo sin faltantes/inválidos; 2: hay faltantes/inválidos
+que atender, aunque los recuperables ya se confirmaron; 1: fallo operativo.
+Es repetible y puede continuar después de un fallo sin duplicar banners.
+
+Para un `missing` o `invalid`, restaurar el **archivo original exacto** bajo su
+`storage_name` y repetir el comando conserva incluso el ID y la URL anteriores.
+Si no existe ese original ni respaldo, pedir al tutor que vuelva a subir la
+imagen mediante `POST /tutoring/banners` y que actualice su oferta propia con
+`PUT /tutoring/offers/:id`, usando el nuevo `bannerUrl` y conservando el resto de
+sus campos. Se aplican los permisos y restricciones vigentes de edición; no
+borrar la oferta ni cambiar su referencia por SQL. La referencia anterior se
+conserva hasta esa reposición. Las ofertas históricas no editables conservan el
+reporte para atención conforme a las reglas existentes.
+
+### Verificación local aislada
+
+Ejecutar `npm run prisma:validate`, `npm run prisma:generate`, `npm run build`,
+`npm run lint`, `npm test`, `npm run test:e2e` y `npm run test:postgres`.
+`TEST_DATABASE_URL` debe señalar un servidor PostgreSQL local **exclusivo de
+pruebas** con permiso CREATE DATABASE, separado de bases, puertos y volúmenes
+de defensa. El runner crea y elimina únicamente bases temporales propias.
+
+`scripts/test-banner-persistence.cjs`, invocado por `test:postgres`, comprueba
+la nueva migración sobre una base poblada creada con los SQL oficiales previos.
+Después usa dos procesos HTTP reales y PostgreSQL: login, subida multipart por
+la API normal, publicación normal de oferta, descarga en A, apagado de A,
+eliminación de su directorio y arranque de B con otro directorio vacío. Compara
+oferta, URL/ruta, HTTP 200, tipo de contenido y SHA-256 exactos. También verifica
+replay, recuperación con simulación y repetición, archivo faltante/corrupto sin
+perder oferta o referencia, restricciones SQL y rollback real de una carga.
+Imprime la comparación A/B y los IDs sintéticos de recuperación como JSON;
+los archivos y logs temporales no forman parte del cambio.
+
+Validación de esta corrección (22/11/2026, base `ef6625c`): Prisma
+validate/generate, build y lint aprobados; **297 unitarias (32 suites)**,
+**195 E2E (11 suites)** y **`npm run test:postgres`: salida 0**. La comparación
+A/B confirmó ruta, HTTP 200, `image/png` y SHA-256 idénticos después de eliminar
+el disco A. Se verificaron también migración poblada, recuperación repetible,
+faltantes/corrupción sin pérdida de ofertas y rollback SQL de la subida.
+
 **Estado vigente del cierre técnico (22/11/2026):** esta rama parte de la integración
 `e6642bc`. La migración oficial `20261121000000_creditos_decimales` convierte los nueve
 importes a NUMERIC y añade la oferta opcional de la solicitud; Prisma usa `Decimal`
@@ -72,7 +169,7 @@ temporal de integración, no una política económica definitiva. Los casos dond
 ambos criterios coinciden continúan. HU-08 permanece **parcialmente validada**.
 El 409 deja la reserva **Confirmada**, con su retención todavía activa; no
 representa una cancelación completada.
-HU-06 dinámica requiere el acuerdo Frontend/BD y banners #47 se trata por separado.
+HU-06 dinámica requiere el acuerdo Frontend/BD. Banners #47 se documenta arriba.
 
 Validación final de 2B: `prisma:validate`, `prisma:generate`, `build`, `lint`,
 **284/284 unitarias (29 suites)**, **194/194 E2E (11 suites)** y
@@ -398,7 +495,7 @@ Para reproducir la integración, usa `npm.cmd run test:postgres` con el servidor
 Pendientes para integración general:
 
 - **HU-08 / Alan y BD:** resolver el disponible antes/después de liberar cuando cambia la posibilidad de cobrar; coordinar un solo mecanismo de cobro antes de desplegar. Ver la orden 2B al inicio. No se generan deudas.
-- **HU-06 / Frontend y BD:** acordar precio sugerido u obligatorio, factores y vigencia. Se conserva el precio publicado y pactado. El almacenamiento durable de banners (#47) se tratará por separado.
+- **HU-06 / Frontend y BD:** acordar precio sugerido u obligatorio, factores y vigencia. Se conserva el precio publicado y pactado. Para banners, ver el procedimiento del issue #47 al inicio de este README.
 - **Frontend:** preservar cadenas exactas y `code` de error, enviar disponibilidad/intervalo completos de la oferta, mantener claves de idempotencia al reintentar y manejar cuenta pendiente/verificación. El contrato auditado y sus archivos están en fase 6.
 - **APIs/académico:** implementar opiniones/calificaciones y reputación acordadas con Frontend; la existencia de su tabla no demuestra endpoints funcionales.
 - **Integración visual:** probar conjuntamente la UI correcta contra el backend acordado; Google real y Calendar remoto requieren configuración propia. Mantener **`VITE_TUTORING_API_ENABLED=false`** mientras la bandera compartida dependa de contratos todavía pendientes. Esa variable es del entorno de Frontend, no habilita capacidades en Nest.
