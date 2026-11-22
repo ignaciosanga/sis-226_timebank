@@ -166,7 +166,7 @@ async function saveProfile() {
 
 <template>
   <div class="profile-layout" :class="{ 'profile-layout-wide': !showingProfile }">
-    <section class="profile-main">
+    <section class="profile-main" data-tour="perfil">
       <article v-if="!showingRoadmap" class="panel profile-hero">
         <div class="profile-banner">
           <div class="banner-pattern"></div>
@@ -197,6 +197,7 @@ async function saveProfile() {
           <div class="profile-actions">
             <button
               class="button button-primary"
+              data-tour="anadir-habilidad"
               type="button"
               aria-haspopup="dialog"
               @click="showForm"
@@ -510,4 +511,4 @@ async function saveProfile() {
   flex-wrap: wrap;
   gap: 1rem;
 }
-</style>
+</style>

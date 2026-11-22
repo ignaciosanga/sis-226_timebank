@@ -135,6 +135,15 @@ export class Environment {
   @Min(1000)
   @Max(60000)
   ASSISTANT_TIMEOUT_MS = 15000;
+
+  @IsOptional()
+  @IsString()
+  ASSISTANT_KEYS_SECRET?: string;
+
+  @IsInt()
+  @Min(0)
+  @Max(1000)
+  ASSISTANT_FREE_MESSAGES = 5;
 }
 
 export function validateEnvironment(
@@ -150,6 +159,7 @@ export function validateEnvironment(
     'SMTP_PORT',
     'EMAIL_VERIFICATION_TTL_MINUTES',
     'ASSISTANT_TIMEOUT_MS',
+    'ASSISTANT_FREE_MESSAGES',
   ]) {
     if (input[key] !== undefined) parsed[key] = Number(input[key]);
   }
@@ -240,6 +250,11 @@ export function validateEnvironment(
   }
   if (/^(change|replace|example|secret|your[_-])/i.test(config.JWT_SECRET))
     throw new Error('Configuracion invalida: JWT_SECRET de ejemplo');
+  if (
+    config.ASSISTANT_KEYS_SECRET &&
+    Buffer.from(config.ASSISTANT_KEYS_SECRET, 'base64').length !== 32
+  )
+    throw new Error('Configuracion invalida: ASSISTANT_KEYS_SECRET');
   if (
     config.NODE_ENV === 'production' &&
     config.MAIL_TRANSPORT === 'smtp' &&

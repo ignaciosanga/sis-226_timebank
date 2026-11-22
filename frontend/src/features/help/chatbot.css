@@ -42,3 +42,43 @@
 .nexo-chat-enter-from,.nexo-chat-leave-to { opacity:0; transform:translateY(8px); }
 @media(max-width:600px) { .nexo-help { left:max(16px,env(safe-area-inset-left)); bottom:calc(16px + env(safe-area-inset-bottom)); } .nexo-help-launcher { min-height:50px; padding:11px 17px; } .nexo-chat-panel { width:min(380px,calc(100vw - 32px)); bottom:62px; height:min(540px,calc(100dvh - 150px)); } .nexo-chat-header { padding:14px; } .nexo-chat-thread { padding:18px 14px; } }
 @media(prefers-reduced-motion:reduce) { .nexo-chat-enter-active,.nexo-chat-leave-active { transition:none; } }
+.nexo-help-launcher { padding-left:12px; }
+.nexo-chat-header .nexo-avatar { margin:-4px 0; }
+.nexo-chat-actions button[aria-pressed="true"] { background:#246d9c; }
+.nexo-chat-login { margin-top:6px; width:100%; }
+.nexo-chat-offers { display:grid; gap:8px; margin:10px 0 0; padding:0; list-style:none; }
+.nexo-chat-offers button { display:grid; gap:3px; width:100%; padding:10px 12px; border:1px solid var(--line); border-left:3px solid var(--ucb-yellow); border-radius:8px; background:white; color:var(--ink); text-align:left; cursor:pointer; }
+.nexo-chat-offers button:hover { border-color:var(--ucb-blue); background:#f0f7fc; }
+.nexo-chat-offers strong { font-size:.86rem; line-height:1.35; }
+.nexo-chat-offers small { color:var(--muted); font-size:.74rem; }
+.nexo-chat-offers span { display:inline-flex; align-items:center; gap:5px; color:var(--ucb-blue); font-size:.78rem; font-weight:700; }
+.nexo-chat-action { display:inline-flex; align-items:center; gap:6px; margin-top:8px; padding:6px 10px; border:1px solid #cfe0ec; border-radius:999px; background:#f0f7fc; color:var(--ucb-blue); font-size:.74rem; font-weight:600; cursor:pointer; }
+.nexo-chat-action:hover { border-color:var(--ucb-blue); }
+.nexo-chat-settings { flex:1; min-height:0; overflow:auto; display:grid; align-content:start; gap:18px; padding:18px; background:#f8fafc; }
+.nexo-chat-settings section { display:grid; gap:12px; padding:14px; border:1px solid var(--line); border-radius:12px; background:white; }
+.nexo-chat-settings h3 { margin:0; font-size:.95rem; }
+.nexo-chat-settings fieldset { margin:0; padding:0; border:0; }
+.nexo-chat-settings legend { margin-bottom:8px; font-size:.78rem; font-weight:600; }
+.nexo-settings-preview { display:flex; align-items:center; gap:14px; }
+.nexo-settings-preview label, .nexo-settings-key-form label { display:grid; gap:5px; flex:1; font-size:.78rem; font-weight:600; }
+.nexo-settings-preview input, .nexo-settings-key-form input { min-height:40px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; font:inherit; font-size:.88rem; }
+.nexo-settings-options { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+.nexo-settings-options label { display:grid; justify-items:center; gap:4px; padding:8px 4px; border:1px solid var(--line); border-radius:10px; font-size:.7rem; cursor:pointer; }
+.nexo-settings-options label.selected { border-color:var(--ucb-blue); box-shadow:0 0 0 2px #dbeaf5; }
+.nexo-settings-options input, .nexo-settings-colors input { position:absolute; opacity:0; pointer-events:none; }
+.nexo-settings-options label:focus-within, .nexo-settings-colors label:focus-within { outline:2px solid var(--ucb-blue); outline-offset:2px; }
+.nexo-settings-colors { display:flex; gap:10px; }
+.nexo-settings-colors label { width:32px; height:32px; border-radius:50%; border:3px solid white; box-shadow:0 0 0 1px var(--line); cursor:pointer; }
+.nexo-settings-colors label.selected { box-shadow:0 0 0 2px var(--ink); }
+.swatch-azul { background:#7fb8e6; } .swatch-amarillo { background:#ffd659; } .swatch-verde { background:#8fdcb8; } .swatch-coral { background:#ffab9e; }
+.nexo-settings-help { margin:0; color:var(--muted); font-size:.78rem; line-height:1.5; }
+.nexo-settings-help a { color:var(--ucb-blue); font-weight:600; }
+.nexo-settings-status { margin:0; font-size:.8rem; font-weight:600; color:var(--ucb-blue); }
+.nexo-settings-key-hint { display:flex; align-items:center; gap:6px; margin:0; font-size:.8rem; }
+.nexo-settings-key-form { display:grid; gap:8px; }
+.nexo-settings-ok, .nexo-settings-error { margin:0; padding:10px 12px; border-radius:8px; font-size:.8rem; }
+.nexo-settings-ok { background:#eaf7f1; color:#11603f; }
+.nexo-settings-error { background:#fdf3f2; color:#8a2b20; }
+.nexo-tour-glow { position:relative; z-index:5; animation:nexo-tour-glow 1.2s ease-in-out 3; border-radius:10px; }
+@keyframes nexo-tour-glow { 0%,100% { box-shadow:0 0 0 0 rgba(242,183,5,0); } 50% { box-shadow:0 0 0 6px rgba(242,183,5,.75), 0 0 24px 6px rgba(0,82,137,.25); } }
+@media(prefers-reduced-motion:reduce) { .nexo-tour-glow { animation:none; outline:3px solid var(--ucb-yellow); outline-offset:3px; } }

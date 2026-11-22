@@ -264,7 +264,8 @@ async function main() {
   step('el asistente responde o informa que no está configurado');
   await api('/assistant/ask', {
     method: 'POST',
-    body: { question: '¿Cómo funcionan los créditos?' },
+    token: learner.token,
+    body: { question: '¿Cómo funcionan los créditos?', route: '/' },
     expect: [200, 503],
   });
 

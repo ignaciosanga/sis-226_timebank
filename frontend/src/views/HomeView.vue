@@ -42,6 +42,15 @@ const allOffers = computed(() => {
 const requestedCourse = computed(() => SYSTEMS_CURRICULUM.find(c => c.codigo === route.query.materia && normalized(c.nombre) === normalized(query.value.trim())))
 const offers = computed(() => allOffers.value.filter((row) => (!category.value || row.skill.id_categoria === category.value) && (requestedCourse.value ? row.skill.codigo === requestedCourse.value.codigo || normalized(row.skill.nombre) === normalized(requestedCourse.value.nombre) : normalized(row.skill.nombre).includes(normalized(query.value.trim())))))
 function openDetail(offer, tab = 'description') { detailTab.value = tab; selectedOffer.value = offer }
+watch([() => route.query.oferta, () => allOffers.value.length], ([id]) => {
+  if (typeof id !== 'string' || !id) return
+  const found = allOffers.value.find((row) => row.detail?.id_oferta === id || row.id_oferta === id)
+  if (!found) return
+  openDetail(found)
+  const nextQuery = { ...route.query }
+  delete nextQuery.oferta
+  router.replace({ path: route.path, query: nextQuery, hash: route.hash })
+}, { immediate: true })
 </script>
 <template>
   <div class="linkedin-grid home-layout" :class="{ 'home-layout-public': !store.authenticated }">
@@ -57,10 +66,10 @@ function openDetail(offer, tab = 'description') { detailTab.value = tab; selecte
       <p class="public-credit-rule">Cada tutor define el <strong>costo total de su clase en créditos</strong>.</p>
       <RouterLink class="button button-primary" to="/registro">Crear cuenta</RouterLink>
     </aside>
-    <section class="feed-column"><header class="discover-card"><div class="discover-heading"><h1>¿Qué quieres aprender hoy?</h1><p>Conecta con alguien que comparte lo que sabe.</p></div><label class="catalog-search"><Search :size="20" aria-hidden="true" /><input v-model="query" type="search" placeholder="Buscar materia por nombre" aria-label="Buscar materia por nombre" /></label><label class="skill-category-filter select-wrap" for="skill-category"><span>Área</span><select id="skill-category" v-model="category"><option value="">Todas</option><option v-for="item in store.categories" :key="item.id_categoria" :value="item.id_categoria">{{ item.nombre }}</option></select></label></header>
+    <section class="feed-column"><header class="discover-card"><div class="discover-heading"><h1>¿Qué quieres aprender hoy?</h1><p>Conecta con alguien que comparte lo que sabe.</p></div><label class="catalog-search" data-tour="buscar-ofertas"><Search :size="20" aria-hidden="true" /><input v-model="query" type="search" placeholder="Buscar materia por nombre" aria-label="Buscar materia por nombre" /></label><label class="skill-category-filter select-wrap" for="skill-category"><span>Área</span><select id="skill-category" v-model="category"><option value="">Todas</option><option v-for="item in store.categories" :key="item.id_categoria" :value="item.id_categoria">{{ item.nombre }}</option></select></label></header>
       <div class="section-heading feed-heading offer-catalog-heading">
         <div><h2>Habilidades para intercambiar</h2><p role="status">{{ offers.length }} {{ offers.length === 1 ? 'oferta disponible' : 'ofertas disponibles' }}</p></div>
-        <button v-if="canOffer" class="button button-offer" type="button" aria-haspopup="dialog" @click="openOffer"><Plus :size="18" aria-hidden="true" />Ofertar una habilidad</button>
+        <button v-if="canOffer" class="button button-offer" data-tour="ofertar" type="button" aria-haspopup="dialog" @click="openOffer"><Plus :size="18" aria-hidden="true" />Ofertar una habilidad</button>
         <span v-else class="feed-community"><GraduationCap :size="16" />Comunidad UCB</span>
       </div>
       <div v-if="offers.length" class="course-list">
