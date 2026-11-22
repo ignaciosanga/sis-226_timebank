@@ -32,6 +32,8 @@ import {
   ReservationStatus,
 } from './exchange.types';
 import { inspectIntegrity } from './integrity';
+import { addNotification } from '../notifications/notification.factory';
+import { NotificationType } from '../notifications/notification.types';
 
 @Injectable()
 export class ExchangesService {
@@ -41,6 +43,22 @@ export class ExchangesService {
     private readonly users: UsersService,
     private readonly skills: SkillsService,
   ) {}
+
+  private notify(
+    state: ExchangeState,
+    recipientId: string,
+    eventId: string,
+    type: NotificationType,
+    title: string,
+    message: string,
+  ): void {
+    addNotification(state, { recipientId, eventId, type, title, message });
+  }
+
+  private displayName(state: ExchangeState, userId: string): string {
+    const user = state.users.get(userId);
+    return user ? `${user.nombre} ${user.apellido}` : 'Un estudiante';
+  }
 
   private transaction<T>(
     work: (state: ExchangeState) => Promise<T> | T,
@@ -286,7 +304,7 @@ export class ExchangesService {
       async (state) => {
         await this.users.requirePublishedStudent(actor);
         await this.users.requirePublishedStudent(input.providerId);
-        await this.skills.requireActive(input.skillId);
+        const skill = await this.skills.requireActive(input.skillId);
         this.requireFuture(interval.fecha_inicio);
         this.requireOffering(state, input.providerId, input.skillId);
         this.requireAvailability(
@@ -316,6 +334,14 @@ export class ExchangesService {
           availabilityId: input.availabilityId,
           descripcion: input.descripcion ?? '',
         });
+        this.notify(
+          state,
+          input.providerId,
+          `solicitud:${record.id_solicitud}:recibida`,
+          NotificationType.SOLICITUD_RECIBIDA,
+          'Nueva solicitud de intercambio',
+          `${this.displayName(state, actor)} quiere aprender ${skill.nombre}.`,
+        );
         return this.requestView(state, record);
       },
     );
@@ -359,7 +385,7 @@ export class ExchangesService {
           throw new ConflictException('La solicitud ya no esta pendiente');
         await this.users.requirePublishedStudent(request.id_solicitante);
         await this.users.requirePublishedStudent(request.id_ofertante);
-        await this.skills.requireActive(request.id_habilidad);
+        const skill = await this.skills.requireActive(request.id_habilidad);
         this.requireFuture(request.fecha_inicio_propuesta);
         this.requireOffering(state, request.id_ofertante, request.id_habilidad);
         const metadata = state.requestMetadata.get(id);
@@ -421,6 +447,14 @@ export class ExchangesService {
         });
         request.estado = RequestStatus.ACEPTADA;
         request.respondida_at = new Date(Date.now());
+        this.notify(
+          state,
+          request.id_solicitante,
+          `reserva:${reservation.id_reserva}:confirmada`,
+          NotificationType.SOLICITUD_ACEPTADA,
+          'Tu solicitud fue aceptada',
+          `${this.displayName(state, actor)} aceptó tu solicitud de ${skill.nombre}. La reserva quedó confirmada.`,
+        );
         this.movement(
           state,
           account,
@@ -443,6 +477,14 @@ export class ExchangesService {
         throw new ConflictException('La solicitud ya no esta pendiente');
       record.estado = RequestStatus.RECHAZADA;
       record.respondida_at = new Date(Date.now());
+      this.notify(
+        state,
+        record.id_solicitante,
+        `solicitud:${record.id_solicitud}:rechazada`,
+        NotificationType.SOLICITUD_RECHAZADA,
+        'Tu solicitud no fue aceptada',
+        `${this.displayName(state, actor)} no pudo aceptar tu solicitud de intercambio.`,
+      );
       return this.requestView(state, record);
     });
   }
@@ -461,6 +503,14 @@ export class ExchangesService {
         );
       record.estado = RequestStatus.CANCELADA;
       record.respondida_at = new Date(Date.now());
+      this.notify(
+        state,
+        record.id_ofertante,
+        `solicitud:${record.id_solicitud}:cancelada`,
+        NotificationType.SOLICITUD_CANCELADA,
+        'Una solicitud fue cancelada',
+        `${this.displayName(state, actor)} canceló una solicitud pendiente.`,
+      );
       return this.requestView(state, record);
     });
   }
@@ -546,6 +596,18 @@ export class ExchangesService {
           this.movement(state, provider, id, 'Transferencia', record.creditos);
           record.estado = ReservationStatus.COMPLETADA;
           record.completed_at = new Date(Date.now());
+          const otherParticipant =
+            actor === record.id_solicitante
+              ? record.id_ofertante
+              : record.id_solicitante;
+          this.notify(
+            state,
+            otherParticipant,
+            `reserva:${id}:completada`,
+            NotificationType.RESERVA_COMPLETADA,
+            'Intercambio completado',
+            'Ambas personas confirmaron el intercambio. La reserva está completada.',
+          );
         }
         return this.reservationView(state, record);
       },
@@ -595,6 +657,22 @@ export class ExchangesService {
             admin &&
             actor !== record.id_solicitante &&
             actor !== record.id_ofertante;
+        const adminCancelledForOthers =
+          admin &&
+          actor !== record.id_solicitante &&
+          actor !== record.id_ofertante;
+        const recipients = [record.id_solicitante, record.id_ofertante].filter(
+          (userId) => adminCancelledForOthers || userId !== actor,
+        );
+        for (const recipientId of recipients)
+          this.notify(
+            state,
+            recipientId,
+            `reserva:${id}:cancelada`,
+            NotificationType.RESERVA_CANCELADA,
+            'Una reserva fue cancelada',
+            `${this.displayName(state, actor)} canceló la reserva. Motivo: ${reason.trim()}`,
+          );
         return this.reservationView(state, record);
       },
     );

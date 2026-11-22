@@ -53,3 +53,14 @@ Regla de cancelaciones: Si alguien cancela antes de que empiece la clase (POST /
 POST /calendar/reservations/:id/authorization-url (Con token): Solo funciona para una reserva `Confirmada` de la que eres participante. Devuelve una `authorizationUrl`; el frontend abre esa URL para que Google pida el permiso `calendar.events` en ese preciso momento.
 
 GET /calendar/callback: Es la URL a la que Google vuelve después de autorizar. El backend crea el evento en el calendario principal y redirige a `/intercambios?calendar=created`. Si el evento ya existía para esa reserva, redirige con `calendar=exists` y no crea un duplicado.
+
+5. Notificaciones (RF-36 y RF-37)
+Todas las rutas requieren un token válido y solo acceden a las notificaciones de la persona autenticada.
+
+GET /notifications/me: Devuelve un arreglo de `{ id_notificacion, tipo, titulo, mensaje, leida, created_at }`, ordenado de más reciente a más antiguo.
+
+PATCH /notifications/:id/read: Marca como leída una notificación propia y devuelve la notificación actualizada. Si no existe o pertenece a otra persona, responde 404.
+
+POST /notifications/read-all: Marca como leídas todas las notificaciones propias y devuelve `{ actualizadas }`.
+
+El backend genera notificaciones al recibir, aceptar, rechazar o cancelar una solicitud; al cancelar una reserva; y cuando la segunda confirmación completa una reserva. La integración de opiniones está preparada en `NotificationsService.notifyOpinionReceived`; se conectará cuando exista el flujo que guarda calificaciones.

@@ -17,6 +17,7 @@ import { ReservationsModule } from './modules/reservations/reservations.module';
 import { CreditsModule } from './modules/credits/credits.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { CalendarModule } from './modules/calendar/calendar.module';
     CreditsModule,
     AnalyticsModule,
     CalendarModule,
+    NotificationsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

@@ -20,6 +20,7 @@ import {
 } from '../../modules/exchanges/exchange.types';
 import { StoredUser } from '../../modules/users/user.types';
 import { SkillLevel } from '../../modules/user-skills/user-skill.types';
+import type { NotificationRecord } from '../../modules/notifications/notification.types';
 import { PrismaService } from './prisma.service';
 
 type Transaction = Prisma.TransactionClient;
@@ -54,6 +55,7 @@ export class PrismaExchangeRepository implements ExchangeRepository {
       requests,
       reservations,
       movements,
+      notifications,
       metadata,
     ] = await Promise.all([
       tx.usuario.findMany(),
@@ -62,6 +64,7 @@ export class PrismaExchangeRepository implements ExchangeRepository {
       tx.solicitudIntercambio.findMany(),
       tx.reserva.findMany(),
       tx.movimientoCredito.findMany(),
+      tx.notificacion.findMany(),
       tx.auditoria.findMany({
         where: { accion: { in: ['BACKEND_METADATA', 'IDEMPOTENCY'] } },
         orderBy: { created_at: 'asc' },
@@ -78,6 +81,7 @@ export class PrismaExchangeRepository implements ExchangeRepository {
       reservationMetadata: new Map(),
       idempotency: new Map(),
       adminAudit: new Map(),
+      notifications: new Map(),
     };
     for (const row of users) {
       if (
@@ -114,6 +118,11 @@ export class PrismaExchangeRepository implements ExchangeRepository {
       state.movements.set(row.id_movimiento, {
         ...row,
         tipo: row.tipo as Movement['tipo'],
+      });
+    for (const row of notifications)
+      state.notifications.set(row.id_notificacion, {
+        ...row,
+        tipo: row.tipo as NotificationRecord['tipo'],
       });
     for (const row of metadata) {
       const data = row.datos_nuevos;
@@ -259,6 +268,13 @@ export class PrismaExchangeRepository implements ExchangeRepository {
     for (const [id, row] of after.movements)
       if (!before.movements.has(id))
         await tx.movimientoCredito.create({ data: row });
+    await write(before.notifications, after.notifications, (row) =>
+      tx.notificacion.upsert({
+        where: { id_notificacion: row.id_notificacion },
+        create: row,
+        update: row,
+      }),
+    );
 
     const saveMetadata = async (
       entity: string,

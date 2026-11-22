@@ -1,6 +1,7 @@
 import type { Availability } from '../availability/availability.types';
 import type { UserSkill } from '../user-skills/user-skill.types';
 import type { StoredUser } from '../users/user.types';
+import type { NotificationRecord } from '../notifications/notification.types';
 
 export enum RequestStatus {
   PENDIENTE = 'Solicitada',
@@ -109,4 +110,5 @@ export interface ExchangeState {
   idempotency: Map<string, IdempotencyRecord>;
   /** Solo escritura: acciones ADMIN sobre usuarios registradas en AUDITORIA. */
   adminAudit: Map<string, AdminAuditEntry>;
+  notifications: Map<string, NotificationRecord>;
 }
