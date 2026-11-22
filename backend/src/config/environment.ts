@@ -88,6 +88,30 @@ export class Environment {
 
   @IsString()
   FRONTEND_URL = 'http://localhost:5173';
+
+    @IsOptional()
+    @IsString()
+    SMTP_HOST?: string;
+
+    @IsInt()
+    @Min(1)
+    @Max(65535)
+    SMTP_PORT = 587;
+
+    @IsBoolean()
+    SMTP_SECURE = false;
+
+    @IsOptional()
+    @IsString()
+    SMTP_USER?: string;
+
+    @IsOptional()
+    @IsString()
+    SMTP_PASSWORD?: string;
+
+    @IsOptional()
+    @IsString()
+    SMTP_FROM?: string;
 }
 
 export function validateEnvironment(
@@ -100,6 +124,7 @@ export function validateEnvironment(
     'RATE_LIMIT_MAX',
     'JWT_EXPIRES_IN_SECONDS',
     'REGISTRATION_INITIAL_CREDITS',
+    'SMTP_PORT',
   ]) {
     if (input[key] !== undefined) parsed[key] = Number(input[key]);
   }
@@ -107,6 +132,7 @@ export function validateEnvironment(
     'DATABASE_ENABLED',
     'SWAGGER_ENABLED',
     'GOOGLE_CALENDAR_ENABLED',
+    'SMTP_SECURE',
   ]) {
     if (input[key] === 'true') parsed[key] = true;
     else if (input[key] === 'false') parsed[key] = false;
@@ -183,6 +209,24 @@ export function validateEnvironment(
     } catch {
       throw new Error(`Configuracion invalida: ${key}`);
     }
+  }
+    const smtpRequested = Boolean(
+    config.SMTP_HOST ||
+    config.SMTP_FROM ||
+    config.SMTP_USER ||
+    config.SMTP_PASSWORD,
+  );
+
+  if (smtpRequested && (!config.SMTP_HOST || !config.SMTP_FROM)) {
+    throw new Error(
+      'Configuracion invalida: SMTP requiere SMTP_HOST y SMTP_FROM',
+    );
+  }
+
+  if (Boolean(config.SMTP_USER) !== Boolean(config.SMTP_PASSWORD)) {
+    throw new Error(
+      'Configuracion invalida: SMTP_USER y SMTP_PASSWORD deben configurarse juntos',
+    );
   }
   if (/^(change|replace|example|secret|your[_-])/i.test(config.JWT_SECRET))
     throw new Error('Configuracion invalida: JWT_SECRET de ejemplo');

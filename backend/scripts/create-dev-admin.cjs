@@ -29,14 +29,17 @@ async function main() {
         'El correo ya existe; este comando no modifica usuarios existentes.',
       );
     const password = randomBytes(24).toString('base64url');
-    const user = await app.get(AuthService).register({
-      nombre: 'Admin',
-      apellido: 'Desarrollo',
-      correo,
-      password,
-      idCarrera: '30000000-0000-4000-8000-000000000001',
-      semestre: 1,
-    });
+    const user = await app.get(AuthService).register(
+      {
+        nombre: 'Admin',
+        apellido: 'Desarrollo',
+        correo,
+        password,
+        idCarrera: '30000000-0000-4000-8000-000000000001',
+        semestre: 1,
+      },
+      { correoVerificado: true },
+    );
     await repository.grantDevelopmentAdmin(user.id);
     console.log(
       `ADMIN local creado: ${correo}\nPassword aleatoria: ${password}\nAutenticar con POST /auth/login. Guardar la clave localmente.`,

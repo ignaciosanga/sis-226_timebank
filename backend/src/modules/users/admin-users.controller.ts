@@ -65,7 +65,7 @@ export class AdminUsersController {
       'Alta de estudiante por ADMIN; reutiliza el registro (Argon2id, créditos iniciales) y audita la acción',
   })
   create(@CurrentUser() admin: PublicUser, @Body() input: RegisterDto) {
-    return this.auth.register(input, admin.id);
+    return this.auth.register(input, { createdBy: admin.id });
   }
 
   @Patch(':id/status')

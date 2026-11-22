@@ -14,6 +14,9 @@ import { GoogleLoginDto } from './dto/google-login.dto';
 import { LoginDto } from './dto/login.dto';
 import { GoogleAuthService } from './google-auth.service';
 import { RegisterDto } from './dto/register.dto';
+import { Throttle } from '@nestjs/throttler';
+import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
 
 class LoginResponse {
   @ApiProperty()
@@ -43,6 +46,28 @@ export class AuthController {
   @ApiConflictResponse({ description: 'Correo no disponible' })
   register(@Body() input: RegisterDto) {
     return this.auth.register(input);
+  }
+  @Post('verify-email')
+  @HttpCode(200)
+  @ApiOkResponse({
+    description: 'Correo verificado correctamente',
+  })
+  @ApiBadRequestResponse({
+    description: 'Token invalido o vencido',
+  })
+  verifyEmail(@Body() input: VerifyEmailDto) {
+    return this.auth.verifyEmail(input.token);
+  }
+
+  @Post('resend-verification')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @ApiOkResponse({
+    description:
+      'Respuesta generica para proteger la existencia de las cuentas',
+  })
+  resendVerification(@Body() input: ResendVerificationDto) {
+    return this.auth.resendVerification(input.correo);
   }
   @Post('login')
   @HttpCode(200)

@@ -338,7 +338,11 @@ export class PrismaExchangeRepository implements ExchangeRepository {
       const sanitize = (row: T | undefined): unknown => {
         if (!row || typeof row !== 'object') return row;
         const safe = { ...row } as Record<string, unknown>;
+
         delete safe.password_hash;
+        delete safe.token_verificacion_hash;
+        delete safe.token_verificacion_expira_at;
+
         return safe;
       };
       for (const [id, row] of next)

@@ -146,13 +146,15 @@ export const useAppStore = defineStore('app', {
       return true
     },
     async register(payload) {
-      await auth.register(payload)
-      try {
-        await this.login(payload.correo, payload.password)
-        return true
-      } catch {
-        return false
-      }
+      return auth.register(payload)
+    },
+
+    async verifyEmail(token) {
+      return auth.verifyEmail(token)
+    },
+
+    async resendVerification(correo) {
+      return auth.resendVerification(correo)
     },
     async updateProfile(changes) {
       this.profile = await auth.updateProfile(changes)

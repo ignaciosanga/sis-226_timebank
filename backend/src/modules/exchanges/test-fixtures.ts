@@ -26,6 +26,9 @@ export function storedUser(id: string, saldo = 0): StoredUser {
     fecha_registro: new Date('2029-01-01T00:00:00Z'),
     ultimo_acceso: null,
     estado: UserStatus.ACTIVO,
+        correo_verificado: true,
+    token_verificacion_hash: null,
+    token_verificacion_expira_at: null,
   };
 }
 

@@ -14,6 +14,9 @@ export function userFixture(overrides: Partial<UserRecord> = {}): UserRecord {
     roles: [Role.ESTUDIANTE],
     active: true,
     passwordHash: 'not-a-real-hash',
+    correoVerificado: true,
+    tokenVerificacionHash: null,
+    tokenVerificacionExpiraAt: null,
     ...overrides,
   };
 }
@@ -23,6 +26,9 @@ export function repositoryMock(): jest.Mocked<UsersRepository> {
     createStudentProfile: jest.fn(),
     findByEmail: jest.fn(),
     findById: jest.fn(),
+    setEmailVerificationToken: jest.fn(),
+    verifyEmailToken: jest.fn(),
+    markEmailVerified: jest.fn(),
     createStudentWithAccount: jest.fn(),
     updateActiveProfile: jest.fn(),
     recordActiveLogin: jest.fn(),

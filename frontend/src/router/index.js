@@ -6,11 +6,13 @@ import ExchangesView from '../views/ExchangesView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import AdminUsersView from '../views/AdminUsersView.vue'
 import MetricsView from '../views/MetricsView.vue'
+import VerifyEmailView from '../views/VerifyEmailView.vue'
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
   routes: [
     { path: '/', name: 'home', component: HomeView, meta: { title: 'Habilidades' } },
     { path: '/registro', name: 'register', component: RegisterView, meta: { title: 'Crear cuenta' } },
+    { path: '/verificar-correo',name: 'verify-email',component: VerifyEmailView,meta: { title: 'Verificar correo' },},
     { path: '/disponibilidad', name: 'availability', component: AvailabilityView, meta: { title: 'Mi disponibilidad' } },
     { path: '/intercambios', name: 'exchanges', component: ExchangesView, meta: { title: 'Mis intercambios' } },
     { path: '/creditos', redirect: '/perfil/creditos' },

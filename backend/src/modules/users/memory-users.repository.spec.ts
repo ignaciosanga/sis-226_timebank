@@ -81,4 +81,77 @@ describe('MemoryUsersRepository', () => {
       }),
     ]);
   });
+
+  it('crea usuarios nuevos con correo pendiente de verificación', async () => {
+    const repository = new MemoryUsersRepository();
+    const user = await repository.createStudentProfile(profile);
+
+    expect(user.correoVerificado).toBe(false);
+    expect(user.tokenVerificacionHash).toBeNull();
+    expect(user.tokenVerificacionExpiraAt).toBeNull();
+  });
+
+  it('guarda y consume un token de verificación válido una sola vez', async () => {
+    const repository = new MemoryUsersRepository();
+    const user = await repository.createStudentProfile(profile);
+    const tokenHash = 'a'.repeat(64);
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    expect(
+      await repository.setEmailVerificationToken(
+        user.id,
+        tokenHash,
+        expiresAt,
+      ),
+    ).toBe(true);
+
+    const verified = await repository.verifyEmailToken(
+      tokenHash,
+      new Date(),
+    );
+
+    expect(verified).toMatchObject({
+      id: user.id,
+      correoVerificado: true,
+      tokenVerificacionHash: null,
+      tokenVerificacionExpiraAt: null,
+    });
+
+    expect(
+      await repository.verifyEmailToken(tokenHash, new Date()),
+    ).toBeNull();
+  });
+
+  it('rechaza tokens vencidos y elimina el token almacenado', async () => {
+    const repository = new MemoryUsersRepository();
+    const user = await repository.createStudentProfile(profile);
+    const tokenHash = 'b'.repeat(64);
+
+    await repository.setEmailVerificationToken(
+      user.id,
+      tokenHash,
+      new Date(Date.now() - 1000),
+    );
+
+    expect(
+      await repository.verifyEmailToken(tokenHash, new Date()),
+    ).toBeNull();
+
+    const saved = await repository.findById(user.id);
+
+    expect(saved?.correoVerificado).toBe(false);
+    expect(saved?.tokenVerificacionHash).toBeNull();
+    expect(saved?.tokenVerificacionExpiraAt).toBeNull();
+  });
+
+  it('permite marcar como verificada una cuenta mediante Google', async () => {
+    const repository = new MemoryUsersRepository();
+    const user = await repository.createStudentProfile(profile);
+
+    const verified = await repository.markEmailVerified(user.id);
+
+    expect(verified?.correoVerificado).toBe(true);
+    expect(verified?.tokenVerificacionHash).toBeNull();
+  });
+
 });

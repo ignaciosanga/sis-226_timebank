@@ -72,6 +72,75 @@ export class MemoryUsersRepository implements UsersRepository {
       return row ? adaptStoredUser(row) : null;
     });
   }
+    setEmailVerificationToken(
+      userId: string,
+      tokenHash: string,
+      expiresAt: Date,
+    ): Promise<boolean> {
+      return this.persistence.transaction((state) => {
+        const user = state.users.get(userId);
+
+        if (
+          !user ||
+          user.estado !== UserStatus.ACTIVO ||
+          user.correo_verificado
+        ) {
+          return false;
+        }
+
+        user.token_verificacion_hash = tokenHash;
+        user.token_verificacion_expira_at = expiresAt;
+
+        return true;
+      });
+    }
+
+    verifyEmailToken(
+      tokenHash: string,
+      now: Date,
+    ): Promise<UserRecord | null> {
+      return this.persistence.transaction((state) => {
+        const user = [...state.users.values()].find(
+          (row) => row.token_verificacion_hash === tokenHash,
+        );
+
+        if (!user || user.correo_verificado) return null;
+
+        if (
+          user.estado !== UserStatus.ACTIVO ||
+          !user.token_verificacion_expira_at ||
+          user.token_verificacion_expira_at.getTime() <= now.getTime()
+        ) {
+          if (user.token_verificacion_hash === tokenHash) {
+            user.token_verificacion_hash = null;
+            user.token_verificacion_expira_at = null;
+          }
+
+          return null;
+        }
+
+        user.correo_verificado = true;
+        user.token_verificacion_hash = null;
+        user.token_verificacion_expira_at = null;
+
+        return adaptStoredUser(user);
+      });
+    }
+
+    markEmailVerified(userId: string): Promise<UserRecord | null> {
+      return this.persistence.transaction((state) => {
+        const user = state.users.get(userId);
+
+        if (!user || user.estado !== UserStatus.ACTIVO) return null;
+
+        user.correo_verificado = true;
+        user.token_verificacion_hash = null;
+        user.token_verificacion_expira_at = null;
+
+        return adaptStoredUser(user);
+      });
+    }
+
   private async requireCareer(id: string): Promise<void> {
     const row = await this.careers.findById(id);
     if (!row || row.estado !== RecordStatus.ACTIVO)
@@ -116,6 +185,9 @@ export class MemoryUsersRepository implements UsersRepository {
         fecha_registro: new Date(),
         ultimo_acceso: null,
         estado: UserStatus.ACTIVO,
+        correo_verificado: input.correoVerificado ?? false,
+        token_verificacion_hash: null,
+        token_verificacion_expira_at: null,
       };
       state.users.set(row.id_usuario, row);
       if (initial > 0) {

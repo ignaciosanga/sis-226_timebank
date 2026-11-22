@@ -16,6 +16,7 @@ export interface CreateStudent {
   initialCredits: string;
   /** ID del ADMIN que da de alta; registra ADMIN_USER_CREATE en la misma transaccion. */
   createdBy?: string;
+  correoVerificado?: boolean;
 }
 
 export class EmailAlreadyExistsError extends Error {}
@@ -39,6 +40,20 @@ export interface UsersRepository {
   /** Alias compatible de registro anterior. Ahora solo escribe USUARIOS.
    * initialCredits es entero de una politica interna; nunca del body HTTP.
    */
+  setEmailVerificationToken(
+    userId: string,
+    tokenHash: string,
+    expiresAt: Date,
+  ): Promise<boolean>;
+
+  verifyEmailToken(
+    tokenHash: string,
+    now: Date,
+  ): Promise<UserRecord | null>;
+
+  markEmailVerified(
+    userId: string,
+  ): Promise<UserRecord | null>;
   createStudentWithAccount(input: CreateStudent): Promise<UserRecord>;
   /** Comprobar estado activo en la misma operacion de escritura. */
   updateActiveProfile(

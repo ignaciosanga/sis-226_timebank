@@ -36,6 +36,9 @@ export interface UserRecord extends PublicUser {
   estado?: UserStatus;
   fechaRegistro?: Date;
   ultimoAcceso?: Date | null;
+  correoVerificado: boolean;
+  tokenVerificacionHash: string | null;
+  tokenVerificacionExpiraAt: Date | null;
 }
 
 /** Proyeccion administrativa: estado y fechas sin saldos ni secretos. */
@@ -63,6 +66,9 @@ export interface StoredUser {
   fecha_registro: Date;
   ultimo_acceso: Date | null;
   estado: UserStatus;
+  correo_verificado: boolean;
+  token_verificacion_hash: string | null;
+  token_verificacion_expira_at: Date | null;
 }
 
 export function adaptStoredUser(user: StoredUser): UserRecord {
@@ -83,6 +89,9 @@ export function adaptStoredUser(user: StoredUser): UserRecord {
     estado: user.estado,
     fechaRegistro: user.fecha_registro,
     ultimoAcceso: user.ultimo_acceso,
+    correoVerificado: user.correo_verificado,
+    tokenVerificacionHash: user.token_verificacion_hash,
+    tokenVerificacionExpiraAt: user.token_verificacion_expira_at,
   };
 }
 

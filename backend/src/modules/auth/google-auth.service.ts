@@ -32,17 +32,30 @@ export class GoogleAuthService {
     );
     const repository = this.users.repository;
     const existing = await repository.findByEmail(identity.correo);
-    if (existing) return this.auth.sessionFor(existing);
+    if (existing) {
+      const verifiedUser = existing.correoVerificado
+        ? existing
+        : await repository.markEmailVerified(existing.id);
+
+      if (!verifiedUser) {
+        throw new UnauthorizedException('Credenciales invalidas');
+      }
+
+      return this.auth.sessionFor(verifiedUser);
+    }
     if (!input.idCarrera || !input.semestre)
       return { registration_required: true as const, profile: identity };
-    await this.auth.register({
-      nombre: input.nombre ?? identity.nombre,
-      apellido: input.apellido ?? identity.apellido,
-      correo: identity.correo,
-      password: randomBytes(48).toString('base64url'),
-      idCarrera: input.idCarrera,
-      semestre: input.semestre,
-    });
+    await this.auth.register(
+      {
+        nombre: input.nombre ?? identity.nombre,
+        apellido: input.apellido ?? identity.apellido,
+        correo: identity.correo,
+        password: randomBytes(48).toString('base64url'),
+        idCarrera: input.idCarrera,
+        semestre: input.semestre,
+      },
+      { correoVerificado: true },
+    );
     const created = await repository.findByEmail(identity.correo);
     if (!created) throw new UnauthorizedException('No se pudo crear la cuenta');
     return this.auth.sessionFor(created);

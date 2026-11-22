@@ -48,6 +48,10 @@ model Usuario {
   ultimo_acceso      DateTime? @db.Timestamptz(6)
   estado             String    @db.VarChar
 
+  correo_verificado  Boolean   @default(false)
+  token_verificacion_hash String? @unique @db.VarChar(64)
+  token_verificacion_expira_at DateTime? @db.Timestamptz(6)
+
   carrera                 Carrera?               @relation(fields: [id_carrera], references: [id_carrera], onDelete: Restrict)
   habilidades             UsuarioHabilidad[]
   disponibilidades        Disponibilidad[]

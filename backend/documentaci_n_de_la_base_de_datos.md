@@ -51,6 +51,9 @@ erDiagram
         timestamptz fecha_registro
         timestamptz ultimo_acceso
         varchar estado
+        boolean correo_verificado
+        varchar token_verificacion_hash
+        timestamptz token_verificacion_expira_at
     }
 
     HABILIDADES {
@@ -223,6 +226,9 @@ Tabla central que almacena la información personal, credenciales, saldo y estad
 - **`creditos_retenidos`** (`int`): Créditos retenidos temporalmente por reservas activas.
 - **`fecha_registro`** / **`ultimo_acceso`** (`timestamptz`): Marcas de tiempo de auditoría de ingreso.
 - **`estado`** (`varchar` / `enum`): Estado de la cuenta (`Activo`, `Inactivo`, `Suspendido`).
+- **`correo_verificado`** (`boolean`): Indica si el usuario confirmó su correo electrónico.
+- **`token_verificacion_hash`** (`varchar(64)`, Unique, Nullable): Hash del token temporal de verificación.
+- **`token_verificacion_expira_at`** (`timestamptz`, Nullable): Fecha y hora de expiración del token.
 
 ---
 

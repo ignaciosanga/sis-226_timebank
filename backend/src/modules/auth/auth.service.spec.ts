@@ -1,10 +1,12 @@
 import {
   ConflictException,
+  ForbiddenException,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
+import { VerificationEmailService } from './verification-email.service';
 import { Role } from '../../common/enums/role.enum';
 import { UsersService } from '../users/users.service';
 import { EmailAlreadyExistsError } from '../users/users.repository';
@@ -35,6 +37,9 @@ describe('AuthService (repositorio aislado, Argon2id y JWT reales)', () => {
   let hash: string;
   let repository: ReturnType<typeof repositoryMock>;
   let service: AuthService;
+  let verificationEmail: {
+    sendVerificationEmail: jest.Mock;
+  };
   const input: RegisterDto = {
     nombre: 'Ana',
     apellido: 'Perez',
@@ -47,12 +52,22 @@ describe('AuthService (repositorio aislado, Argon2id y JWT reales)', () => {
   beforeAll(async () => {
     hash = await passwords.hash(input.password);
   });
-  beforeEach(() => {
+    beforeEach(() => {
     repository = repositoryMock();
-    // Valor exclusivo del test, no constituye una politica del producto.
-    service = new AuthService(new UsersService(repository), passwords, jwt, {
-      initialCredits: '10',
-    });
+
+    verificationEmail = {
+      sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
+    };
+
+    repository.setEmailVerificationToken.mockResolvedValue(true);
+
+    service = new AuthService(
+      new UsersService(repository),
+      passwords,
+      jwt,
+      { initialCredits: '10' },
+      verificationEmail as unknown as VerificationEmailService,
+    );
   });
 
   it('genera y verifica un JWT con sujeto, emisor, audiencia y expiracion', async () => {
@@ -123,6 +138,7 @@ describe('AuthService (repositorio aislado, Argon2id y JWT reales)', () => {
       passwords,
       jwt,
       { initialCredits: null },
+      verificationEmail as unknown as VerificationEmailService,
     );
     await expect(pending.register(input)).rejects.toThrow(
       ServiceUnavailableException,
@@ -136,6 +152,7 @@ describe('AuthService (repositorio aislado, Argon2id y JWT reales)', () => {
       passwords,
       jwt,
       { initialCredits: null, profileOnly: true },
+      verificationEmail as unknown as VerificationEmailService,
     );
     repository.findByEmail.mockResolvedValue(null);
     repository.createStudentProfile.mockResolvedValue(
@@ -152,9 +169,13 @@ describe('AuthService (repositorio aislado, Argon2id y JWT reales)', () => {
   });
 
   it('bloquea acceso si no hay adaptador oficial', async () => {
-    const pending = new AuthService(new UsersService(), passwords, jwt, {
-      initialCredits: null,
-    });
+    const pending = new AuthService(
+      new UsersService(),
+      passwords,
+      jwt,
+      { initialCredits: null },
+      verificationEmail as unknown as VerificationEmailService,
+    );
     await expect(pending.login(input)).rejects.toThrow(
       ServiceUnavailableException,
     );
@@ -211,5 +232,131 @@ describe('AuthService (repositorio aislado, Argon2id y JWT reales)', () => {
         await jwt.signAsync({ sub: 'test' }, { audience: 'otro-cliente' }),
       ),
     ).rejects.toThrow();
+  });
+    it('genera un token seguro, guarda su hash y envia el correo', async () => {
+      const start = Date.now();
+
+      repository.findByEmail.mockResolvedValue(null);
+      repository.createStudentWithAccount.mockResolvedValue(
+        userFixture({ passwordHash: hash, correoVerificado: false }),
+      );
+
+      await service.register(input);
+
+      expect(repository.setEmailVerificationToken).toHaveBeenCalledTimes(1);
+      expect(verificationEmail.sendVerificationEmail).toHaveBeenCalledTimes(1);
+
+      const [userId, tokenHash, expiresAt] =
+        repository.setEmailVerificationToken.mock.calls[0]!;
+
+      expect(userId).toBe('usuario-test');
+      expect(tokenHash).toMatch(/^[a-f0-9]{64}$/);
+      expect(expiresAt.getTime()).toBeGreaterThanOrEqual(
+        start + 24 * 60 * 60 * 1000,
+      );
+      expect(expiresAt.getTime()).toBeLessThanOrEqual(
+        Date.now() + 24 * 60 * 60 * 1000,
+      );
+
+      const [correo, token] =
+        verificationEmail.sendVerificationEmail.mock.calls[0]!;
+
+      expect(correo).toBe('ana@example.test');
+      expect(createHash('sha256').update(token).digest('hex')).toBe(tokenHash);
+    });
+
+    it('no envia correo adicional cuando el registro viene verificado por Google', async () => {
+      repository.findByEmail.mockResolvedValue(null);
+      repository.createStudentWithAccount.mockResolvedValue(
+        userFixture({ passwordHash: hash, correoVerificado: true }),
+      );
+
+      await service.register(input, { correoVerificado: true });
+
+      expect(
+        repository.createStudentWithAccount.mock.calls[0]![0].correoVerificado,
+      ).toBe(true);
+      expect(repository.setEmailVerificationToken).not.toHaveBeenCalled();
+      expect(verificationEmail.sendVerificationEmail).not.toHaveBeenCalled();
+    });
+
+    it('rechaza el login si la contraseña es correcta pero el correo no esta verificado', async () => {
+      repository.findByEmail.mockResolvedValue(
+        userFixture({
+          passwordHash: hash,
+          correoVerificado: false,
+        }),
+      );
+
+      await expect(service.login(input)).rejects.toThrow(ForbiddenException);
+
+      expect(repository.recordActiveLogin).not.toHaveBeenCalled();
+    });
+
+    it('consume el token al verificar el correo', async () => {
+      repository.verifyEmailToken.mockResolvedValue(
+        userFixture({ correoVerificado: true }),
+      );
+
+      const result = await service.verifyEmail('token-de-prueba');
+
+      expect(repository.verifyEmailToken).toHaveBeenCalledWith(
+        createHash('sha256').update('token-de-prueba').digest('hex'),
+        expect.any(Date),
+      );
+      expect(result.message).toBe('Correo verificado correctamente');
+    });
+      it('reenvia el correo de verificacion a una cuenta pendiente', async () => {
+    repository.findByEmail.mockResolvedValue(
+      userFixture({
+        correo: 'ana@example.test',
+        correoVerificado: false,
+      }),
+    );
+
+    const result = await service.resendVerification('ANA@EXAMPLE.TEST');
+
+    expect(repository.findByEmail).toHaveBeenCalledWith('ana@example.test');
+    expect(repository.setEmailVerificationToken).toHaveBeenCalledTimes(1);
+    expect(verificationEmail.sendVerificationEmail).toHaveBeenCalledWith(
+      'ana@example.test',
+      expect.any(String),
+    );
+    expect(result.message).toContain('Si la cuenta existe');
+  });
+
+  it('no revela si una cuenta inexistente necesita verificacion', async () => {
+    repository.findByEmail.mockResolvedValue(null);
+
+    const result = await service.resendVerification('desconocido@example.test');
+
+    expect(result.message).toContain('Si la cuenta existe');
+    expect(repository.setEmailVerificationToken).not.toHaveBeenCalled();
+    expect(verificationEmail.sendVerificationEmail).not.toHaveBeenCalled();
+  });
+
+  it('no reenvia correo a cuentas ya verificadas', async () => {
+    repository.findByEmail.mockResolvedValue(
+      userFixture({ correoVerificado: true }),
+    );
+
+    const result = await service.resendVerification('ana@example.test');
+
+    expect(result.message).toContain('Si la cuenta existe');
+    expect(repository.setEmailVerificationToken).not.toHaveBeenCalled();
+    expect(verificationEmail.sendVerificationEmail).not.toHaveBeenCalled();
+  });
+
+  it('mantiene respuesta generica si falla el envio del correo', async () => {
+    repository.findByEmail.mockResolvedValue(
+      userFixture({ correoVerificado: false }),
+    );
+    verificationEmail.sendVerificationEmail.mockRejectedValue(
+      new Error('SMTP no disponible'),
+    );
+
+    const result = await service.resendVerification('ana@example.test');
+
+    expect(result.message).toContain('Si la cuenta existe');
   });
 });

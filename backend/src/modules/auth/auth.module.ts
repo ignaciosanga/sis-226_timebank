@@ -14,6 +14,7 @@ import { REGISTRATION_POLICY } from './registration-policy';
 import { AuthController } from './auth.controller';
 import { UsersController } from '../users/users.controller';
 import { AdminUsersController } from '../users/admin-users.controller';
+import { VerificationEmailService } from './verification-email.service';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { AdminUsersController } from '../users/admin-users.controller';
   providers: [
     AuthService,
     GoogleAuthService,
+     VerificationEmailService,
     PasswordService,
     JwtStrategy,
     JwtAuthGuard,
