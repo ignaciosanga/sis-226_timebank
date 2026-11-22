@@ -47,11 +47,16 @@
 .nexo-chat-actions button[aria-pressed="true"] { background:#246d9c; }
 .nexo-chat-login { margin-top:6px; width:100%; }
 .nexo-chat-offers { display:grid; gap:8px; margin:10px 0 0; padding:0; list-style:none; }
-.nexo-chat-offers button { display:grid; gap:3px; width:100%; padding:10px 12px; border:1px solid var(--line); border-left:3px solid var(--ucb-yellow); border-radius:8px; background:white; color:var(--ink); text-align:left; cursor:pointer; }
-.nexo-chat-offers button:hover { border-color:var(--ucb-blue); background:#f0f7fc; }
-.nexo-chat-offers strong { font-size:.86rem; line-height:1.35; }
+.nexo-chat-offers button { position:relative; display:grid; gap:4px; width:100%; padding:11px 13px 10px; border:1px solid transparent; border-radius:14px; background:linear-gradient(#fff,#fff) padding-box, linear-gradient(135deg,#7fb8e6,#b9a7f5 50%,#ffd659) border-box; color:var(--ink); text-align:left; cursor:pointer; box-shadow:0 2px 10px rgba(127,120,230,.10); transition:transform .15s ease, box-shadow .15s ease; }
+.nexo-chat-offers button:hover { transform:translateY(-1px); box-shadow:0 6px 18px rgba(127,120,230,.22); }
+.nexo-chat-offers button:focus-visible { outline:2px solid #8f7ae8; outline-offset:2px; }
+.nexo-offer-tag { display:inline-flex; align-items:center; gap:4px; width:max-content; padding:2px 8px; border-radius:999px; background:linear-gradient(90deg,#eaf4fc,#f1edff); color:#5b4bc4; font-size:.66rem; font-style:normal; font-weight:700; letter-spacing:.01em; }
+.nexo-chat-offers strong { font-size:.88rem; line-height:1.35; }
 .nexo-chat-offers small { color:var(--muted); font-size:.74rem; }
-.nexo-chat-offers span { display:inline-flex; align-items:center; gap:5px; color:var(--ucb-blue); font-size:.78rem; font-weight:700; }
+.nexo-offer-foot { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:2px; }
+.nexo-offer-foot b { padding:2px 9px; border-radius:999px; background:#fff6d6; color:#7a5a00; font-size:.76rem; }
+.nexo-offer-foot i { display:inline-flex; align-items:center; gap:4px; color:var(--ucb-blue); font-size:.76rem; font-style:normal; font-weight:700; }
+.nexo-chat-offers button:hover .nexo-offer-foot i svg { transform:translateX(2px); transition:transform .15s ease; }
 .nexo-chat-action { display:inline-flex; align-items:center; gap:6px; margin-top:8px; padding:6px 10px; border:1px solid #cfe0ec; border-radius:999px; background:#f0f7fc; color:var(--ucb-blue); font-size:.74rem; font-weight:600; cursor:pointer; }
 .nexo-chat-action:hover { border-color:var(--ucb-blue); }
 .nexo-chat-settings { flex:1; min-height:0; overflow:auto; display:grid; align-content:start; gap:18px; padding:18px; background:#f8fafc; }

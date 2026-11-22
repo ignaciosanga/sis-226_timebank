@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowUp, ChevronDown, ExternalLink, KeyRound, MapPin, RotateCcw, Settings2, Trash2, X } from '@lucide/vue'
+import { ArrowRight, ArrowUp, ChevronDown, KeyRound, MapPin, RotateCcw, Settings2, Sparkles, Trash2, X } from '@lucide/vue'
 import { useAppStore } from '../../stores/app'
 import { askAssistant, deleteAssistantKey, getAssistantProfile, saveAssistantAvatar, saveAssistantKey } from '../../services/assistant'
 import { canAsk, historyFor, MAX_QUESTION_LENGTH } from './chat-history'
@@ -189,7 +189,7 @@ onBeforeUnmount(() => { clearTimeout(talkTimer); clearTimeout(dozeTimer) })
                 <span>{{ message.role === 'user' ? 'Tú' : avatar.nombre }}</span>
                 <p>{{ message.text }}</p>
                 <ul v-if="message.offers?.length" class="nexo-chat-offers" aria-label="Tutorías encontradas">
-                  <li v-for="card in message.offers" :key="card.id_oferta"><button type="button" @click="openOffer(card)"><strong>{{ card.titulo }}</strong><small>{{ card.materia }} · {{ card.tutor }}</small><span>{{ card.costo_creditos }} {{ Number(card.costo_creditos) === 1 ? 'crédito' : 'créditos' }}<ExternalLink :size="14" aria-hidden="true" /></span></button></li>
+                  <li v-for="card in message.offers" :key="card.id_oferta"><button type="button" @click="openOffer(card)"><em class="nexo-offer-tag"><Sparkles :size="12" aria-hidden="true" />Sugerida por {{ avatar.nombre }}</em><strong>{{ card.titulo }}</strong><small>{{ card.materia }} · {{ card.tutor }}</small><span class="nexo-offer-foot"><b>{{ card.costo_creditos }} {{ Number(card.costo_creditos) === 1 ? 'crédito' : 'créditos' }}</b><i>Ver oferta<ArrowRight :size="14" aria-hidden="true" /></i></span></button></li>
                 </ul>
                 <button v-if="message.action" class="nexo-chat-action" type="button" @click="runAction(message.action)"><MapPin :size="14" aria-hidden="true" />{{ message.action.label }} · mostrar de nuevo</button>
                 <button v-if="message.needsKey" class="nexo-chat-action" type="button" @click="tab = 'ajustes'"><KeyRound :size="14" aria-hidden="true" />Agregar mi API key de Groq</button>
