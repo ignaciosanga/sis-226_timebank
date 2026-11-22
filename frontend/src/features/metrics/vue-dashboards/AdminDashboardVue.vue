@@ -1,17 +1,97 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useAppStore } from '../../../stores/app'
+import { getAcademic, getReputation } from '../../../services/analytics'
+import { demoEnabled } from '../../demo/mode.js'
 import DonutChart from './charts/DonutChart.vue'
 import LineChart from './charts/LineChart.vue'
 import BarChart from './charts/BarChart.vue'
 import HeatmapChart from './charts/HeatmapChart.vue'
+import KnowledgeScorePanel from './KnowledgeScorePanel.vue'
+import CommandCenterPanel from './CommandCenterPanel.vue'
 import { buildAdminSprint0Data } from './sprint0-data.js'
+import { buildSyntheticReputationPayload } from './knowledge-score.js'
+import { buildSyntheticAcademicPayload } from './knowledge-gap.js'
 import './vue-dashboards.css'
 
+const store = useAppStore()
 const data = computed(() => buildAdminSprint0Data())
-const activeTab = ref('all')
+const activeTab = ref('command')
 const periodGranularity = ref('week')
 
+const reputationData = ref(null)
+const reputationLoading = ref(false)
+const reputationError = ref('')
+
+const academicData = ref(null)
+const academicLoading = ref(false)
+const academicError = ref('')
+const usingAcademicDemo = ref(demoEnabled)
+
+async function loadReputation() {
+  if (demoEnabled) {
+    reputationData.value = buildSyntheticReputationPayload()
+    reputationError.value = ''
+    reputationLoading.value = false
+    return
+  }
+  reputationLoading.value = true
+  reputationError.value = ''
+  try {
+    reputationData.value = await getReputation()
+  } catch (failure) {
+    reputationData.value = null
+    reputationError.value = failure?.message || 'No se pudieron cargar las métricas de reputación.'
+  } finally {
+    reputationLoading.value = false
+  }
+}
+
+async function loadAcademic() {
+  if (demoEnabled) {
+    academicData.value = buildSyntheticAcademicPayload()
+    academicError.value = ''
+    academicLoading.value = false
+    usingAcademicDemo.value = true
+    return
+  }
+  academicLoading.value = true
+  academicError.value = ''
+  try {
+    const res = await getAcademic()
+    const hasActivity = Array.isArray(res?.data) && res.data.some((r) => r.solicitudes > 0 || r.tutores_activos > 0)
+    if (hasActivity) {
+      academicData.value = res
+      usingAcademicDemo.value = false
+    } else {
+      // Para el deploy previo a cargar datos en Neon, respaldamos con muestra sintética y mostramos el aviso demo.
+      academicData.value = buildSyntheticAcademicPayload()
+      usingAcademicDemo.value = true
+    }
+  } catch (failure) {
+    academicData.value = null
+    academicError.value = failure?.message || 'No se pudo cargar el Command Center.'
+    usingAcademicDemo.value = false
+  } finally {
+    academicLoading.value = false
+  }
+}
+
+onMounted(() => {
+  loadAcademic()
+  loadReputation()
+})
+
+const showDemoNotice = computed(() => {
+  if (demoEnabled) return true
+  if (activeTab.value === 'command') return usingAcademicDemo.value
+  if (activeTab.value === 'reputation') return false
+  return true
+})
+
 const tabs = [
+  { id: 'command', label: 'Command Center' },
+  { id: 'reputation', label: 'Reputación y tutores' },
   { id: 'all', label: 'Vista completa' },
   { id: 'hu04', label: 'Resumen general' },
   { id: 'hu05', label: 'Intercambios y horarios' },
@@ -27,7 +107,7 @@ const activitySeries = computed(() =>
 
 <template>
   <div class="vd-shell">
-    <p class="vd-demo-notice" role="note"><strong>Datos de demostración.</strong> Estos gráficos usan 100 registros sintéticos para mostrar cómo funcionará el panel; no reflejan la actividad real de Nexo U.</p>
+    <p v-if="showDemoNotice" class="vd-demo-notice" role="note"><strong>Datos de demostración.</strong> Estos gráficos usan 100 registros sintéticos para mostrar cómo funcionará el panel; no reflejan la actividad real de Nexo U.</p>
     <div class="vd-tabs" role="tablist" aria-label="Secciones del informe administrador">
       <button
         v-for="tab in tabs"
@@ -42,6 +122,25 @@ const activitySeries = computed(() =>
         {{ tab.label }}
       </button>
     </div>
+
+    <!-- Command Center · Knowledge Gap Index -->
+    <CommandCenterPanel
+      v-if="show('command')"
+      :academic="academicData"
+      :loading="academicLoading"
+      :error="academicError"
+      @retry="loadAcademic"
+    />
+
+    <!-- Reputación y reconocimiento de tutores (Knowledge Score) -->
+    <KnowledgeScorePanel
+      v-if="show('reputation')"
+      :reputation="reputationData"
+      :users="store.community"
+      :loading="reputationLoading"
+      :error="reputationError"
+      @retry="loadReputation"
+    />
 
     <!-- Dashboard general de la plataforma -->
     <section v-if="show('hu04')" class="vd-section" aria-labelledby="hu04-title">
