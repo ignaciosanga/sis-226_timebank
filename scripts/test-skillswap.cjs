@@ -301,7 +301,42 @@ async function main() {
       );
       return { reservation, end, expected, offer };
     }
+    const matchPath = `/tutoring/recommendations?skillId=${skillId}`;
+    await api.get(matchPath).expect(401);
+    const initialMatches = (await get(matchPath, st).expect(200)).body.data;
+    assert.equal(initialMatches.length, 2);
+    assert.ok(initialMatches.every((r) => r.afinidad === 47.5));
+    assert.equal((await get(matchPath, tt).expect(200)).body.data.length, 1);
+    await get(matchPath + '&fechaInicio=invalid', st).expect(400);
+    await get(`/tutoring/recommendations?skillId=${randomUUID()}`, st).expect(
+      400,
+    );
+    const slotStart = new Date(originalNow() + 86400000),
+      slotEnd = new Date(+slotStart + 3600000);
+    await api
+      .post('/availability')
+      .auth(et, { type: 'bearer' })
+      .send({
+        fechaInicio: slotStart.toISOString(),
+        fechaFin: slotEnd.toISOString(),
+      })
+      .expect(201);
+    const timedPath =
+      matchPath +
+      `&fechaInicio=${encodeURIComponent(slotStart.toISOString())}&fechaFin=${encodeURIComponent(slotEnd.toISOString())}`;
+    const timedMatches = (await get(timedPath, st).expect(200)).body.data;
+    assert.equal(timedMatches.length, 1);
+    assert.equal(timedMatches[0].tutor_id, emptyTutor.id);
+    assert.equal(timedMatches[0].afinidad, 72.5);
+    await get(
+      matchPath + `&fechaInicio=${encodeURIComponent(slotStart.toISOString())}`,
+      st,
+    ).expect(400);
     const completed = await book(tt, tutor, 3600000);
+    const occupiedPath =
+      matchPath +
+      `&fechaInicio=${encodeURIComponent(new Date(+completed.end - 3600000).toISOString())}&fechaFin=${encodeURIComponent(completed.end.toISOString())}`;
+    assert.deepEqual((await get(occupiedPath, st).expect(200)).body.data, []);
     Date.now = () => completed.end.getTime() + 1000;
     await post(
       `/reservations/${completed.reservation.id_reserva}/confirm`,

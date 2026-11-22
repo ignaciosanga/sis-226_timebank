@@ -1,5 +1,7 @@
 # Banco de Tiempo Universitario — Backend
 
+Matching solicitado por PO: `GET /tutoring/recommendations` invoca directamente el motor entregado por BD. [Contrato, requisitos de Neon y uso para Front](docs/matching.md).
+
 ## Entrega de Kevin: académico y economía SkillSwap v4 (22/11/2026)
 
 Continuación de `feat/backend-nucleo-transaccional-parcial3` desde `8fe275b`. Incluye las tareas A01–A10 de los puntos 6 y 7 del plan: 49 materias, prerrequisitos, Mi ruta, opiniones, reputación e indicadores. Añade detalle/edición de ofertas y la integración HU-06/HU-08 con la entrega real BD v4: precios dinámicos, créditos en décimas, cancelación tardía, deudas y cobro automático.

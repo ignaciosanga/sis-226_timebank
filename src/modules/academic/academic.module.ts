@@ -9,6 +9,7 @@ import {
 import { AcademicRepository } from './academic.repository';
 import { ReviewsController } from './reviews.controller';
 import { ReviewsService } from './reviews.service';
+import { MatchingController, MatchingService } from './matching.controller';
 
 @Module({
   imports: [PrismaModule, AuthModule, ExchangePersistenceModule],
@@ -16,7 +17,8 @@ import { ReviewsService } from './reviews.service';
     AcademicController,
     AcademicAnalyticsController,
     ReviewsController,
+    MatchingController,
   ],
-  providers: [AcademicRepository, ReviewsService],
+  providers: [AcademicRepository, ReviewsService, MatchingService],
 })
 export class AcademicModule {}
