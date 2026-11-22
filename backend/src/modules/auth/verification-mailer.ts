@@ -2,8 +2,15 @@ import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createRequire } from 'node:module';
 import { Environment } from '../../config/environment';
+import { verificationEmail } from './verification-email';
 
-type MailMessage = { from: string; to: string; subject: string; text: string };
+type MailMessage = {
+  from: string;
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+};
 type SmtpTransport = { sendMail(message: MailMessage): Promise<unknown> };
 const nodemailer = createRequire(__filename)('nodemailer') as {
   createTransport(options: Record<string, unknown>): SmtpTransport;
@@ -41,10 +48,12 @@ export class VerificationMailer {
     );
     // Fragmento: la credencial no llega al servidor mediante GET ni al Referer.
     url.hash = new URLSearchParams({ token }).toString();
-    const subject = 'Confirma tu cuenta institucional de Nexo U';
-    const text = `Para activar la cuenta que registraste, abre este enlace y pulsa Confirmar:\n${url.href}\n\nEl enlace vence en ${config.get('EMAIL_VERIFICATION_TTL_MINUTES', { infer: true })} minutos. Si no solicitaste esta cuenta, ignora este correo. No compartas el enlace.`;
+    const mail = verificationEmail(
+      url.href,
+      config.get('EMAIL_VERIFICATION_TTL_MINUTES', { infer: true }),
+    );
     if (config.get('MAIL_TRANSPORT', { infer: true }) === 'brevo')
-      return this.sendWithBrevo(to, subject, text);
+      return this.sendWithBrevo(to, mail);
     const transport = nodemailer.createTransport({
       host: config.get('SMTP_HOST', { infer: true }),
       port: config.get('SMTP_PORT', { infer: true }),
@@ -68,8 +77,9 @@ export class VerificationMailer {
       await transport.sendMail({
         from: config.get('MAIL_FROM', { infer: true }),
         to,
-        subject,
-        text,
+        subject: mail.subject,
+        text: mail.text,
+        html: mail.html,
       });
     } catch {
       throw new ServiceUnavailableException(
@@ -80,8 +90,7 @@ export class VerificationMailer {
 
   private async sendWithBrevo(
     to: string,
-    subject: string,
-    text: string,
+    mail: ReturnType<typeof verificationEmail>,
   ): Promise<void> {
     let response: Response;
     try {
@@ -95,8 +104,9 @@ export class VerificationMailer {
         body: JSON.stringify({
           sender: parseSender(this.config.get('MAIL_FROM', { infer: true })),
           to: [{ email: to }],
-          subject,
-          textContent: text,
+          subject: mail.subject,
+          textContent: mail.text,
+          htmlContent: mail.html,
         }),
         signal: AbortSignal.timeout(10000),
       });

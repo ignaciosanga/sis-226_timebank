@@ -43,6 +43,7 @@ describe('VerificationMailer con Brevo', () => {
       sender: unknown;
       to: unknown;
       textContent: string;
+      htmlContent: string;
     };
     expect(body.sender).toEqual({
       name: 'Nexo U',
@@ -51,6 +52,10 @@ describe('VerificationMailer con Brevo', () => {
     expect(body.to).toEqual([{ email: 'ana@ucb.edu.bo' }]);
     expect(body.textContent).toContain(
       'https://api.nexo.example/auth/verify-email#token=token-secreto',
+    );
+    expect(body.htmlContent).toContain('Confirmar mi correo');
+    expect(body.htmlContent).toContain(
+      'href="https://api.nexo.example/auth/verify-email#token=token-secreto"',
     );
   });
 
