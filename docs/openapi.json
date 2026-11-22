@@ -1,2 +1,5789 @@
-{"openapi":"3.0.0","paths":{"/health":{"get":{"operationId":"HealthController_check","parameters":[],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HealthResponse"}}}}},"summary":"Liveness del proceso; no comprueba PostgreSQL","tags":["health"]}},"/health/ready":{"get":{"operationId":"HealthController_ready","parameters":[],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ReadinessResponse"}}}},"503":{"description":"PostgreSQL o esquema no disponible"}},"summary":"Comprueba conexion y presencia de las 12 tablas","tags":["health"]}},"/auth/register":{"post":{"operationId":"AuthController_register","parameters":[],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/RegisterDto"}}}},"responses":{"201":{"description":"Estudiante @ucb.edu.bo con bono configurable (demo: 8 creditos); usuario y movimiento atomicos","content":{"application/json":{"schema":{"$ref":"#/components/schemas/PublicUser"}}}},"400":{"description":"DTO inválido o propiedades adicionales"},"409":{"description":"Correo no disponible"}},"tags":["Autenticación"]}},"/auth/login":{"post":{"operationId":"AuthController_login","parameters":[],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/LoginDto"}}}},"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/LoginResponse"}}}},"400":{"description":"DTO inválido o propiedades adicionales"},"401":{"description":""}},"tags":["Autenticación"]}},"/users/me":{"get":{"operationId":"UsersController_me","parameters":[],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/PublicUser"}}}},"401":{"description":""}},"security":[{"bearer":[]}],"tags":["Usuarios"]},"patch":{"operationId":"UsersController_update","parameters":[],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/UpdateProfileDto"}}}},"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/PublicUser"}}}},"401":{"description":""}},"security":[{"bearer":[]}],"tags":["Usuarios"]}},"/admin/users":{"get":{"operationId":"AdminUsersController_list","parameters":[{"name":"page","required":false,"in":"query","schema":{"minimum":1,"default":1,"allOf":[{"$ref":"#/components/schemas/Object"}]}},{"name":"limit","required":false,"in":"query","schema":{"minimum":1,"maximum":100,"default":20,"allOf":[{"$ref":"#/components/schemas/Object"}]}},{"name":"search","required":false,"in":"query","schema":{"maxLength":100,"type":"string"}},{"name":"estado","required":false,"in":"query","schema":{"type":"string","enum":["Activo","Inactivo","Suspendido"]}},{"name":"rol","required":false,"in":"query","schema":{"type":"string","enum":["Estudiante","Profesor","Administrador"]}},{"name":"idCarrera","required":false,"in":"query","schema":{"format":"uuid","type":"string"}}],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/AdminUsersPage"}}}},"401":{"description":""},"403":{"description":"Requiere rol ADMIN"}},"security":[{"bearer":[]}],"summary":"Listar usuarios con búsqueda (nombre, apellido, correo) y filtros por estado, rol y carrera","tags":["Administración de usuarios"]},"post":{"operationId":"AdminUsersController_create","parameters":[],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/RegisterDto"}}}},"responses":{"201":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/PublicUser"}}}},"400":{"description":"Datos inválidos"},"401":{"description":""},"403":{"description":"Requiere rol ADMIN"},"409":{"description":"Correo no disponible"}},"security":[{"bearer":[]}],"summary":"Alta de estudiante por ADMIN; reutiliza el registro (Argon2id, créditos iniciales) y audita la acción","tags":["Administración de usuarios"]}},"/admin/users/{id}/status":{"patch":{"operationId":"AdminUsersController_setStatus","parameters":[{"name":"id","required":true,"in":"path","schema":{"type":"string"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/UpdateUserStatusDto"}}}},"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/AdminUser"}}}},"401":{"description":""},"403":{"description":"Requiere rol ADMIN"},"404":{"description":"Usuario inexistente"},"409":{"description":"Estado incompatible, cuenta propia, último ADMIN activo, reservas confirmadas o créditos retenidos"}},"security":[{"bearer":[]}],"summary":"Baja lógica (Inactivo) o reactivación (Activo) con auditoría","tags":["Administración de usuarios"]}},"/careers":{"get":{"operationId":"CareersController_list","parameters":[{"name":"page","required":false,"in":"query","schema":{"minimum":1,"default":1,"allOf":[{"$ref":"#/components/schemas/Object"}]}},{"name":"limit","required":false,"in":"query","schema":{"minimum":1,"maximum":100,"default":20,"allOf":[{"$ref":"#/components/schemas/Object"}]}},{"name":"search","required":false,"in":"query","schema":{"maxLength":100,"type":"string"}}],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CareersPage"}}}}},"summary":"Carreras activas; usar su UUID al registrar un estudiante","tags":["Carreras"]}},"/careers/{id}":{"get":{"operationId":"CareersController_get","parameters":[{"name":"id","required":true,"in":"path","schema":{"type":"string"}}],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Career"}}}},"404":{"description":"Carrera inexistente o inactiva"}},"tags":["Carreras"]}},"/categories":{"get":{"operationId":"CategoriesController_list","parameters":[{"name":"page","required":false,"in":"query","schema":{"minimum":1,"default":1,"allOf":[{"$ref":"#/components/schemas/Object"}]}},{"name":"limit","required":false,"in":"query","schema":{"minimum":1,"maximum":100,"default":20,"allOf":[{"$ref":"#/components/schemas/Object"}]}},{"name":"search","required":false,"in":"query","schema":{"maxLength":100,"type":"string"}}],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CategoriesPage"}}}}},"summary":"Categorías activas; respuesta { data, meta } con paginación","tags":["Categorías"]},"post":{"operationId":"CategoriesController_create","parameters":[],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CreateCategoryDto"}}}},"responses":{"201":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Category"}}}},"401":{"description":""},"403":{"description":""},"409":{"description":"Nombre duplicado"}},"security":[{"bearer":[]}],"tags":["Categorías"]}},"/categories/{id}":{"get":{"operationId":"CategoriesController_get","parameters":[{"name":"id","required":true,"in":"path","schema":{"type":"string"}}],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Category"}}}},"404":{"description":"Categoría inexistente o inactiva"}},"tags":["Categorías"]}},"/skills/{id}/providers":{"get":{"operationId":"SkillsController_listProviders","parameters":[{"name":"id","required":true,"in":"path","schema":{"type":"string"}},{"name":"page","required":false,"in":"query","schema":{"minimum":1,"default":1,"allOf":[{"$ref":"#/components/schemas/Object"}]}},{"name":"limit","required":false,"in":"query","schema":{"minimum":1,"maximum":100,"default":20,"allOf":[{"$ref":"#/components/schemas/Object"}]}},{"name":"search","required":false,"in":"query","schema":{"maxLength":100,"type":"string"}},{"name":"nivel","required":false,"in":"query","schema":{"type":"string","enum":["Basico","Intermedio","Avanzado","Experto"]}}],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/SkillProvidersPage"}}}},"404":{"description":"Habilidad o categoria inactiva/inexistente"}},"summary":"Ofertantes estudiantes activos; filtros search (nombre), nivel, page y limit","tags":["Habilidades"]}},"/skills":{"get":{"operationId":"SkillsController_list","parameters":[{"name":"page","required":false,"in":"query","schema":{"minimum":1,"default":1,"allOf":[{"$ref":"#/components/schemas/Object"}]}},{"name":"limit","required":false,"in":"query","schema":{"minimum":1,"maximum":100,"default":20,"allOf":[{"$ref":"#/components/schemas/Object"}]}},{"name":"search","required":false,"in":"query","schema":{"maxLength":100,"type":"string"}},{"name":"categoryId","required":false,"in":"query","schema":{"format":"uuid","type":"string"}}],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/SkillsPage"}}}}},"summary":"Habilidades activas; filtros search/categoryId y paginación { data, meta }","tags":["Habilidades"]},"post":{"operationId":"SkillsController_create","parameters":[],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CreateSkillDto"}}}},"responses":{"201":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Skill"}}}},"401":{"description":""},"403":{"description":""},"404":{"description":"Categoría inexistente o inactiva"},"409":{"description":""}},"security":[{"bearer":[]}],"tags":["Habilidades"]}},"/skills/{id}":{"get":{"operationId":"SkillsController_get","parameters":[{"name":"id","required":true,"in":"path","schema":{"type":"string"}}],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Skill"}}}},"404":{"description":""}},"tags":["Habilidades"]}},"/users/me/skills":{"get":{"operationId":"UserSkillsController_mine","parameters":[],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/PublishedUserSkill"}}}}},"401":{"description":""},"404":{"description":""}},"security":[{"bearer":[]}],"tags":["Habilidades de estudiantes"]},"post":{"operationId":"UserSkillsController_add","parameters":[],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CreateUserSkillDto"}}}},"responses":{"201":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/UserSkill"}}}},"401":{"description":""},"403":{"description":""},"404":{"description":""},"409":{"description":""}},"security":[{"bearer":[]}],"tags":["Habilidades de estudiantes"]}},"/users/me/skills/{skillId}":{"delete":{"operationId":"UserSkillsController_remove","parameters":[{"name":"skillId","required":true,"in":"path","schema":{"type":"string"}}],"responses":{"204":{"description":""},"401":{"description":""},"404":{"description":""}},"security":[{"bearer":[]}],"tags":["Habilidades de estudiantes"]}},"/users/{id}/skills":{"get":{"operationId":"UserSkillsController_published","parameters":[{"name":"id","required":true,"in":"path","schema":{"type":"string"}}],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/PublishedUserSkill"}}}}},"401":{"description":""},"404":{"description":""}},"security":[{"bearer":[]}],"tags":["Habilidades de estudiantes"]}},"/availability":{"post":{"operationId":"AvailabilityController_create","parameters":[],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CreateAvailabilityDto"}}}},"responses":{"201":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Availability"}}}},"400":{"description":""},"401":{"description":""},"403":{"description":""},"409":{"description":"Horario duplicado o superpuesto"}},"security":[{"bearer":[]}],"tags":["Disponibilidad"]}},"/availability/me":{"get":{"operationId":"AvailabilityController_mine","parameters":[],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/Availability"}}}}},"401":{"description":""},"403":{"description":""}},"security":[{"bearer":[]}],"tags":["Disponibilidad"]}},"/availability/{id}":{"patch":{"operationId":"AvailabilityController_update","parameters":[{"name":"id","required":true,"in":"path","schema":{"type":"string"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/UpdateAvailabilityDto"}}}},"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Availability"}}}},"400":{"description":""},"401":{"description":""},"403":{"description":""},"404":{"description":""},"409":{"description":""}},"security":[{"bearer":[]}],"tags":["Disponibilidad"]},"delete":{"operationId":"AvailabilityController_remove","parameters":[{"name":"id","required":true,"in":"path","schema":{"type":"string"}}],"responses":{"204":{"description":"Desactivada; borrado lógico idempotente"},"401":{"description":""},"403":{"description":""},"404":{"description":""}},"security":[{"bearer":[]}],"tags":["Disponibilidad"]}},"/users/{id}/availability":{"get":{"operationId":"PublishedAvailabilityController_published","parameters":[{"name":"id","required":true,"in":"path","schema":{"type":"string"}}],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/Availability"}}}}},"401":{"description":""},"404":{"description":"Estudiante inexistente, inactivo o sin rol ESTUDIANTE"}},"security":[{"bearer":[]}],"tags":["Disponibilidad"]}},"/exchanges":{"post":{"operationId":"ExchangesController_create","parameters":[{"name":"idempotency-key","required":true,"in":"header","schema":{"type":"string"}},{"name":"Idempotency-Key","in":"header","description":"16–128 caracteres; conservar la misma clave al reintentar la misma operación","required":true,"schema":{"type":"string"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CreateExchangeDto"}}}},"responses":{"201":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ExchangeRequestResponse"}}}},"400":{"description":""},"401":{"description":""},"403":{"description":""},"404":{"description":""},"409":{"description":""}},"security":[{"bearer":[]}],"summary":"Solicitar intercambio; no retiene créditos hasta que el ofertante acepte","tags":["Solicitudes de intercambio"]}},"/exchanges/me":{"get":{"operationId":"ExchangesController_mine","parameters":[],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/ExchangeRequestResponse"}}}}},"400":{"description":""},"401":{"description":""},"403":{"description":""},"404":{"description":""},"409":{"description":""}},"security":[{"bearer":[]}],"tags":["Solicitudes de intercambio"]}},"/exchanges/integrity":{"get":{"operationId":"ExchangesController_audit","parameters":[],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/IntegrityResponse"}}}},"400":{"description":""},"401":{"description":""},"403":{"description":""},"404":{"description":""},"409":{"description":""}},"security":[{"bearer":[]}],"summary":"Auditoría de solo lectura: reservas simultáneas y coherencia de créditos en esta instancia","tags":["Solicitudes de intercambio"]}},"/exchanges/{id}/accept":{"post":{"operationId":"ExchangesController_accept","parameters":[{"name":"id","required":true,"in":"path","schema":{"type":"string"}},{"name":"idempotency-key","required":true,"in":"header","schema":{"type":"string"}},{"name":"Idempotency-Key","in":"header","description":"16–128 caracteres; conservar la misma clave al reintentar la misma operación","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ReservationResponse"}}}},"400":{"description":""},"401":{"description":""},"403":{"description":""},"404":{"description":""},"409":{"description":""}},"security":[{"bearer":[]}],"tags":["Solicitudes de intercambio"]}},"/exchanges/{id}/reject":{"post":{"operationId":"ExchangesController_reject","parameters":[{"name":"id","required":true,"in":"path","schema":{"type":"string"}},{"name":"idempotency-key","required":true,"in":"header","schema":{"type":"string"}},{"name":"Idempotency-Key","in":"header","description":"16–128 caracteres; conservar la misma clave al reintentar la misma operación","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ExchangeRequestResponse"}}}},"400":{"description":""},"401":{"description":""},"403":{"description":""},"404":{"description":""},"409":{"description":""}},"security":[{"bearer":[]}],"tags":["Solicitudes de intercambio"]}},"/exchanges/{id}/cancel":{"post":{"operationId":"ExchangesController_cancel","parameters":[{"name":"id","required":true,"in":"path","schema":{"type":"string"}},{"name":"idempotency-key","required":true,"in":"header","schema":{"type":"string"}},{"name":"Idempotency-Key","in":"header","description":"16–128 caracteres; conservar la misma clave al reintentar la misma operación","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ExchangeRequestResponse"}}}},"400":{"description":""},"401":{"description":""},"403":{"description":""},"404":{"description":""},"409":{"description":""}},"security":[{"bearer":[]}],"tags":["Solicitudes de intercambio"]}},"/reservations/me":{"get":{"operationId":"ReservationsController_mine","parameters":[],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/ReservationResponse"}}}}},"400":{"description":""},"401":{"description":""},"403":{"description":""},"404":{"description":""},"409":{"description":""}},"security":[{"bearer":[]}],"tags":["Reservas"]}},"/reservations/{id}":{"get":{"operationId":"ReservationsController_get","parameters":[{"name":"id","required":true,"in":"path","schema":{"type":"string"}}],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ReservationResponse"}}}},"400":{"description":""},"401":{"description":""},"403":{"description":""},"404":{"description":""},"409":{"description":""}},"security":[{"bearer":[]}],"tags":["Reservas"]}},"/reservations/{id}/confirm":{"post":{"operationId":"ReservationsController_confirm","parameters":[{"name":"id","required":true,"in":"path","schema":{"type":"string"}},{"name":"idempotency-key","required":true,"in":"header","schema":{"type":"string"}},{"name":"Idempotency-Key","in":"header","description":"16–128 caracteres; conservar la misma clave al reintentar la misma operación","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ReservationResponse"}}}},"400":{"description":""},"401":{"description":""},"403":{"description":""},"404":{"description":""},"409":{"description":""}},"security":[{"bearer":[]}],"tags":["Reservas"]}},"/reservations/{id}/cancel":{"post":{"operationId":"ReservationsController_cancel","parameters":[{"name":"id","required":true,"in":"path","schema":{"type":"string"}},{"name":"idempotency-key","required":true,"in":"header","schema":{"type":"string"}},{"name":"Idempotency-Key","in":"header","description":"16–128 caracteres; conservar la misma clave al reintentar la misma operación","required":true,"schema":{"type":"string"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CancelReservationDto"}}}},"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ReservationResponse"}}}},"400":{"description":""},"401":{"description":""},"403":{"description":""},"404":{"description":""},"409":{"description":""}},"security":[{"bearer":[]}],"tags":["Reservas"]}},"/credits/me":{"get":{"operationId":"CreditsController_me","parameters":[],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/AccountResponse"}}}},"400":{"description":""},"401":{"description":""},"403":{"description":""},"409":{"description":""}},"security":[{"bearer":[]}],"tags":["Créditos de tiempo"]}},"/credits/me/movements":{"get":{"operationId":"CreditsController_movements","parameters":[],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/MovementResponse"}}}}},"400":{"description":""},"401":{"description":""},"403":{"description":""},"409":{"description":""}},"security":[{"bearer":[]}],"tags":["Créditos de tiempo"]}},"/credits/grants":{"post":{"operationId":"CreditsController_grant","parameters":[{"name":"idempotency-key","required":true,"in":"header","schema":{"type":"string"}},{"name":"Idempotency-Key","in":"header","description":"16–128 caracteres; conservar la misma clave al reintentar la misma operación","required":true,"schema":{"type":"string"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/GrantCreditsDto"}}}},"responses":{"201":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/GrantCreditsResponse"}}}},"400":{"description":""},"401":{"description":""},"403":{"description":""},"409":{"description":""}},"security":[{"bearer":[]}],"summary":"Carga de créditos exclusiva para pruebas locales por ADMIN; no representa dinero ni saldo de bienvenida","tags":["Créditos de tiempo"]}},"/analytics/overview":{"get":{"operationId":"AnalyticsController_overview","parameters":[{"name":"from","required":false,"in":"query","description":"Inicio ISO-8601 con zona horaria (incluido)","schema":{"format":"date-time","type":"string"}},{"name":"to","required":false,"in":"query","description":"Fin ISO-8601 con zona horaria (excluido)","schema":{"format":"date-time","type":"string"}},{"name":"groupBy","required":false,"in":"query","schema":{"default":"day","type":"string","enum":["day","month"]}},{"name":"limit","required":false,"in":"query","schema":{"minimum":1,"maximum":50,"default":10,"allOf":[{"$ref":"#/components/schemas/Object"}]}}],"responses":{"200":{"description":"Resumen general; saldos actuales separados"},"400":{"description":"Fechas o parámetros inválidos"},"401":{"description":""},"403":{"description":"Requiere rol ADMIN"},"503":{"description":"Disponible solo con PERSISTENCE_MODE=prisma"}},"security":[{"bearer":[]}],"summary":"Resumen general: usuarios, intercambios y créditos del periodo","tags":["Analytics (Dashboard)"]}},"/analytics/users":{"get":{"operationId":"AnalyticsController_users","parameters":[{"name":"from","required":false,"in":"query","description":"Inicio ISO-8601 con zona horaria (incluido)","schema":{"format":"date-time","type":"string"}},{"name":"to","required":false,"in":"query","description":"Fin ISO-8601 con zona horaria (excluido)","schema":{"format":"date-time","type":"string"}},{"name":"groupBy","required":false,"in":"query","schema":{"default":"day","type":"string","enum":["day","month"]}},{"name":"limit","required":false,"in":"query","schema":{"minimum":1,"maximum":50,"default":10,"allOf":[{"$ref":"#/components/schemas/Object"}]}}],"responses":{"200":{"description":"Agregados de usuarios sin datos personales"},"400":{"description":"Fechas o parámetros inválidos"},"401":{"description":""},"403":{"description":"Requiere rol ADMIN"},"503":{"description":"Disponible solo con PERSISTENCE_MODE=prisma"}},"security":[{"bearer":[]}],"summary":"Usuarios por estado, carrera y registros","tags":["Analytics (Dashboard)"]}},"/analytics/exchanges":{"get":{"operationId":"AnalyticsController_exchanges","parameters":[{"name":"from","required":false,"in":"query","description":"Inicio ISO-8601 con zona horaria (incluido)","schema":{"format":"date-time","type":"string"}},{"name":"to","required":false,"in":"query","description":"Fin ISO-8601 con zona horaria (excluido)","schema":{"format":"date-time","type":"string"}},{"name":"groupBy","required":false,"in":"query","schema":{"default":"day","type":"string","enum":["day","month"]}},{"name":"limit","required":false,"in":"query","schema":{"minimum":1,"maximum":50,"default":10,"allOf":[{"$ref":"#/components/schemas/Object"}]}}],"responses":{"200":{"description":"Solicitudes, reservas, tasas y series"},"400":{"description":"Fechas o parámetros inválidos"},"401":{"description":""},"403":{"description":"Requiere rol ADMIN"},"503":{"description":"Disponible solo con PERSISTENCE_MODE=prisma"}},"security":[{"bearer":[]}],"summary":"Solicitudes, reservas y cancelaciones","tags":["Analytics (Dashboard)"]}},"/analytics/credits":{"get":{"operationId":"AnalyticsController_credits","parameters":[{"name":"from","required":false,"in":"query","description":"Inicio ISO-8601 con zona horaria (incluido)","schema":{"format":"date-time","type":"string"}},{"name":"to","required":false,"in":"query","description":"Fin ISO-8601 con zona horaria (excluido)","schema":{"format":"date-time","type":"string"}},{"name":"groupBy","required":false,"in":"query","schema":{"default":"day","type":"string","enum":["day","month"]}},{"name":"limit","required":false,"in":"query","schema":{"minimum":1,"maximum":50,"default":10,"allOf":[{"$ref":"#/components/schemas/Object"}]}}],"responses":{"200":{"description":"Créditos como strings enteros"},"400":{"description":"Fechas o parámetros inválidos"},"401":{"description":""},"403":{"description":"Requiere rol ADMIN"},"503":{"description":"Disponible solo con PERSISTENCE_MODE=prisma"}},"security":[{"bearer":[]}],"summary":"Créditos transferidos, liberados, bonos y retenidos","tags":["Analytics (Dashboard)"]}},"/analytics/skills":{"get":{"operationId":"AnalyticsController_skills","parameters":[{"name":"from","required":false,"in":"query","description":"Inicio ISO-8601 con zona horaria (incluido)","schema":{"format":"date-time","type":"string"}},{"name":"to","required":false,"in":"query","description":"Fin ISO-8601 con zona horaria (excluido)","schema":{"format":"date-time","type":"string"}},{"name":"groupBy","required":false,"in":"query","schema":{"default":"day","type":"string","enum":["day","month"]}},{"name":"limit","required":false,"in":"query","schema":{"minimum":1,"maximum":50,"default":10,"allOf":[{"$ref":"#/components/schemas/Object"}]}}],"responses":{"200":{"description":"Rankings limitados por `limit`"},"400":{"description":"Fechas o parámetros inválidos"},"401":{"description":""},"403":{"description":"Requiere rol ADMIN"},"503":{"description":"Disponible solo con PERSISTENCE_MODE=prisma"}},"security":[{"bearer":[]}],"summary":"Habilidades y categorías más solicitadas","tags":["Analytics (Dashboard)"]}}},"info":{"title":"Banco de Tiempo Universitario","description":"v0.4: autenticacion JWT, catalogos, disponibilidad, solicitudes, reservas y creditos de tiempo transaccionales. PostgreSQL con modelo optimizado de 12 tablas y Docker Compose local.","version":"0.4.0","contact":{}},"tags":[],"servers":[],"components":{"securitySchemes":{"bearer":{"scheme":"bearer","bearerFormat":"JWT","type":"http"}},"schemas":{"HealthResponse":{"type":"object","properties":{"status":{"type":"string","example":"ok"},"service":{"type":"string","example":"banco-tiempo-backend"}},"required":["status","service"]},"ReadinessResponse":{"type":"object","properties":{"status":{"type":"string","example":"ok"},"persistence":{"type":"string","enum":["memory","postgresql"]}},"required":["status","persistence"]},"RegisterDto":{"type":"object","properties":{"nombre":{"type":"string","example":"Ana","maxLength":100},"apellido":{"type":"string","example":"Pérez","maxLength":100},"correo":{"type":"string","example":"ana@ucb.edu.bo","format":"email","description":"Dominio exacto ucb.edu.bo; se normaliza antes de validar"},"password":{"type":"string","minLength":12,"maxLength":128,"writeOnly":true,"format":"password"},"idCarrera":{"type":"string","example":"30000000-0000-4000-8000-000000000001","description":"UUID de una carrera activa obtenida de GET /careers"},"semestre":{"type":"number","example":3,"minimum":1}},"required":["nombre","apellido","correo","password","idCarrera","semestre"]},"PublicUser":{"type":"object","properties":{"id":{"type":"string","format":"uuid"},"nombre":{"type":"string"},"apellido":{"type":"string"},"correo":{"type":"string","format":"email"},"idCarrera":{"type":"object"},"semestre":{"type":"object"},"rol":{"type":"string","enum":["Estudiante","Profesor","Administrador"]},"roles":{"type":"array","items":{"type":"string","enum":["ESTUDIANTE","PROFESOR","ADMIN"]}}},"required":["id","nombre","apellido","correo","idCarrera","semestre","rol","roles"]},"LoginDto":{"type":"object","properties":{"correo":{"type":"string","example":"ana@example.test","format":"email"},"password":{"type":"string","minLength":1,"maxLength":128,"writeOnly":true,"format":"password"}},"required":["correo","password"]},"LoginResponse":{"type":"object","properties":{"access_token":{"type":"string"},"token_type":{"type":"string","enum":["Bearer"]},"user":{"$ref":"#/components/schemas/PublicUser"}},"required":["access_token","token_type","user"]},"UpdateProfileDto":{"type":"object","properties":{"nombre":{"type":"string","maxLength":100},"apellido":{"type":"string","maxLength":100},"idCarrera":{"type":"string","maxLength":128},"semestre":{"type":"number","minimum":1}}},"Object":{"type":"object","properties":{}},"AdminUser":{"type":"object","properties":{"id":{"type":"string","format":"uuid"},"nombre":{"type":"string"},"apellido":{"type":"string"},"correo":{"type":"string","format":"email"},"idCarrera":{"type":"object"},"semestre":{"type":"object"},"rol":{"type":"string","enum":["Estudiante","Profesor","Administrador"]},"roles":{"type":"array","items":{"type":"string","enum":["ESTUDIANTE","PROFESOR","ADMIN"]}},"estado":{"type":"string","enum":["Activo","Inactivo","Suspendido"]},"fechaRegistro":{"type":"string","format":"date-time"},"ultimoAcceso":{"type":"string","format":"date-time","nullable":true}},"required":["id","nombre","apellido","correo","idCarrera","semestre","rol","roles","estado","fechaRegistro","ultimoAcceso"]},"PaginationMeta":{"type":"object","properties":{"page":{"type":"number"},"limit":{"type":"number"},"total":{"type":"number"},"totalPages":{"type":"number"}},"required":["page","limit","total","totalPages"]},"AdminUsersPage":{"type":"object","properties":{"data":{"type":"array","items":{"$ref":"#/components/schemas/AdminUser"}},"meta":{"$ref":"#/components/schemas/PaginationMeta"}},"required":["data","meta"]},"UpdateUserStatusDto":{"type":"object","properties":{"estado":{"type":"string","enum":["Activo","Inactivo"],"description":"Inactivo = baja logica; Activo = reactivacion"},"motivo":{"type":"string","maxLength":255}},"required":["estado"]},"Career":{"type":"object","properties":{"id_carrera":{"type":"string","format":"uuid"},"nombre":{"type":"string"},"facultad":{"type":"string"},"estado":{"type":"string","enum":["activo","inactivo"]}},"required":["id_carrera","nombre","facultad","estado"]},"CareersPage":{"type":"object","properties":{"data":{"type":"array","items":{"$ref":"#/components/schemas/Career"}},"meta":{"$ref":"#/components/schemas/PaginationMeta"}},"required":["data","meta"]},"Category":{"type":"object","properties":{"id_categoria":{"type":"string","format":"uuid"},"nombre":{"type":"string"},"estado":{"type":"string","enum":["activo","inactivo"]}},"required":["id_categoria","nombre","estado"]},"CategoriesPage":{"type":"object","properties":{"data":{"type":"array","items":{"$ref":"#/components/schemas/Category"}},"meta":{"$ref":"#/components/schemas/PaginationMeta"}},"required":["data","meta"]},"CreateCategoryDto":{"type":"object","properties":{"nombre":{"type":"string","example":"Tecnología","maxLength":100}},"required":["nombre"]},"SkillProvider":{"type":"object","properties":{"id_usuario":{"type":"string","format":"uuid"},"nombre":{"type":"string","description":"Nombre completo del ofertante"},"id_habilidad":{"type":"string","format":"uuid"},"habilidad":{"type":"string"},"nivel":{"type":"string","enum":["Basico","Intermedio","Avanzado","Experto"]}},"required":["id_usuario","nombre","id_habilidad","habilidad","nivel"]},"SkillProvidersPage":{"type":"object","properties":{"data":{"type":"array","items":{"$ref":"#/components/schemas/SkillProvider"}},"meta":{"$ref":"#/components/schemas/PaginationMeta"}},"required":["data","meta"]},"Skill":{"type":"object","properties":{"id_habilidad":{"type":"string","format":"uuid"},"nombre":{"type":"string"},"id_categoria":{"type":"string","format":"uuid"},"estado":{"type":"string","enum":["activo","inactivo"]}},"required":["id_habilidad","nombre","id_categoria","estado"]},"SkillsPage":{"type":"object","properties":{"data":{"type":"array","items":{"$ref":"#/components/schemas/Skill"}},"meta":{"$ref":"#/components/schemas/PaginationMeta"}},"required":["data","meta"]},"CreateSkillDto":{"type":"object","properties":{"nombre":{"type":"string","example":"Tecnología","maxLength":100},"categoryId":{"type":"string","format":"uuid","description":"Se adapta a id_categoria"}},"required":["nombre","categoryId"]},"PublishedUserSkill":{"type":"object","properties":{"id_usuario":{"type":"string","format":"uuid"},"id_habilidad":{"type":"string","format":"uuid"},"nivel":{"type":"string","enum":["Basico","Intermedio","Avanzado","Experto"]},"habilidad":{"$ref":"#/components/schemas/Skill"}},"required":["id_usuario","id_habilidad","nivel","habilidad"]},"CreateUserSkillDto":{"type":"object","properties":{"skillId":{"type":"string","format":"uuid","description":"Se adapta a id_habilidad; el usuario procede del JWT"},"nivel":{"type":"string","enum":["Basico","Intermedio","Avanzado","Experto"]}},"required":["skillId","nivel"]},"UserSkill":{"type":"object","properties":{"id_usuario":{"type":"string","format":"uuid"},"id_habilidad":{"type":"string","format":"uuid"},"nivel":{"type":"string","enum":["Basico","Intermedio","Avanzado","Experto"]}},"required":["id_usuario","id_habilidad","nivel"]},"CreateAvailabilityDto":{"type":"object","properties":{"fechaInicio":{"type":"string","format":"date-time","example":"2026-11-02T09:00:00-04:00"},"fechaFin":{"type":"string","format":"date-time","example":"2026-11-02T10:00:00-04:00"}},"required":["fechaInicio","fechaFin"]},"Availability":{"type":"object","properties":{"id_disponibilidad":{"type":"string","format":"uuid"},"id_usuario":{"type":"string","format":"uuid"},"fecha_inicio":{"type":"string","format":"date-time"},"fecha_fin":{"type":"string","format":"date-time"},"estado":{"type":"string","enum":["disponible","reservado","cancelado"]}},"required":["id_disponibilidad","id_usuario","fecha_inicio","fecha_fin","estado"]},"UpdateAvailabilityDto":{"type":"object","properties":{"fechaInicio":{"type":"string","format":"date-time"},"fechaFin":{"type":"string","format":"date-time"}}},"CreateExchangeDto":{"type":"object","properties":{"fechaInicio":{"type":"string","format":"date-time","example":"2026-11-02T09:00:00-04:00"},"fechaFin":{"type":"string","format":"date-time","example":"2026-11-02T10:00:00-04:00"},"providerId":{"type":"string","format":"uuid"},"skillId":{"type":"string","format":"uuid"},"availabilityId":{"type":"string","format":"uuid"},"descripcion":{"type":"string","maxLength":500}},"required":["fechaInicio","fechaFin","providerId","skillId","availabilityId"]},"RequestStatus":{"type":"string","enum":["Solicitada","Aceptada","Rechazada","Cancelada"]},"ExchangeRequestResponse":{"type":"object","properties":{"id_solicitud":{"type":"string","format":"uuid","nullable":true},"id_solicitante":{"type":"string","format":"uuid"},"id_ofertante":{"type":"string","format":"uuid"},"id_habilidad":{"type":"string","format":"uuid"},"id_disponibilidad":{"type":"string","format":"uuid","nullable":true,"description":"Contexto de la API guardado en AUDITORIA"},"created_at":{"type":"string","format":"date-time"},"fecha_inicio_propuesta":{"type":"string","format":"date-time"},"fecha_fin_propuesta":{"type":"string","format":"date-time"},"creditos_requeridos":{"type":"integer","minimum":1},"respondida_at":{"type":"string","format":"date-time","nullable":true},"descripcion":{"type":"string","maxLength":500,"description":"Descripcion de API conservada en AUDITORIA"},"estado":{"allOf":[{"$ref":"#/components/schemas/RequestStatus"}]},"costo_creditos":{"type":"string","pattern":"^\\d+$","example":"4","description":"Creditos enteros; un credito equivale a 15 minutos"}},"required":["id_solicitud","id_solicitante","id_ofertante","id_habilidad","id_disponibilidad","created_at","fecha_inicio_propuesta","fecha_fin_propuesta","creditos_requeridos","respondida_at","descripcion","estado","costo_creditos"]},"IntegrityIssueResponse":{"type":"object","properties":{"code":{"type":"string","example":"PARTICIPANT_RESERVATION_OVERLAP"},"ids":{"type":"array","items":{"type":"string"}}},"required":["code","ids"]},"IntegrityCountsResponse":{"type":"object","properties":{"solicitudes":{"type":"integer","minimum":0},"reservas":{"type":"integer","minimum":0},"movimientos":{"type":"integer","minimum":0},"usuarios":{"type":"integer","minimum":0}},"required":["solicitudes","reservas","movimientos","usuarios"]},"IntegrityResponse":{"type":"object","properties":{"status":{"type":"string","enum":["ok","inconsistente"]},"scope":{"type":"string","enum":["memory-process","postgresql-transaction"]},"issues":{"type":"array","items":{"$ref":"#/components/schemas/IntegrityIssueResponse"}},"counts":{"$ref":"#/components/schemas/IntegrityCountsResponse"}},"required":["status","scope","issues","counts"]},"ReservationStatus":{"type":"string","enum":["Confirmada","Completada","Cancelada"]},"ConfirmationResponse":{"type":"object","properties":{"id_reserva":{"type":"string","format":"uuid"},"id_usuario":{"type":"string","format":"uuid"},"fecha":{"type":"string","format":"date-time"}},"required":["id_reserva","id_usuario","fecha"]},"CancellationResponse":{"type":"object","properties":{"id_reserva":{"type":"string","format":"uuid"},"id_usuario":{"type":"string","format":"uuid"},"motivo":{"type":"string","maxLength":500},"fecha":{"type":"string","format":"date-time"},"administrativa":{"type":"boolean"}},"required":["id_reserva","id_usuario","motivo","fecha","administrativa"]},"ReservationResponse":{"type":"object","properties":{"id_solicitud":{"type":"string","format":"uuid","nullable":true},"id_solicitante":{"type":"string","format":"uuid"},"id_ofertante":{"type":"string","format":"uuid"},"id_habilidad":{"type":"string","format":"uuid"},"id_disponibilidad":{"type":"string","format":"uuid","nullable":true,"description":"Contexto de la API guardado en AUDITORIA"},"created_at":{"type":"string","format":"date-time"},"id_reserva":{"type":"string","format":"uuid"},"fecha_inicio":{"type":"string","format":"date-time"},"fecha_fin":{"type":"string","format":"date-time"},"creditos":{"type":"integer","minimum":1},"modalidad":{"type":"string","enum":["Presencial","Virtual","Hibrida"]},"lugar":{"type":"string","example":"Por coordinar"},"estado":{"allOf":[{"$ref":"#/components/schemas/ReservationStatus"}]},"confirmacion_solicitante_at":{"type":"string","format":"date-time","nullable":true},"confirmacion_ofertante_at":{"type":"string","format":"date-time","nullable":true},"cancelado_por":{"type":"string","format":"uuid","nullable":true},"motivo_cancelacion":{"type":"string","maxLength":500,"nullable":true},"horas_anticipacion_cancelacion":{"type":"integer","minimum":0,"nullable":true},"completed_at":{"type":"string","format":"date-time","nullable":true},"cancelled_at":{"type":"string","format":"date-time","nullable":true},"monto_creditos":{"type":"string","pattern":"^\\d+$","example":"4","description":"Creditos enteros; un credito equivale a 15 minutos"},"confirmaciones":{"maxItems":2,"description":"Vista derivada de los dos timestamps oficiales","type":"array","items":{"$ref":"#/components/schemas/ConfirmationResponse"}},"cancelacion":{"nullable":true,"description":"Vista derivada de campos de RESERVAS","type":"object","allOf":[{"$ref":"#/components/schemas/CancellationResponse"}]}},"required":["id_solicitud","id_solicitante","id_ofertante","id_habilidad","id_disponibilidad","created_at","id_reserva","fecha_inicio","fecha_fin","creditos","modalidad","lugar","estado","confirmacion_solicitante_at","confirmacion_ofertante_at","cancelado_por","motivo_cancelacion","horas_anticipacion_cancelacion","completed_at","cancelled_at","monto_creditos","confirmaciones","cancelacion"]},"CancelReservationDto":{"type":"object","properties":{"motivo":{"type":"string","maxLength":500}},"required":["motivo"]},"AccountResponse":{"type":"object","properties":{"id_usuario":{"type":"string","format":"uuid"},"saldo":{"type":"string","pattern":"^\\d+$","example":"4","description":"Creditos enteros; un credito equivale a 15 minutos"},"creditos_retenidos":{"type":"string","pattern":"^\\d+$","example":"1","description":"Creditos enteros; un credito equivale a 15 minutos"},"disponibles":{"type":"string","pattern":"^\\d+$","example":"3","description":"Creditos enteros; un credito equivale a 15 minutos"},"unidad":{"type":"string","enum":["CREDITO_15_MINUTOS"]}},"required":["id_usuario","saldo","creditos_retenidos","disponibles","unidad"]},"MovementType":{"type":"string","enum":["BonoInicial","Recompensa","Penalizacion","Transferencia","Ajuste","Retencion","Liberacion","Consumo"]},"MovementResponse":{"type":"object","properties":{"id_movimiento":{"type":"string","format":"uuid"},"id_usuario":{"type":"string","format":"uuid"},"id_reserva":{"type":"string","format":"uuid","nullable":true},"tipo":{"allOf":[{"$ref":"#/components/schemas/MovementType"}]},"cantidad":{"type":"integer","example":-4},"monto":{"type":"string","pattern":"^-?\\d+$","example":"-4"},"saldo_anterior":{"type":"integer","minimum":0},"saldo_posterior":{"type":"integer","minimum":0},"retenidos_anterior":{"type":"integer","minimum":0},"retenidos_posterior":{"type":"integer","minimum":0},"created_at":{"type":"string","format":"date-time"},"descripcion":{"type":"string","maxLength":500,"nullable":true}},"required":["id_movimiento","id_usuario","id_reserva","tipo","cantidad","monto","saldo_anterior","saldo_posterior","retenidos_anterior","retenidos_posterior","created_at","descripcion"]},"GrantCreditsDto":{"type":"object","properties":{"userId":{"type":"string","format":"uuid"},"amount":{"type":"string","example":"8","description":"Creditos enteros: 1 credito = 15 minutos; carga de desarrollo"},"reason":{"type":"string","maxLength":500}},"required":["userId","amount","reason"]},"GrantCreditsResponse":{"type":"object","properties":{"cuenta":{"$ref":"#/components/schemas/AccountResponse"},"movimiento":{"$ref":"#/components/schemas/MovementResponse"}},"required":["cuenta","movimiento"]}}}}
-
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Liveness del proceso; no comprueba PostgreSQL",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "HealthController_ready",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "PostgreSQL o esquema no disponible"
+          }
+        },
+        "summary": "Comprueba conexion y presencia del esquema, verificacion, ofertas y banners",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "operationId": "AuthController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Crea cuenta Pendiente sin bono. Envia enlace por correo; no devuelve token ni sesion. Si falla el transporte, usar resend-verification.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "DTO inválido o propiedades adicionales"
+          },
+          "409": {
+            "description": "Correo no disponible"
+          }
+        },
+        "tags": [
+          "Autenticación"
+        ]
+      }
+    },
+    "/auth/verify-email": {
+      "post": {
+        "operationId": "AuthController_confirmEmail",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyEmailDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Consume el enlace y activa con bono una sola vez; reutilizarlo no entrega otra sesion ni bono",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "DTO inválido o propiedades adicionales"
+          }
+        },
+        "tags": [
+          "Autenticación"
+        ]
+      },
+      "get": {
+        "operationId": "AuthController_verificationPage",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Pagina HTML de confirmacion explicita; GET no consume credenciales"
+          },
+          "400": {
+            "description": "DTO inválido o propiedades adicionales"
+          }
+        },
+        "tags": [
+          "Autenticación"
+        ]
+      }
+    },
+    "/auth/resend-verification": {
+      "post": {
+        "operationId": "AuthController_resend",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResendVerificationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Respuesta generica; rota enlaces pendientes, con espera de 60 segundos por cuenta"
+          },
+          "400": {
+            "description": "DTO inválido o propiedades adicionales"
+          }
+        },
+        "tags": [
+          "Autenticación"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "DTO inválido o propiedades adicionales"
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": "Cuenta pendiente: code EMAIL_VERIFICATION_REQUIRED; confirmar correo antes de iniciar sesion"
+          }
+        },
+        "tags": [
+          "Autenticación"
+        ]
+      }
+    },
+    "/auth/google": {
+      "post": {
+        "operationId": "AuthController_loginWithGoogle",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleLoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sesión con una cuenta de Google @ucb.edu.bo verificada; si la cuenta no existe devuelve registration_required y se completa enviando idCarrera y semestre"
+          },
+          "400": {
+            "description": "DTO inválido o propiedades adicionales"
+          },
+          "401": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Autenticación"
+        ]
+      }
+    },
+    "/users/me": {
+      "get": {
+        "operationId": "UsersController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicUser"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Usuarios"
+        ]
+      },
+      "patch": {
+        "operationId": "UsersController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicUser"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Usuarios"
+        ]
+      }
+    },
+    "/admin/users": {
+      "get": {
+        "operationId": "AdminUsersController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "estado",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Pendiente",
+                "Activo",
+                "Inactivo",
+                "Suspendido"
+              ]
+            }
+          },
+          {
+            "name": "rol",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Estudiante",
+                "Profesor",
+                "Administrador"
+              ]
+            }
+          },
+          {
+            "name": "idCarrera",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUsersPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": "Requiere rol ADMIN"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar usuarios con búsqueda (nombre, apellido, correo) y filtros por estado, rol y carrera",
+        "tags": [
+          "Administración de usuarios"
+        ]
+      },
+      "post": {
+        "operationId": "AdminUsersController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Perfil Pendiente con verification_required: true; confirmar el correo enviado antes del login",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicUser"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos"
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": "Requiere rol ADMIN"
+          },
+          "409": {
+            "description": "Correo no disponible"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Alta pendiente por ADMIN; envía confirmación por correo, saldo cero hasta verificar y audita la acción",
+        "tags": [
+          "Administración de usuarios"
+        ]
+      }
+    },
+    "/admin/users/{id}/status": {
+      "patch": {
+        "operationId": "AdminUsersController_setStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUser"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": "Requiere rol ADMIN"
+          },
+          "404": {
+            "description": "Usuario inexistente"
+          },
+          "409": {
+            "description": "Estado incompatible, cuenta propia, último ADMIN activo, reservas confirmadas o créditos retenidos"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Baja lógica (Inactivo) o reactivación (Activo) con auditoría",
+        "tags": [
+          "Administración de usuarios"
+        ]
+      }
+    },
+    "/careers": {
+      "get": {
+        "operationId": "CareersController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CareersPage"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Carreras activas; usar su UUID al registrar un estudiante",
+        "tags": [
+          "Carreras"
+        ]
+      }
+    },
+    "/careers/{id}": {
+      "get": {
+        "operationId": "CareersController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Career"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Carrera inexistente o inactiva"
+          }
+        },
+        "tags": [
+          "Carreras"
+        ]
+      }
+    },
+    "/categories": {
+      "get": {
+        "operationId": "CategoriesController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoriesPage"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Categorías activas; respuesta { data, meta } con paginación",
+        "tags": [
+          "Categorías"
+        ]
+      },
+      "post": {
+        "operationId": "CategoriesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCategoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Category"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": ""
+          },
+          "409": {
+            "description": "Nombre duplicado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Categorías"
+        ]
+      }
+    },
+    "/categories/{id}": {
+      "get": {
+        "operationId": "CategoriesController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Category"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Categoría inexistente o inactiva"
+          }
+        },
+        "tags": [
+          "Categorías"
+        ]
+      }
+    },
+    "/skills/{id}/providers": {
+      "get": {
+        "operationId": "SkillsController_listProviders",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "nivel",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Basico",
+                "Intermedio",
+                "Avanzado",
+                "Experto"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillProvidersPage"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Habilidad o categoria inactiva/inexistente"
+          }
+        },
+        "summary": "Ofertantes estudiantes activos; filtros search (nombre), nivel, page y limit",
+        "tags": [
+          "Habilidades"
+        ]
+      }
+    },
+    "/skills": {
+      "get": {
+        "operationId": "SkillsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillsPage"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Habilidades activas; filtros search/categoryId y paginación { data, meta }",
+        "tags": [
+          "Habilidades"
+        ]
+      },
+      "post": {
+        "operationId": "SkillsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSkillDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Skill"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": ""
+          },
+          "404": {
+            "description": "Categoría inexistente o inactiva"
+          },
+          "409": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Habilidades"
+        ]
+      }
+    },
+    "/skills/{id}": {
+      "get": {
+        "operationId": "SkillsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Skill"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Habilidades"
+        ]
+      }
+    },
+    "/users/me/skills": {
+      "get": {
+        "operationId": "UserSkillsController_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublishedUserSkill"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Habilidades de estudiantes"
+        ]
+      },
+      "post": {
+        "operationId": "UserSkillsController_add",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserSkillDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserSkill"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          },
+          "409": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Habilidades de estudiantes"
+        ]
+      }
+    },
+    "/users/me/skills/{skillId}": {
+      "delete": {
+        "operationId": "UserSkillsController_remove",
+        "parameters": [
+          {
+            "name": "skillId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "401": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Habilidades de estudiantes"
+        ]
+      }
+    },
+    "/users/{id}/skills": {
+      "get": {
+        "operationId": "UserSkillsController_published",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublishedUserSkill"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Habilidades de estudiantes"
+        ]
+      }
+    },
+    "/availability": {
+      "post": {
+        "operationId": "AvailabilityController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAvailabilityDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Availability"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": ""
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": ""
+          },
+          "409": {
+            "description": "Horario duplicado o superpuesto"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Disponibilidad"
+        ]
+      }
+    },
+    "/availability/me": {
+      "get": {
+        "operationId": "AvailabilityController_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Availability"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Disponibilidad"
+        ]
+      }
+    },
+    "/availability/{id}": {
+      "patch": {
+        "operationId": "AvailabilityController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAvailabilityDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Availability"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": ""
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          },
+          "409": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Disponibilidad"
+        ]
+      },
+      "delete": {
+        "operationId": "AvailabilityController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Desactivada; borrado lógico idempotente"
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Disponibilidad"
+        ]
+      }
+    },
+    "/users/{id}/availability": {
+      "get": {
+        "operationId": "PublishedAvailabilityController_published",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Availability"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": ""
+          },
+          "404": {
+            "description": "Estudiante inexistente, inactivo o sin rol ESTUDIANTE"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Disponibilidad"
+        ]
+      }
+    },
+    "/exchanges": {
+      "post": {
+        "description": "availabilityId resuelve la oferta. offerId es opcional y debe coincidir. El servidor copia costo_creditos a creditos_requeridos e id_oferta; no se admite un importe del cliente. Fechas exactas de la clase completa. En esquema entero las ofertas devuelven 409 OFFER_PRICE_FLOW_PENDING. Los horarios sin oferta conservan la tarifa historica.",
+        "operationId": "ExchangesController_create",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "description": "16–128 caracteres; conservar la misma clave al reintentar la misma operación",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateExchangeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExchangeRequestResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": ""
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          },
+          "409": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Solicitar una clase y guardar su precio; no retiene hasta la aceptacion",
+        "tags": [
+          "Solicitudes de intercambio"
+        ]
+      }
+    },
+    "/exchanges/me": {
+      "get": {
+        "operationId": "ExchangesController_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ExchangeRequestResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": ""
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          },
+          "409": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Solicitudes de intercambio"
+        ]
+      }
+    },
+    "/exchanges/integrity": {
+      "get": {
+        "operationId": "ExchangesController_audit",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntegrityResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": ""
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          },
+          "409": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Auditoría de solo lectura: reservas simultáneas y coherencia de créditos en esta instancia",
+        "tags": [
+          "Solicitudes de intercambio"
+        ]
+      }
+    },
+    "/exchanges/{id}/accept": {
+      "post": {
+        "description": "Cuerpo vacio {}. Actualiza solicitud y horario, crea una reserva y retiene atomicamente el importe guardado en la solicitud, aunque cambie el catalogo. No paga al tutor. Un reintento recupera la misma reserva; conflictos de horario o saldo devuelven 409 sin efectos parciales.",
+        "operationId": "ExchangesController_accept",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "description": "16–128 caracteres; conservar la misma clave al reintentar la misma operación",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": ""
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          },
+          "409": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "El tutor acepta y retiene una sola vez el precio pactado",
+        "tags": [
+          "Solicitudes de intercambio"
+        ]
+      }
+    },
+    "/exchanges/{id}/reject": {
+      "post": {
+        "operationId": "ExchangesController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "description": "16–128 caracteres; conservar la misma clave al reintentar la misma operación",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExchangeRequestResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": ""
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          },
+          "409": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Solicitudes de intercambio"
+        ]
+      }
+    },
+    "/exchanges/{id}/cancel": {
+      "post": {
+        "operationId": "ExchangesController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "description": "16–128 caracteres; conservar la misma clave al reintentar la misma operación",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExchangeRequestResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": ""
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          },
+          "409": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Solicitudes de intercambio"
+        ]
+      }
+    },
+    "/reservations/me": {
+      "get": {
+        "operationId": "ReservationsController_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReservationResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": ""
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          },
+          "409": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Reservas"
+        ]
+      }
+    },
+    "/reservations/{id}": {
+      "get": {
+        "operationId": "ReservationsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": ""
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          },
+          "409": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Reservas"
+        ]
+      }
+    },
+    "/reservations/{id}/confirm": {
+      "post": {
+        "description": "Bearer de un participante, cuerpo {} e Idempotency-Key. Solo despues del fin. La primera confirmacion mantiene Confirmada y la retencion; la segunda consume y transfiere una sola vez RESERVAS.creditos y devuelve Completada. Repetir una persona no sustituye a la otra. Reservas de oferta o fraccionarias requieren esquema decimal compatible; en esquema entero devuelven 409 DECIMAL_SETTLEMENT_PENDING. La cancelacion ya comprometida impide pagar.",
+        "operationId": "ReservationsController_confirm",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "description": "16–128 caracteres; conservar la misma clave al reintentar la misma operación",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": ""
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          },
+          "409": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirmar participacion y liquidar al recibir ambas confirmaciones",
+        "tags": [
+          "Reservas"
+        ]
+      }
+    },
+    "/reservations/{id}/cancel": {
+      "post": {
+        "description": "Una sola Liberacion por el importe de la reserva, sin pago al tutor. Participantes antes del inicio; despues requiere ADMIN. El horario de una oferta vuelve a estar disponible. Reintentos no repiten la liberacion.",
+        "operationId": "ReservationsController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "description": "16–128 caracteres; conservar la misma clave al reintentar la misma operación",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelReservationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": ""
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          },
+          "409": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancelar y liberar exactamente el importe retenido",
+        "tags": [
+          "Reservas"
+        ]
+      }
+    },
+    "/credits/me": {
+      "get": {
+        "operationId": "CreditsController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": ""
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": ""
+          },
+          "409": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Créditos de tiempo"
+        ]
+      }
+    },
+    "/credits/me/movements": {
+      "get": {
+        "operationId": "CreditsController_movements",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MovementResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": ""
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": ""
+          },
+          "409": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Créditos de tiempo"
+        ]
+      }
+    },
+    "/credits/grants": {
+      "post": {
+        "operationId": "CreditsController_grant",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "description": "16–128 caracteres; conservar la misma clave al reintentar la misma operación",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantCreditsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrantCreditsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": ""
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": ""
+          },
+          "409": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Carga de créditos exclusiva para pruebas locales por ADMIN; no representa dinero ni saldo de bienvenida",
+        "tags": [
+          "Créditos de tiempo"
+        ]
+      }
+    },
+    "/analytics/overview": {
+      "get": {
+        "operationId": "AnalyticsController_overview",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inicio ISO-8601 con zona horaria (incluido)",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Fin ISO-8601 con zona horaria (excluido)",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "groupBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "day",
+              "type": "string",
+              "enum": [
+                "day",
+                "month"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resumen general; saldos actuales separados"
+          },
+          "400": {
+            "description": "Fechas o parámetros inválidos"
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": "Requiere rol ADMIN"
+          },
+          "503": {
+            "description": "Disponible solo con PERSISTENCE_MODE=prisma"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Resumen general: usuarios, intercambios y créditos del periodo",
+        "tags": [
+          "Analytics (Dashboard)"
+        ]
+      }
+    },
+    "/analytics/users": {
+      "get": {
+        "operationId": "AnalyticsController_users",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inicio ISO-8601 con zona horaria (incluido)",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Fin ISO-8601 con zona horaria (excluido)",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "groupBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "day",
+              "type": "string",
+              "enum": [
+                "day",
+                "month"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agregados de usuarios sin datos personales"
+          },
+          "400": {
+            "description": "Fechas o parámetros inválidos"
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": "Requiere rol ADMIN"
+          },
+          "503": {
+            "description": "Disponible solo con PERSISTENCE_MODE=prisma"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Usuarios por estado, carrera y registros",
+        "tags": [
+          "Analytics (Dashboard)"
+        ]
+      }
+    },
+    "/analytics/exchanges": {
+      "get": {
+        "operationId": "AnalyticsController_exchanges",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inicio ISO-8601 con zona horaria (incluido)",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Fin ISO-8601 con zona horaria (excluido)",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "groupBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "day",
+              "type": "string",
+              "enum": [
+                "day",
+                "month"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Solicitudes, reservas, tasas y series"
+          },
+          "400": {
+            "description": "Fechas o parámetros inválidos"
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": "Requiere rol ADMIN"
+          },
+          "503": {
+            "description": "Disponible solo con PERSISTENCE_MODE=prisma"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Solicitudes, reservas y cancelaciones",
+        "tags": [
+          "Analytics (Dashboard)"
+        ]
+      }
+    },
+    "/analytics/credits": {
+      "get": {
+        "operationId": "AnalyticsController_credits",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inicio ISO-8601 con zona horaria (incluido)",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Fin ISO-8601 con zona horaria (excluido)",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "groupBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "day",
+              "type": "string",
+              "enum": [
+                "day",
+                "month"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Creditos exactos como strings enteros o con una decima"
+          },
+          "400": {
+            "description": "Fechas o parámetros inválidos"
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": "Requiere rol ADMIN"
+          },
+          "503": {
+            "description": "Disponible solo con PERSISTENCE_MODE=prisma"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Créditos transferidos, liberados, bonos y retenidos",
+        "tags": [
+          "Analytics (Dashboard)"
+        ]
+      }
+    },
+    "/analytics/skills": {
+      "get": {
+        "operationId": "AnalyticsController_skills",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inicio ISO-8601 con zona horaria (incluido)",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Fin ISO-8601 con zona horaria (excluido)",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "groupBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "day",
+              "type": "string",
+              "enum": [
+                "day",
+                "month"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rankings limitados por `limit`"
+          },
+          "400": {
+            "description": "Fechas o parámetros inválidos"
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": "Requiere rol ADMIN"
+          },
+          "503": {
+            "description": "Disponible solo con PERSISTENCE_MODE=prisma"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Habilidades y categorías más solicitadas",
+        "tags": [
+          "Analytics (Dashboard)"
+        ]
+      }
+    },
+    "/calendar/reservations/{id}/authorization-url": {
+      "post": {
+        "operationId": "CalendarController_authorizationUrl",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "URL de Google solicitada solamente al agregar una reserva Confirmada al calendario"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Google Calendar"
+        ]
+      }
+    },
+    "/calendar/callback": {
+      "get": {
+        "operationId": "CalendarController_callback",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Google Calendar"
+        ]
+      }
+    },
+    "/tutoring/offers": {
+      "get": {
+        "operationId": "TutoringController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "skillId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "codigo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "SIS-111",
+              "type": "string"
+            }
+          },
+          {
+            "name": "tutorId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "excludeTutorId",
+            "required": false,
+            "in": "query",
+            "description": "Excluir tutor al consultar otros tutores",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfferPage"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Catalogo publico de ofertas vigentes; page, limit y search opcional",
+        "tags": [
+          "Ofertas de tutoria"
+        ]
+      },
+      "post": {
+        "operationId": "TutoringController_publish",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "description": "16–128 caracteres; conservar la misma clave al reintentar la misma operación",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOfferDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfferResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Precio textual positivo, enteros o decimas; DTO/intervalo invalido"
+          },
+          "401": {
+            "description": "Sesion invalida o cuenta pendiente/inactiva"
+          },
+          "403": {
+            "description": "La habilidad no pertenece al tutor autenticado"
+          },
+          "409": {
+            "description": "Oferta activa duplicada, nivel/horario incompatible o clave reutilizada con otro contenido"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Publicar una clase con precio total exacto y crear su horario en una transaccion; no mueve creditos",
+        "tags": [
+          "Ofertas de tutoria"
+        ]
+      }
+    },
+    "/tutoring/offers/{id}": {
+      "get": {
+        "operationId": "TutoringController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfferResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Detalle público de una oferta activa, sin restricción de carrera",
+        "tags": [
+          "Ofertas de tutoria"
+        ]
+      },
+      "put": {
+        "operationId": "TutoringController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "description": "16–128 caracteres; conservar la misma clave al reintentar la misma operación",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOfferDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfferResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reemplazar contenido de oferta propia; conserva snapshots y bloquea cambios de horario contratado",
+        "tags": [
+          "Ofertas de tutoria"
+        ]
+      }
+    },
+    "/tutoring/banners": {
+      "post": {
+        "operationId": "TutoringBannerController_upload",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "description": "16–128 caracteres; conservar la misma clave al reintentar la misma operación",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "banner"
+                ],
+                "properties": {
+                  "banner": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BannerUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": ""
+          },
+          "401": {
+            "description": ""
+          },
+          "409": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cargar un banner propio JPG, PNG o WebP de hasta 3 MiB",
+        "tags": [
+          "Ofertas de tutorias"
+        ]
+      }
+    },
+    "/tutoring/banners/{id}": {
+      "get": {
+        "operationId": "TutoringBannerController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          }
+        },
+        "summary": "Leer la imagen de una oferta publicada activa",
+        "tags": [
+          "Ofertas de tutorias"
+        ]
+      }
+    },
+    "/curricula/systems": {
+      "get": {
+        "operationId": "AcademicController_curriculum",
+        "parameters": [
+          {
+            "name": "codigo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "semestre",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9,
+              "type": "number"
+            }
+          },
+          {
+            "name": "area",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "basicas",
+                "software",
+                "ia",
+                "informacion",
+                "infraestructura",
+                "general"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "503": {
+            "description": "Requiere PostgreSQL y propuesta académica aprobada, migrada y cargada"
+          }
+        },
+        "summary": "Pensum por código, área y semestre; MAT-030 externo",
+        "tags": [
+          "Pensum y Mi ruta"
+        ]
+      }
+    },
+    "/roadmap/me": {
+      "get": {
+        "operationId": "AcademicController_roadmap",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoadmapResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Requiere PostgreSQL y propuesta académica aprobada, migrada y cargada"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Declaraciones manuales propias del currículo systems, disponible a cualquier carrera",
+        "tags": [
+          "Pensum y Mi ruta"
+        ]
+      }
+    },
+    "/roadmap/me/courses/{codigo}": {
+      "put": {
+        "operationId": "AcademicController_update",
+        "parameters": [
+          {
+            "name": "codigo",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoadmapUpdateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoadmapResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Requiere PostgreSQL y propuesta académica aprobada, migrada y cargada"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualiza solo una materia; pending elimina la declaración; no exige prerrequisitos",
+        "tags": [
+          "Pensum y Mi ruta"
+        ]
+      }
+    },
+    "/intercambios/mis-clases": {
+      "get": {
+        "operationId": "AcademicController_classes",
+        "parameters": [
+          {
+            "name": "codigo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "semestre",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9,
+              "type": "number"
+            }
+          },
+          {
+            "name": "area",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "basicas",
+                "software",
+                "ia",
+                "informacion",
+                "infraestructura",
+                "general"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "ISO-8601 con zona; incluido",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "ISO-8601 con zona; excluido",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "503": {
+            "description": "Requiere PostgreSQL y propuesta académica aprobada, migrada y cargada"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Clases completadas propias y resumen Aprendí/Enseñé; créditos como texto exacto",
+        "tags": [
+          "Pensum y Mi ruta"
+        ]
+      }
+    },
+    "/analytics/academic": {
+      "get": {
+        "operationId": "AcademicAnalyticsController_command",
+        "parameters": [
+          {
+            "name": "codigo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "semestre",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9,
+              "type": "number"
+            }
+          },
+          {
+            "name": "area",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "basicas",
+                "software",
+                "ia",
+                "informacion",
+                "infraestructura",
+                "general"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "ISO-8601 con zona; incluido",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "ISO-8601 con zona; excluido",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Command Center: demanda observada, cobertura y proyección etiquetada",
+        "tags": [
+          "Indicadores académicos ADMIN"
+        ]
+      }
+    },
+    "/analytics/reputation": {
+      "get": {
+        "operationId": "AcademicAnalyticsController_ranking",
+        "parameters": [
+          {
+            "name": "codigo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "semestre",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9,
+              "type": "number"
+            }
+          },
+          {
+            "name": "area",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "basicas",
+                "software",
+                "ia",
+                "informacion",
+                "infraestructura",
+                "general"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "ISO-8601 con zona; incluido",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "ISO-8601 con zona; excluido",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ranking descriptivo por tutor/materia; Knowledge Score pendiente del PO",
+        "tags": [
+          "Indicadores académicos ADMIN"
+        ]
+      }
+    },
+    "/analytics/economy": {
+      "get": {
+        "operationId": "AcademicAnalyticsController_economy",
+        "parameters": [
+          {
+            "name": "codigo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "semestre",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9,
+              "type": "number"
+            }
+          },
+          {
+            "name": "area",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "basicas",
+                "software",
+                "ia",
+                "informacion",
+                "infraestructura",
+                "general"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "ISO-8601 con zona; incluido",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "ISO-8601 con zona; excluido",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Distribución de precios, horarios y cuentas sin movimientos; solo lectura",
+        "tags": [
+          "Indicadores académicos ADMIN"
+        ]
+      }
+    },
+    "/tutoring/reviews/me": {
+      "get": {
+        "operationId": "ReviewsController_mine",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Opiniones escritas por la cuenta autenticada",
+        "tags": [
+          "Opiniones y reputación"
+        ]
+      }
+    },
+    "/tutoring/reviews": {
+      "get": {
+        "operationId": "ReviewsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "tutorId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "skillId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewPage"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Opiniones válidas por tutor y materia; sin identidad del evaluador",
+        "tags": [
+          "Opiniones y reputación"
+        ]
+      }
+    },
+    "/tutoring/reputation": {
+      "get": {
+        "operationId": "ReviewsController_reputation",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "tutorId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "skillId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Media, opiniones y clases completadas por tutor/materia; sin score no aprobado",
+        "tags": [
+          "Opiniones y reputación"
+        ]
+      }
+    },
+    "/tutoring/reservations/{id}/review": {
+      "post": {
+        "operationId": "ReviewsController_create",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "description": "16–128 caracteres; conservar la misma clave al reintentar la misma operación",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Calificar una reserva completada; solo solicitante, una opinión y replay seguro",
+        "tags": [
+          "Opiniones y reputación"
+        ]
+      }
+    },
+    "/assistant/ask": {
+      "post": {
+        "operationId": "AssistantController_ask",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskAssistantDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantAnswerDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Se acabaron los mensajes gratis del día (ASSISTANT_QUOTA_EXCEEDED) o más de 10 por minuto"
+          },
+          "502": {
+            "description": "El modelo no respondió"
+          },
+          "503": {
+            "description": "Asistente sin configurar u ocupado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Asistente IA"
+        ]
+      }
+    },
+    "/assistant/me": {
+      "get": {
+        "operationId": "AssistantController_profile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantProfileDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Asistente IA"
+        ]
+      }
+    },
+    "/assistant/me/avatar": {
+      "put": {
+        "operationId": "AssistantController_saveAvatar",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantAvatarDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantProfileDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Asistente IA"
+        ]
+      }
+    },
+    "/assistant/me/key": {
+      "put": {
+        "operationId": "AssistantController_saveKey",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantKeyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Comprueba la key con Groq y la guarda cifrada; nunca se devuelve",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantProfileDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Asistente IA"
+        ]
+      },
+      "delete": {
+        "operationId": "AssistantController_clearKey",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantProfileDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Asistente IA"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Banco de Tiempo Universitario",
+    "description": "v0.4, fase 5: cuentas institucionales, ofertas, solicitudes con precio pactado, retencion, cancelacion y doble confirmacion con pago exacto. El pago usa RESERVAS.creditos tras terminar la clase y recibir ambas confirmaciones. Ofertas y fracciones requieren esquema decimal compatible; la base entera mantiene OFFER_PRICE_FLOW_PENDING para contratar y DECIMAL_SETTLEMENT_PENDING para liquidar reservas de oferta. Importes financieros en JSON como strings.",
+    "version": "0.4.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "ok"
+          },
+          "service": {
+            "type": "string",
+            "example": "banco-tiempo-backend"
+          }
+        },
+        "required": [
+          "status",
+          "service"
+        ]
+      },
+      "ReadinessResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "ok"
+          },
+          "persistence": {
+            "type": "string",
+            "enum": [
+              "memory",
+              "postgresql"
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "persistence"
+        ]
+      },
+      "RegisterDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "example": "Ana",
+            "maxLength": 100
+          },
+          "apellido": {
+            "type": "string",
+            "example": "Pérez",
+            "maxLength": 100
+          },
+          "correo": {
+            "type": "string",
+            "example": "ana@ucb.edu.bo",
+            "format": "email",
+            "description": "Dominio exacto ucb.edu.bo; se normaliza antes de validar"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 128,
+            "writeOnly": true,
+            "format": "password"
+          },
+          "idCarrera": {
+            "type": "string",
+            "example": "30000000-0000-4000-8000-000000000001",
+            "description": "UUID de una carrera activa obtenida de GET /careers"
+          },
+          "semestre": {
+            "type": "number",
+            "example": 3,
+            "minimum": 1
+          }
+        },
+        "required": [
+          "nombre",
+          "apellido",
+          "correo",
+          "password",
+          "idCarrera",
+          "semestre"
+        ]
+      },
+      "RegistrationResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "apellido": {
+            "type": "string"
+          },
+          "correo": {
+            "type": "string",
+            "format": "email"
+          },
+          "idCarrera": {
+            "type": "object"
+          },
+          "semestre": {
+            "type": "object"
+          },
+          "rol": {
+            "type": "string",
+            "enum": [
+              "Estudiante",
+              "Profesor",
+              "Administrador"
+            ]
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "ESTUDIANTE",
+                "PROFESOR",
+                "ADMIN"
+              ]
+            }
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "Pendiente",
+              "Activo",
+              "Inactivo",
+              "Suspendido"
+            ]
+          },
+          "verification_required": {
+            "type": "boolean",
+            "example": true,
+            "description": "Cuenta Pendiente, saldo cero y sin sesion; revisar correo institucional"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "apellido",
+          "correo",
+          "idCarrera",
+          "semestre",
+          "rol",
+          "roles",
+          "verification_required"
+        ]
+      },
+      "VerifyEmailDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Credencial de un solo uso recibida por correo; nunca es un Bearer de sesion",
+            "minLength": 43,
+            "maxLength": 43
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "VerificationResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "verified"
+            ]
+          },
+          "login_required": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "status",
+          "login_required"
+        ]
+      },
+      "ResendVerificationDto": {
+        "type": "object",
+        "properties": {
+          "correo": {
+            "type": "string",
+            "format": "email",
+            "example": "ana@ucb.edu.bo"
+          }
+        },
+        "required": [
+          "correo"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "correo": {
+            "type": "string",
+            "example": "ana@example.test",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "writeOnly": true,
+            "format": "password"
+          }
+        },
+        "required": [
+          "correo",
+          "password"
+        ]
+      },
+      "PublicUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "apellido": {
+            "type": "string"
+          },
+          "correo": {
+            "type": "string",
+            "format": "email"
+          },
+          "idCarrera": {
+            "type": "object"
+          },
+          "semestre": {
+            "type": "object"
+          },
+          "rol": {
+            "type": "string",
+            "enum": [
+              "Estudiante",
+              "Profesor",
+              "Administrador"
+            ]
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "ESTUDIANTE",
+                "PROFESOR",
+                "ADMIN"
+              ]
+            }
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "Pendiente",
+              "Activo",
+              "Inactivo",
+              "Suspendido"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "apellido",
+          "correo",
+          "idCarrera",
+          "semestre",
+          "rol",
+          "roles"
+        ]
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string"
+          },
+          "token_type": {
+            "type": "string",
+            "enum": [
+              "Bearer"
+            ]
+          },
+          "user": {
+            "$ref": "#/components/schemas/PublicUser"
+          }
+        },
+        "required": [
+          "access_token",
+          "token_type",
+          "user"
+        ]
+      },
+      "GoogleLoginDto": {
+        "type": "object",
+        "properties": {
+          "credential": {
+            "type": "string",
+            "description": "ID token entregado por Google Identity Services"
+          },
+          "idCarrera": {
+            "type": "string",
+            "description": "Solo para crear la cuenta la primera vez"
+          },
+          "semestre": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 12
+          },
+          "nombre": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "apellido": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "credential"
+        ]
+      },
+      "UpdateProfileDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "apellido": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "idCarrera": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "semestre": {
+            "type": "number",
+            "minimum": 1
+          }
+        }
+      },
+      "Object": {
+        "type": "object",
+        "properties": {}
+      },
+      "AdminUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "apellido": {
+            "type": "string"
+          },
+          "correo": {
+            "type": "string",
+            "format": "email"
+          },
+          "idCarrera": {
+            "type": "object"
+          },
+          "semestre": {
+            "type": "object"
+          },
+          "rol": {
+            "type": "string",
+            "enum": [
+              "Estudiante",
+              "Profesor",
+              "Administrador"
+            ]
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "ESTUDIANTE",
+                "PROFESOR",
+                "ADMIN"
+              ]
+            }
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "Pendiente",
+              "Activo",
+              "Inactivo",
+              "Suspendido"
+            ]
+          },
+          "fechaRegistro": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ultimoAcceso": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "apellido",
+          "correo",
+          "idCarrera",
+          "semestre",
+          "rol",
+          "roles",
+          "fechaRegistro",
+          "ultimoAcceso"
+        ]
+      },
+      "PaginationMeta": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "totalPages": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "totalPages"
+        ]
+      },
+      "AdminUsersPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminUser"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "UpdateUserStatusDto": {
+        "type": "object",
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "Activo",
+              "Inactivo"
+            ],
+            "description": "Inactivo = baja logica; Activo = reactivacion"
+          },
+          "motivo": {
+            "type": "string",
+            "maxLength": 255
+          }
+        },
+        "required": [
+          "estado"
+        ]
+      },
+      "Career": {
+        "type": "object",
+        "properties": {
+          "id_carrera": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "facultad": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "activo",
+              "inactivo"
+            ]
+          }
+        },
+        "required": [
+          "id_carrera",
+          "nombre",
+          "facultad",
+          "estado"
+        ]
+      },
+      "CareersPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Career"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "Category": {
+        "type": "object",
+        "properties": {
+          "id_categoria": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "activo",
+              "inactivo"
+            ]
+          }
+        },
+        "required": [
+          "id_categoria",
+          "nombre",
+          "estado"
+        ]
+      },
+      "CategoriesPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Category"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "CreateCategoryDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "example": "Tecnología",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "nombre"
+        ]
+      },
+      "SkillProvider": {
+        "type": "object",
+        "properties": {
+          "id_usuario": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombre": {
+            "type": "string",
+            "description": "Nombre completo del ofertante"
+          },
+          "id_habilidad": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "habilidad": {
+            "type": "string"
+          },
+          "nivel": {
+            "type": "string",
+            "enum": [
+              "Basico",
+              "Intermedio",
+              "Avanzado",
+              "Experto"
+            ]
+          }
+        },
+        "required": [
+          "id_usuario",
+          "nombre",
+          "id_habilidad",
+          "habilidad",
+          "nivel"
+        ]
+      },
+      "SkillProvidersPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkillProvider"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "Skill": {
+        "type": "object",
+        "properties": {
+          "codigo": {
+            "type": "object",
+            "nullable": true,
+            "example": "SIS-111"
+          },
+          "id_habilidad": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "id_categoria": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "activo",
+              "inactivo"
+            ]
+          }
+        },
+        "required": [
+          "id_habilidad",
+          "nombre",
+          "id_categoria",
+          "estado"
+        ]
+      },
+      "SkillsPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Skill"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "CreateSkillDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "example": "Tecnología",
+            "maxLength": 100
+          },
+          "categoryId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Se adapta a id_categoria"
+          }
+        },
+        "required": [
+          "nombre",
+          "categoryId"
+        ]
+      },
+      "PublishedUserSkill": {
+        "type": "object",
+        "properties": {
+          "id_usuario": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id_habilidad": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nivel": {
+            "type": "string",
+            "enum": [
+              "Basico",
+              "Intermedio",
+              "Avanzado",
+              "Experto"
+            ]
+          },
+          "habilidad": {
+            "$ref": "#/components/schemas/Skill"
+          }
+        },
+        "required": [
+          "id_usuario",
+          "id_habilidad",
+          "nivel",
+          "habilidad"
+        ]
+      },
+      "CreateUserSkillDto": {
+        "type": "object",
+        "properties": {
+          "skillId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Se adapta a id_habilidad; el usuario procede del JWT"
+          },
+          "nivel": {
+            "type": "string",
+            "enum": [
+              "Basico",
+              "Intermedio",
+              "Avanzado",
+              "Experto"
+            ]
+          }
+        },
+        "required": [
+          "skillId",
+          "nivel"
+        ]
+      },
+      "UserSkill": {
+        "type": "object",
+        "properties": {
+          "id_usuario": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id_habilidad": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nivel": {
+            "type": "string",
+            "enum": [
+              "Basico",
+              "Intermedio",
+              "Avanzado",
+              "Experto"
+            ]
+          }
+        },
+        "required": [
+          "id_usuario",
+          "id_habilidad",
+          "nivel"
+        ]
+      },
+      "CreateAvailabilityDto": {
+        "type": "object",
+        "properties": {
+          "fechaInicio": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-02T09:00:00-04:00"
+          },
+          "fechaFin": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-02T10:00:00-04:00"
+          }
+        },
+        "required": [
+          "fechaInicio",
+          "fechaFin"
+        ]
+      },
+      "Availability": {
+        "type": "object",
+        "properties": {
+          "id_disponibilidad": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id_usuario": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fecha_inicio": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fecha_fin": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "disponible",
+              "reservado",
+              "cancelado"
+            ]
+          }
+        },
+        "required": [
+          "id_disponibilidad",
+          "id_usuario",
+          "fecha_inicio",
+          "fecha_fin",
+          "estado"
+        ]
+      },
+      "UpdateAvailabilityDto": {
+        "type": "object",
+        "properties": {
+          "fechaInicio": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fechaFin": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreateExchangeDto": {
+        "type": "object",
+        "properties": {
+          "fechaInicio": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-02T09:00:00-04:00"
+          },
+          "fechaFin": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-02T10:00:00-04:00"
+          },
+          "providerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "skillId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "availabilityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "offerId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Opcional: debe coincidir con la oferta resuelta por availabilityId. El precio procede del servidor."
+          },
+          "descripcion": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "fechaInicio",
+          "fechaFin",
+          "providerId",
+          "skillId",
+          "availabilityId"
+        ]
+      },
+      "RequestStatus": {
+        "type": "string",
+        "enum": [
+          "Solicitada",
+          "Aceptada",
+          "Rechazada",
+          "Cancelada"
+        ]
+      },
+      "ExchangeRequestResponse": {
+        "type": "object",
+        "properties": {
+          "id_solicitud": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "id_solicitante": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id_ofertante": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id_habilidad": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id_disponibilidad": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Contexto de la API guardado en AUDITORIA"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id_oferta": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Oferta de origen; NULL en solicitudes historicas sin oferta"
+          },
+          "fecha_inicio_propuesta": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fecha_fin_propuesta": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "creditos_requeridos": {
+            "type": "string",
+            "pattern": "^\\d+(?:\\.\\d)?$",
+            "example": "3.7",
+            "description": "Creditos exactos como texto, enteros o decimas. Precio pactado de oferta o tarifa historica para horarios anteriores."
+          },
+          "respondida_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "descripcion": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Descripcion de API conservada en AUDITORIA"
+          },
+          "estado": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RequestStatus"
+              }
+            ]
+          },
+          "costo_creditos": {
+            "type": "string",
+            "pattern": "^\\d+(?:\\.\\d)?$",
+            "example": "3.7",
+            "description": "Creditos exactos como texto, enteros o decimas. Precio pactado de oferta o tarifa historica para horarios anteriores."
+          }
+        },
+        "required": [
+          "id_solicitud",
+          "id_solicitante",
+          "id_ofertante",
+          "id_habilidad",
+          "id_disponibilidad",
+          "created_at",
+          "id_oferta",
+          "fecha_inicio_propuesta",
+          "fecha_fin_propuesta",
+          "creditos_requeridos",
+          "respondida_at",
+          "descripcion",
+          "estado",
+          "costo_creditos"
+        ]
+      },
+      "IntegrityIssueResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "PARTICIPANT_RESERVATION_OVERLAP"
+          },
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "code",
+          "ids"
+        ]
+      },
+      "IntegrityCountsResponse": {
+        "type": "object",
+        "properties": {
+          "solicitudes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reservas": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "movimientos": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "usuarios": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "solicitudes",
+          "reservas",
+          "movimientos",
+          "usuarios"
+        ]
+      },
+      "IntegrityResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "inconsistente"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "memory-process",
+              "postgresql-transaction"
+            ]
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IntegrityIssueResponse"
+            }
+          },
+          "counts": {
+            "$ref": "#/components/schemas/IntegrityCountsResponse"
+          }
+        },
+        "required": [
+          "status",
+          "scope",
+          "issues",
+          "counts"
+        ]
+      },
+      "ReservationStatus": {
+        "type": "string",
+        "enum": [
+          "Confirmada",
+          "Completada",
+          "Cancelada"
+        ]
+      },
+      "ConfirmationResponse": {
+        "type": "object",
+        "properties": {
+          "id_reserva": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id_usuario": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id_reserva",
+          "id_usuario",
+          "fecha"
+        ]
+      },
+      "CancellationResponse": {
+        "type": "object",
+        "properties": {
+          "id_reserva": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id_usuario": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "motivo": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "administrativa": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id_reserva",
+          "id_usuario",
+          "motivo",
+          "fecha",
+          "administrativa"
+        ]
+      },
+      "ReservationResponse": {
+        "type": "object",
+        "properties": {
+          "id_solicitud": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "id_solicitante": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id_ofertante": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id_habilidad": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id_disponibilidad": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Contexto de la API guardado en AUDITORIA"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id_oferta": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "id_reserva": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fecha_inicio": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fecha_fin": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "creditos": {
+            "type": "string",
+            "pattern": "^\\d+(?:\\.\\d)?$",
+            "example": "3.7",
+            "description": "Creditos exactos como texto, enteros o decimas. Precio pactado de oferta o tarifa historica para horarios anteriores."
+          },
+          "modalidad": {
+            "type": "string",
+            "enum": [
+              "Presencial",
+              "Virtual",
+              "Hibrida"
+            ]
+          },
+          "lugar": {
+            "type": "string",
+            "example": "Por coordinar"
+          },
+          "estado": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReservationStatus"
+              }
+            ]
+          },
+          "confirmacion_solicitante_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "confirmacion_ofertante_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "cancelado_por": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "motivo_cancelacion": {
+            "type": "string",
+            "maxLength": 500,
+            "nullable": true
+          },
+          "horas_anticipacion_cancelacion": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "cancelled_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "monto_creditos": {
+            "type": "string",
+            "pattern": "^\\d+(?:\\.\\d)?$",
+            "example": "3.7",
+            "description": "Creditos exactos como texto, enteros o decimas. Precio pactado de oferta o tarifa historica para horarios anteriores."
+          },
+          "confirmaciones": {
+            "maxItems": 2,
+            "description": "Vista derivada de los dos timestamps oficiales",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfirmationResponse"
+            }
+          },
+          "cancelacion": {
+            "nullable": true,
+            "description": "Vista derivada de campos de RESERVAS",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CancellationResponse"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id_solicitud",
+          "id_solicitante",
+          "id_ofertante",
+          "id_habilidad",
+          "id_disponibilidad",
+          "created_at",
+          "id_oferta",
+          "id_reserva",
+          "fecha_inicio",
+          "fecha_fin",
+          "creditos",
+          "modalidad",
+          "lugar",
+          "estado",
+          "confirmacion_solicitante_at",
+          "confirmacion_ofertante_at",
+          "cancelado_por",
+          "motivo_cancelacion",
+          "horas_anticipacion_cancelacion",
+          "completed_at",
+          "cancelled_at",
+          "monto_creditos",
+          "confirmaciones",
+          "cancelacion"
+        ]
+      },
+      "CancelReservationDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "motivo"
+        ]
+      },
+      "AccountResponse": {
+        "type": "object",
+        "properties": {
+          "id_usuario": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "saldo": {
+            "type": "string",
+            "pattern": "^\\d+(?:\\.\\d)?$",
+            "example": "3.7",
+            "description": "Creditos exactos como texto, enteros o decimas. Precio pactado de oferta o tarifa historica para horarios anteriores."
+          },
+          "creditos_retenidos": {
+            "type": "string",
+            "pattern": "^\\d+(?:\\.\\d)?$",
+            "example": "1",
+            "description": "Creditos exactos como texto, enteros o decimas. Precio pactado de oferta o tarifa historica para horarios anteriores."
+          },
+          "disponibles": {
+            "type": "string",
+            "pattern": "^\\d+(?:\\.\\d)?$",
+            "example": "3",
+            "description": "Creditos exactos como texto, enteros o decimas. Precio pactado de oferta o tarifa historica para horarios anteriores."
+          },
+          "unidad": {
+            "type": "string",
+            "enum": [
+              "CREDITO",
+              "CREDITO_15_MINUTOS"
+            ],
+            "description": "CREDITO en esquema decimal; unidad historica para la base entera"
+          }
+        },
+        "required": [
+          "id_usuario",
+          "saldo",
+          "creditos_retenidos",
+          "disponibles",
+          "unidad"
+        ]
+      },
+      "MovementType": {
+        "type": "string",
+        "enum": [
+          "BonoInicial",
+          "Recompensa",
+          "Penalizacion",
+          "Transferencia",
+          "Ajuste",
+          "Retencion",
+          "Liberacion",
+          "Consumo"
+        ]
+      },
+      "MovementResponse": {
+        "type": "object",
+        "properties": {
+          "id_movimiento": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id_usuario": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id_reserva": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "tipo": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MovementType"
+              }
+            ]
+          },
+          "cantidad": {
+            "type": "string",
+            "pattern": "^-?\\d+(?:\\.\\d)?$",
+            "example": "-3.7"
+          },
+          "monto": {
+            "type": "string",
+            "pattern": "^-?\\d+(?:\\.\\d)?$",
+            "example": "-3.7"
+          },
+          "saldo_anterior": {
+            "type": "string",
+            "pattern": "^\\d+(?:\\.\\d)?$",
+            "example": "3.7",
+            "description": "Creditos exactos como texto, enteros o decimas. Precio pactado de oferta o tarifa historica para horarios anteriores."
+          },
+          "saldo_posterior": {
+            "type": "string",
+            "pattern": "^\\d+(?:\\.\\d)?$",
+            "example": "3.7",
+            "description": "Creditos exactos como texto, enteros o decimas. Precio pactado de oferta o tarifa historica para horarios anteriores."
+          },
+          "retenidos_anterior": {
+            "type": "string",
+            "pattern": "^\\d+(?:\\.\\d)?$",
+            "example": "3.7",
+            "description": "Creditos exactos como texto, enteros o decimas. Precio pactado de oferta o tarifa historica para horarios anteriores."
+          },
+          "retenidos_posterior": {
+            "type": "string",
+            "pattern": "^\\d+(?:\\.\\d)?$",
+            "example": "3.7",
+            "description": "Creditos exactos como texto, enteros o decimas. Precio pactado de oferta o tarifa historica para horarios anteriores."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "descripcion": {
+            "type": "string",
+            "maxLength": 500,
+            "nullable": true
+          }
+        },
+        "required": [
+          "id_movimiento",
+          "id_usuario",
+          "id_reserva",
+          "tipo",
+          "cantidad",
+          "monto",
+          "saldo_anterior",
+          "saldo_posterior",
+          "retenidos_anterior",
+          "retenidos_posterior",
+          "created_at",
+          "descripcion"
+        ]
+      },
+      "GrantCreditsDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "string",
+            "example": "8",
+            "description": "Creditos como texto, entero o una decima; las bases con esquema entero siguen rechazando fracciones. Carga de desarrollo."
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "userId",
+          "amount",
+          "reason"
+        ]
+      },
+      "GrantCreditsResponse": {
+        "type": "object",
+        "properties": {
+          "cuenta": {
+            "$ref": "#/components/schemas/AccountResponse"
+          },
+          "movimiento": {
+            "$ref": "#/components/schemas/MovementResponse"
+          }
+        },
+        "required": [
+          "cuenta",
+          "movimiento"
+        ]
+      },
+      "OfferResponse": {
+        "type": "object",
+        "properties": {
+          "id_oferta": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id_usuario": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id_tutor": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id_habilidad": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id_disponibilidad": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nivel": {
+            "type": "string",
+            "enum": [
+              "Basico",
+              "Intermedio",
+              "Avanzado",
+              "Experto"
+            ]
+          },
+          "titulo": {
+            "type": "string"
+          },
+          "descripcion": {
+            "type": "string"
+          },
+          "costo_creditos": {
+            "type": "string",
+            "example": "3.7"
+          },
+          "bannerUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "fecha_inicio": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fecha_fin": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "tutor": {
+            "type": "object",
+            "example": {
+              "id": "UUID",
+              "nombre": "Ana",
+              "apellido": "Perez"
+            }
+          },
+          "materia": {
+            "type": "object",
+            "example": {
+              "id_habilidad": "UUID",
+              "nombre": "Programacion"
+            }
+          },
+          "metricas": {
+            "type": "object",
+            "example": {
+              "promedio": null,
+              "opiniones": 0,
+              "tutorias_completadas": 0
+            }
+          }
+        },
+        "required": [
+          "id_oferta",
+          "id_usuario",
+          "id_tutor",
+          "id_habilidad",
+          "id_disponibilidad",
+          "nivel",
+          "titulo",
+          "descripcion",
+          "costo_creditos",
+          "bannerUrl",
+          "fecha_inicio",
+          "fecha_fin",
+          "tutor",
+          "materia",
+          "metricas"
+        ]
+      },
+      "OfferPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OfferResponse"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "CreateOfferDto": {
+        "type": "object",
+        "properties": {
+          "fechaInicio": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-02T09:00:00-04:00"
+          },
+          "fechaFin": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-02T10:00:00-04:00"
+          },
+          "skillId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Habilidad activa que el tutor ya ofrece en su perfil"
+          },
+          "nivel": {
+            "type": "string",
+            "enum": [
+              "Basico",
+              "Intermedio",
+              "Avanzado",
+              "Experto"
+            ]
+          },
+          "titulo": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "descripcion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1500
+          },
+          "costoCreditos": {
+            "type": "string",
+            "example": "3.7",
+            "description": "Precio TOTAL por clase, texto exacto positivo; enteros o una decima. Limite tecnico 9999999999.9, pendiente maximo comercial del PO."
+          },
+          "bannerUrl": {
+            "type": "string",
+            "description": "URL absoluta devuelta por POST /tutoring/banners para este tutor"
+          }
+        },
+        "required": [
+          "fechaInicio",
+          "fechaFin",
+          "skillId",
+          "nivel",
+          "titulo",
+          "descripcion",
+          "costoCreditos"
+        ]
+      },
+      "BannerUploadResponse": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Referencia propia para bannerUrl de la oferta; disponible publicamente al publicar. Caduca en 24h si no se utiliza."
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "RoadmapResponse": {
+        "type": "object",
+        "properties": {
+          "curriculum": {
+            "type": "string",
+            "example": "systems"
+          },
+          "courses": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "approved",
+                "current"
+              ]
+            },
+            "example": {
+              "SIS-111": "approved"
+            }
+          }
+        },
+        "required": [
+          "curriculum",
+          "courses"
+        ]
+      },
+      "RoadmapUpdateDto": {
+        "type": "object",
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "current",
+              "pending"
+            ]
+          }
+        },
+        "required": [
+          "estado"
+        ]
+      },
+      "ReviewResponse": {
+        "type": "object",
+        "properties": {
+          "id_calificacion": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id_reserva": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "calificacion": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "comentario": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id_calificacion",
+          "id_reserva",
+          "calificacion",
+          "comentario",
+          "created_at"
+        ]
+      },
+      "ReviewPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewResponse"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "ReviewDto": {
+        "type": "object",
+        "properties": {
+          "calificacion": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "comentario": {
+            "type": "object",
+            "maxLength": 500,
+            "default": ""
+          }
+        },
+        "required": [
+          "calificacion"
+        ]
+      },
+      "AssistantTurnDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant"
+            ]
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 1200
+          }
+        },
+        "required": [
+          "role",
+          "content"
+        ]
+      },
+      "AskAssistantDto": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "example": "¿Cómo reservo una tutoría?",
+            "maxLength": 500
+          },
+          "history": {
+            "maxItems": 6,
+            "description": "Últimos turnos de la conversación, del más antiguo al más reciente",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssistantTurnDto"
+            }
+          },
+          "route": {
+            "type": "string",
+            "example": "/perfil",
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "question"
+        ]
+      },
+      "AssistantActionDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "navigate"
+            ]
+          },
+          "route": {
+            "type": "string",
+            "example": "/perfil"
+          },
+          "target": {
+            "type": "object",
+            "example": "anadir-habilidad",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "example": "Añadir una materia a tu perfil"
+          }
+        },
+        "required": [
+          "type",
+          "route",
+          "label"
+        ]
+      },
+      "AssistantOfferCardDto": {
+        "type": "object",
+        "properties": {
+          "id_oferta": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "titulo": {
+            "type": "string"
+          },
+          "materia": {
+            "type": "string"
+          },
+          "tutor": {
+            "type": "string"
+          },
+          "costo_creditos": {
+            "type": "string",
+            "example": "3.5"
+          },
+          "fecha_inicio": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id_oferta",
+          "titulo",
+          "materia",
+          "tutor",
+          "costo_creditos",
+          "fecha_inicio"
+        ]
+      },
+      "AssistantQuotaDto": {
+        "type": "object",
+        "properties": {
+          "llavePropia": {
+            "type": "boolean"
+          },
+          "limite": {
+            "type": "number"
+          },
+          "usados": {
+            "type": "number"
+          },
+          "restantes": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "llavePropia",
+          "limite",
+          "usados",
+          "restantes"
+        ]
+      },
+      "AssistantAnswerDto": {
+        "type": "object",
+        "properties": {
+          "answer": {
+            "type": "string",
+            "example": "Te llevo a tu perfil…"
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssistantActionDto"
+            }
+          },
+          "offers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssistantOfferCardDto"
+            }
+          },
+          "quota": {
+            "$ref": "#/components/schemas/AssistantQuotaDto"
+          }
+        },
+        "required": [
+          "answer",
+          "actions",
+          "offers",
+          "quota"
+        ]
+      },
+      "AssistantAvatarDto": {
+        "type": "object",
+        "properties": {
+          "estilo": {
+            "type": "string",
+            "enum": [
+              "orbe",
+              "gota",
+              "burbuja",
+              "chispa"
+            ]
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "azul",
+              "amarillo",
+              "verde",
+              "coral"
+            ]
+          },
+          "nombre": {
+            "type": "string",
+            "example": "Nexo",
+            "maxLength": 24
+          }
+        },
+        "required": [
+          "estilo",
+          "color",
+          "nombre"
+        ]
+      },
+      "AssistantProfileDto": {
+        "type": "object",
+        "properties": {
+          "avatar": {
+            "$ref": "#/components/schemas/AssistantAvatarDto"
+          },
+          "llavePista": {
+            "type": "object",
+            "example": "gsk_…a1b2",
+            "nullable": true
+          },
+          "quota": {
+            "$ref": "#/components/schemas/AssistantQuotaDto"
+          },
+          "llavesHabilitadas": {
+            "type": "boolean",
+            "description": "Si el servidor puede guardar llaves cifradas"
+          }
+        },
+        "required": [
+          "avatar",
+          "llavePista",
+          "quota",
+          "llavesHabilitadas"
+        ]
+      },
+      "AssistantKeyDto": {
+        "type": "object",
+        "properties": {
+          "apiKey": {
+            "type": "string",
+            "description": "API key personal de Groq (gsk_…)"
+          }
+        },
+        "required": [
+          "apiKey"
+        ]
+      }
+    }
+  }
+}
