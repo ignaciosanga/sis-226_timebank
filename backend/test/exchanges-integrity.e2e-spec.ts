@@ -31,6 +31,10 @@ interface Actor {
 
 interface ExchangeResponse {
   id_solicitud: string;
+  nombre_solicitante?: string;
+  apellido_solicitante?: string;
+  nombre_ofertante?: string;
+  apellido_ofertante?: string;
   estado: string;
   fecha_inicio_propuesta: string;
   fecha_fin_propuesta: string;
@@ -41,6 +45,10 @@ interface ExchangeResponse {
 
 interface ReservationResponse {
   id_reserva: string;
+  nombre_solicitante: string;
+  apellido_solicitante: string;
+  nombre_ofertante: string;
+  apellido_ofertante: string;
   id_solicitud: string;
   estado: string;
   creditos: string;
@@ -107,14 +115,18 @@ describe('Reservas y creditos atomicos por HTTP con memoria y JWT reales', () =>
     actor.token = response.body.access_token as string;
   }
 
-  async function register(isAdmin = false): Promise<Actor> {
+  async function register(
+    isAdmin = false,
+    nombre = 'Ana',
+    apellido = 'Intercambios',
+  ): Promise<Actor> {
     const correo = `intercambio-${randomUUID()}@ucb.edu.bo`;
     const password = randomBytes(24).toString('base64url');
     const response = await client()
       .post('/auth/register')
       .send({
-        nombre: 'Ana',
-        apellido: 'Intercambios',
+        nombre,
+        apellido,
         correo,
         password,
         idCarrera: '30000000-0000-4000-8000-000000000001',
@@ -268,10 +280,10 @@ describe('Reservas y creditos atomicos por HTTP con memoria y JWT reales', () =>
       },
     });
     await app.init();
-    admin = await register(true);
-    requester = await register();
-    provider = await register();
-    other = await register();
+    admin = await register(true, 'Admin', 'Prueba');
+    requester = await register(false, 'Lucia', 'Solicitante');
+    provider = await register(false, 'Marco', 'Ofertante');
+    other = await register(false, 'Carlos', 'Alternativo');
 
     const start = Math.ceil((Date.now() + 3_600_000) / 60_000) * 60_000;
     fechaInicio = new Date(start).toISOString();
@@ -298,6 +310,36 @@ describe('Reservas y creditos atomicos por HTTP con memoria y JWT reales', () =>
     });
     await client().get('/credits/me').expect(401);
     await client().get('/reservations/me').expect(401);
+  });
+
+  it('devuelve los nombres de los participantes en solicitudes y reservas', async () => {
+    const exchange = await createExchange();
+
+    const listedRequests = await requests(requester);
+
+    expect(listedRequests).toHaveLength(1);
+    expect(listedRequests[0]).toMatchObject({
+      id_solicitante: requester.id,
+      id_ofertante: provider.id,
+      nombre_solicitante: 'Lucia',
+      apellido_solicitante: 'Solicitante',
+      nombre_ofertante: 'Marco',
+      apellido_ofertante: 'Ofertante',
+    });
+
+    await acceptExchange(exchange);
+
+    const listedReservations = await reservations(requester);
+
+    expect(listedReservations).toHaveLength(1);
+    expect(listedReservations[0]).toMatchObject({
+      id_solicitante: requester.id,
+      id_ofertante: provider.id,
+      nombre_solicitante: 'Lucia',
+      apellido_solicitante: 'Solicitante',
+      nombre_ofertante: 'Marco',
+      apellido_ofertante: 'Ofertante',
+    });
   });
 
   it('persiste solicitudes, reservas y saldos en el modelo de 12 tablas con creditos enteros', async () => {

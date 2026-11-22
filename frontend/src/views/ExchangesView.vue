@@ -23,7 +23,23 @@ watch(() => route.query.calendar, (result) => {
 }, { immediate: true })
 const requests = computed(() => store.myRequests.filter((row) => (direction.value === 'recibidas' ? row.id_ofertante === store.user.id : row.id_solicitante === store.user.id) && (!status.value || row.estado === status.value)))
 const reservations = computed(() => store.myReservations.filter((row) => !status.value || row.estado === status.value))
-const other = (row) => store.findUser(row.id_ofertante === store.user.id ? row.id_solicitante : row.id_ofertante)
+const other = (row) => {
+  const isRequester = row.id_ofertante === store.user.id
+  const userId = isRequester ? row.id_solicitante : row.id_ofertante
+  const user = store.findUser(userId)
+
+  const nombre = isRequester
+    ? row.nombre_solicitante
+    : row.nombre_ofertante
+
+  const apellido = isRequester
+    ? row.apellido_solicitante
+    : row.apellido_ofertante
+
+  return nombre
+    ? { ...user, nombre, apellido: apellido ?? '' }
+    : user
+}
 const ownConfirmation = (row) => row.id_solicitante === store.user.id ? row.confirmacion_solicitante_at : row.confirmacion_ofertante_at
 const otherConfirmation = (row) => row.id_solicitante === store.user.id ? row.confirmacion_ofertante_at : row.confirmacion_solicitante_at
 const actionTitles = { accept: 'Aceptar solicitud', reject: 'Rechazar solicitud', 'cancel-request': 'Cancelar solicitud', 'cancel-reservation': 'Cancelar reserva', confirm: 'Confirmar servicio terminado' }

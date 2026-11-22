@@ -60,6 +60,43 @@ export class ExchangesService {
       return result;
     });
   }
+
+  private async enrichParticipants<T extends {
+    id_solicitante: string;
+    id_ofertante: string;
+  }>(records: T[]) {
+    const userIds = [
+      ...new Set(
+        records.flatMap((record) => [
+          record.id_solicitante,
+          record.id_ofertante,
+        ]),
+      ),
+    ];
+
+    const users = await Promise.all(
+      userIds.map(async (id) => [
+        id,
+        await this.users.repository.findById(id),
+      ] as const),
+    );
+
+    const usersById = new Map(users);
+
+    return records.map((record) => {
+      const requester = usersById.get(record.id_solicitante);
+      const provider = usersById.get(record.id_ofertante);
+
+      return {
+        ...record,
+        nombre_solicitante: requester?.nombre ?? '',
+        apellido_solicitante: requester?.apellido ?? '',
+        nombre_ofertante: provider?.nombre ?? '',
+        apellido_ofertante: provider?.apellido ?? '',
+      };
+    });
+  }
+
   private fingerprint(input: unknown): string {
     const canonical = (value: unknown): unknown => {
       if (isDate(value)) return value.toISOString();
@@ -448,7 +485,8 @@ export class ExchangesService {
   }
   async listRequests(actor: string) {
     await this.users.requireActive(actor);
-    return this.persistence.read((state) =>
+
+    const records = await this.persistence.read((state) =>
       [...state.requests.values()]
         .filter(
           (record) =>
@@ -456,6 +494,8 @@ export class ExchangesService {
         )
         .map((record) => this.requestView(state, record)),
     );
+
+    return this.enrichParticipants(records);
   }
   acceptRequest(
     actor: string,
@@ -608,7 +648,8 @@ export class ExchangesService {
   }
   async listReservations(actor: string) {
     await this.users.requireActive(actor);
-    return this.persistence.read((state) =>
+
+    const records = await this.persistence.read((state) =>
       [...state.reservations.values()]
         .filter(
           (record) =>
@@ -616,6 +657,8 @@ export class ExchangesService {
         )
         .map((record) => this.reservationView(state, record)),
     );
+
+    return this.enrichParticipants(records);
   }
   async getReservation(actor: string, id: string) {
     await this.users.requireActive(actor);
