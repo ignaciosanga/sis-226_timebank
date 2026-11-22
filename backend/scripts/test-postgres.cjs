@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const { randomBytes, randomUUID } = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const { resolve, dirname } = require('node:path');
-const { mkdtempSync, readFileSync, rmSync } = require('node:fs');
+const { mkdtempSync, rmSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { Client } = require('pg');
 const request = require('supertest');
@@ -302,27 +302,8 @@ async function main() {
       mailbox,
       connectionString: url.href,
     });
-    // El ensayo decimal se aplica despues de conservar los controles INTEGER.
-    // No forma parte de prisma/migrations ni alcanza la base de demostracion.
-    assert.match(database, /^timebank_test_[a-f0-9]{16}$/);
-    assert.equal(url.pathname, `/${database}`);
-    const decimalSetup = new Client({ connectionString: url.href });
-    try {
-      await decimalSetup.connect();
-      assert.equal(
-        (await decimalSetup.query('SELECT current_database() AS name')).rows[0]
-          .name,
-        database,
-      );
-      await decimalSetup.query(
-        readFileSync(
-          resolve(__dirname, 'fixtures/phase4-decimal-provisional.sql'),
-          'utf8',
-        ),
-      );
-    } finally {
-      await decimalSetup.end();
-    }
+    // Los verificadores decimales usan las mismas migraciones oficiales.
+    // El fixture provisional se conserva solo como referencia histórica.
     await require('./test-offer-requests.cjs').verifyOfferRequests({
       open,
       mailbox,
@@ -335,6 +316,11 @@ async function main() {
         connectionString: url.href,
       },
     );
+    await require('./test-cancellations.cjs').verifyCancellations({
+      open,
+      mailbox,
+      connectionString: url.href,
+    });
   } finally {
     Date.now = originalNow;
     await Promise.all(apps.map((app) => app.close().catch(() => undefined)));

@@ -37,6 +37,10 @@ import {
   ReservationStatus,
 } from './exchange.types';
 import { inspectIntegrity } from './integrity';
+import {
+  cancellationCharge,
+  classifyCancellation,
+} from './cancellation-policy';
 import type { TutoringOffer } from '../tutoring/offer.types';
 
 @Injectable()
@@ -60,6 +64,43 @@ export class ExchangesService {
       return result;
     });
   }
+
+  private async enrichParticipants<T extends {
+    id_solicitante: string;
+    id_ofertante: string;
+  }>(records: T[]) {
+    const userIds = [
+      ...new Set(
+        records.flatMap((record) => [
+          record.id_solicitante,
+          record.id_ofertante,
+        ]),
+      ),
+    ];
+
+    const users = await Promise.all(
+      userIds.map(async (id) => [
+        id,
+        await this.users.repository.findById(id),
+      ] as const),
+    );
+
+    const usersById = new Map(users);
+
+    return records.map((record) => {
+      const requester = usersById.get(record.id_solicitante);
+      const provider = usersById.get(record.id_ofertante);
+
+      return {
+        ...record,
+        nombre_solicitante: requester?.nombre ?? '',
+        apellido_solicitante: requester?.apellido ?? '',
+        nombre_ofertante: provider?.nombre ?? '',
+        apellido_ofertante: provider?.apellido ?? '',
+      };
+    });
+  }
+
   private fingerprint(input: unknown): string {
     const canonical = (value: unknown): unknown => {
       if (isDate(value)) return value.toISOString();
@@ -260,6 +301,7 @@ export class ExchangesService {
             motivo: record.motivo_cancelacion,
             fecha: record.cancelled_at,
             administrativa: metadata?.administrativa ?? false,
+            clasificacion: metadata?.clasificacionCancelacion ?? null,
           }
         : null,
     };
@@ -448,7 +490,8 @@ export class ExchangesService {
   }
   async listRequests(actor: string) {
     await this.users.requireActive(actor);
-    return this.persistence.read((state) =>
+
+    const records = await this.persistence.read((state) =>
       [...state.requests.values()]
         .filter(
           (record) =>
@@ -456,6 +499,8 @@ export class ExchangesService {
         )
         .map((record) => this.requestView(state, record)),
     );
+
+    return this.enrichParticipants(records);
   }
   acceptRequest(
     actor: string,
@@ -608,7 +653,8 @@ export class ExchangesService {
   }
   async listReservations(actor: string) {
     await this.users.requireActive(actor);
-    return this.persistence.read((state) =>
+
+    const records = await this.persistence.read((state) =>
       [...state.reservations.values()]
         .filter(
           (record) =>
@@ -616,6 +662,8 @@ export class ExchangesService {
         )
         .map((record) => this.reservationView(state, record)),
     );
+
+    return this.enrichParticipants(records);
   }
   async getReservation(actor: string, id: string) {
     await this.users.requireActive(actor);
@@ -736,25 +784,57 @@ export class ExchangesService {
         const user = await this.users.requireActive(actor);
         const record = this.requireReservation(state, id);
         const admin = user.roles.includes(Role.ADMIN);
+        const now = Date.now();
         if (!admin) this.requireParticipant(record, actor);
         if (record.estado === ReservationStatus.CANCELADA)
-            throw new ConflictException('La reserva ya fue cancelada; solo se admite el replay con la misma Idempotency-Key');
+          throw new ConflictException(
+            'La reserva ya fue cancelada; solo se admite el replay con la misma Idempotency-Key',
+          );
         if (record.estado === ReservationStatus.COMPLETADA)
           throw new ConflictException(
             'Una reserva completada no se puede cancelar',
           );
-        if (!admin && Date.now() >= record.fecha_inicio.getTime())
+        if (!admin && now >= record.fecha_inicio.getTime())
           throw new ConflictException(
             'Despues del inicio la cancelacion requiere ADMIN',
           );
         const account = this.account(state, record.id_solicitante);
         if (compareCredits(account.creditos_retenidos, record.creditos) < 0)
           throw new ConflictException('Retencion inconsistente');
+        const classification = classifyCancellation(
+          admin,
+          record.fecha_inicio,
+          now,
+        );
+        const payer =
+          classification === 'injustificada'
+            ? this.account(state, actor)
+            : null;
+        const availableBefore = payer
+          ? subtractCredits(payer.saldo, payer.creditos_retenidos)
+          : '0';
+        const penaltyType = payer
+          ? cancellationCharge(
+              availableBefore,
+              actor === record.id_solicitante
+                ? addCredits(availableBefore, record.creditos)
+                : availableBefore,
+            )
+          : null;
         this.movement(state, account, id, 'Liberacion', record.creditos);
+        if (payer && penaltyType)
+          this.movement(
+            state,
+            payer,
+            id,
+            penaltyType,
+            penaltyType === 'Penalizacion' ? '-0.5' : '0',
+            'Cancelacion injustificada con menos de 5 horas de anticipacion',
+          );
         record.estado = ReservationStatus.CANCELADA;
         record.cancelado_por = actor;
         record.motivo_cancelacion = reason.trim();
-        record.cancelled_at = new Date(Date.now());
+        record.cancelled_at = new Date(now);
         record.horas_anticipacion_cancelacion = Math.max(
           0,
           Math.floor(
@@ -766,16 +846,16 @@ export class ExchangesService {
         const offered =
           record.id_solicitud &&
           state.requests.get(record.id_solicitud)?.id_oferta;
-        if (offered && metadata) {
+        if (offered && metadata?.availabilityId) {
           const slot = state.availability.get(metadata.availabilityId);
           if (slot?.estado === AvailabilityStatus.RESERVADO)
             slot.estado = AvailabilityStatus.DISPONIBLE;
         }
-        if (metadata)
-          metadata.administrativa =
-            admin &&
-            actor !== record.id_solicitante &&
-            actor !== record.id_ofertante;
+        state.reservationMetadata.set(id, {
+          availabilityId: metadata?.availabilityId ?? null,
+          administrativa: admin,
+          clasificacionCancelacion: classification,
+        });
         return this.reservationView(state, record);
       },
     );

@@ -207,14 +207,15 @@ La fase 4 deberá recibir/resolver `id_oferta`, validar su horario y copiar el p
 
 Este apéndice define el contrato actual de solicitud, aceptación y cancelación. Las secciones anteriores conservan el alcance de cada entrega. Los importes de solicitudes, reservas y movimientos ahora se entregan como **strings**, incluso cuando su valor es entero. La contratación de ofertas depende de que los nueve campos del ledger admitan decimales en el entorno elegido.
 
-### Entorno habitual y ensayo decimal
+### Integración oficial y entornos históricos
 
 | Entorno local                         | API y Swagger                    | Alcance de contratación                                                                                                                                                              |
 | ------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Cierre local `nexou_cierre_s3`         | `http://127.0.0.1:4106`, `/docs` | Nueve migraciones oficiales; nueve NUMERIC y relación opcional de oferta alineados con Prisma. Solicitud, retención, cancelación y doble confirmación decimal verificadas. |
 | Base habitual de demostración         | `http://127.0.0.1:4103`, `/docs` | Conserva los nueve campos INTEGER y sus datos anteriores. Solicitar o aceptar una oferta devuelve 409 `OFFER_PRICE_FLOW_PENDING`; los intercambios históricos siguen disponibles.    |
 | Ensayo aislado `nexo_u_phase4_ensayo` | `http://127.0.0.1:4105`, `/docs` | Permite solicitar, aceptar y cancelar ofertas con precio decimal mediante un SQL provisional separado del historial oficial de migraciones. No constituye la entrega acordada de BD. |
 
-Configurar `VITE_API_URL` según el entorno que se esté revisando y obtener una sesión de ese entorno. La habilitación de la base habitual requiere la migración decimal acordada con BD y su validación de actualización; cambiar una bandera de Frontend no sustituye esa condición. Mantener **`VITE_TUTORING_API_ENABLED=false`** mientras la bandera conjunta dependa también de doble confirmación, pago u otros frentes pendientes.
+Configurar `VITE_API_URL` según el entorno que se esté revisando y obtener una sesión de ese entorno. Los montajes 4103 y 4105 conservan el contexto de las fases anteriores. En una instalación actual, `prisma migrate deploy` aplica `20261121000000_creditos_decimales`; no se necesita el fixture provisional ni la conversión INTEGER por diez. Los CHECK SQL conservan una décima y la cota de `2147483647`. No cambiar la bandera conjunta de Frontend sin su verificación de integración.
 
 ### Solicitar una oferta
 
@@ -277,6 +278,21 @@ Para rechazar una solicitud pendiente, el tutor usa `POST /exchanges/UUID_SOLICI
 
 Antes del inicio la cancelación libera exactamente el precio reservado. Después del inicio requiere ADMIN; una reserva completada no puede cancelarse. La respuesta 200 conserva `creditos: "3.7"` y pasa a `Cancelada`. El horario propio de la oferta se libera cuando corresponde. No editarlo directamente: se mantiene 409 `OFFER_AVAILABILITY_MANAGED` para modificaciones independientes.
 
+Orden 2B (HU-08, parcialmente validada): `cancelacion.clasificacion` devuelve
+`sin_multa` con anticipación de 5 horas exactas o más, `injustificada` con menos
+de 5 horas, o `administrativa` cuando cancela ADMIN, aunque sea participante.
+El historial anterior puede devolver `null`. Solo la injustificada genera un
+movimiento para la persona que cancela: `Penalizacion` de `"-0.5"` si alcanza el
+disponible o `penalizacion_sin_saldo` de `"0"` si no alcanza. Se libera toda la
+retención del solicitante, aunque cancele el tutor. No hay deuda ni cobro parcial.
+
+Alan y BD aún deben decidir si se evalúa el disponible antes o después de liberar.
+Si esa diferencia cambia la posibilidad de cobrar, se devuelve 409
+`CANCELLATION_BALANCE_POLICY_PENDING` sin efectos; mostrar el mensaje del servidor
+y mantener el estado actual. No presentarlo como cancelación completada ni como
+horario ocupado. Los dos resultados posibles y la referencia SQL están en el
+[README, orden 2B](../README.md#orden-2b--hu-08-parcialmente-validada).
+
 ### Decimales, errores y reintentos en Frontend
 
 Conservar como texto todos los importes: `saldo`, `creditos_retenidos`, `disponibles`, `creditos_requeridos`, `costo_creditos`, `creditos`, `monto_creditos`, `cantidad`, `monto` y los cuatro snapshots del movimiento. `cantidad` y `monto` pueden tener signo; los contadores de elementos siguen siendo números. No usar `Number`, `parseInt` ni aritmética binaria para calcular el importe que se envía o conciliar saldos; presentar los importes y el disponible devueltos por el servidor. Se mantiene la política provisional de enteros/décimas. El ledger conserva su cota técnica anterior de `2147483647` por importe; no se amplía por el máximo de publicación de ofertas.
@@ -292,15 +308,16 @@ Conservar `data.code` al construir `ApiError`; un 409 puede necesitar una explic
 | `OFFER_NOT_AVAILABLE`        | La oferta o su horario ya no cumplen las condiciones de contratación. Actualizar el catálogo y permitir otra selección.                                                       |
 | `OFFER_SNAPSHOT_REQUIRED`    | Una solicitud anterior no tiene el vínculo y precio pactado necesarios para aceptar mediante una oferta. No completarlo con un importe elegido por el cliente.                |
 | `OFFER_AVAILABILITY_MANAGED` | El horario pertenece a una oferta y no se modifica por separado.                                                                                                              |
-| `DECIMAL_SETTLEMENT_PENDING` | La confirmación y liquidación de reservas vinculadas a ofertas o con importe fraccionario están protegidas hasta la fase 5. No emitir un pago alternativo.                    |
+| `DECIMAL_SETTLEMENT_PENDING` | El entorno conserva el esquema INTEGER histórico y no puede liquidar la reserva de oferta/fraccionaria. No aparece en el esquema decimal oficial compatible.                  |
+| `CANCELLATION_BALANCE_POLICY_PENDING` | La liberación cambia si alcanza para la multa; pendiente de Alan y BD. La reserva y los saldos siguen intactos. |
 
 Otros conflictos, como saldo insuficiente, solicitud resuelta, superposición o reutilización incompatible de una clave, conservan el mensaje del servidor. Mantener el manejo general de 400, 401, 403 y 404 descrito antes. Una misma acción reintentada conserva **la misma clave y el mismo cuerpo**, también después de reiniciar; crear, aceptar, rechazar y cancelar son acciones distintas con claves distintas. Agregar o quitar `offerId` durante un reintento cambia el cuerpo: conservar exactamente la petición original.
 
-La fase 4 no habilita `POST /reservations/:id/confirm` para reservas de oferta, incluso si el precio publicado es entero, ni para reservas fraccionarias. Devuelve `DECIMAL_SETTLEMENT_PENDING` antes de guardar confirmaciones, consumir saldo o pagar al tutor. La fase 5 debe habilitar doble confirmación y pago exacto sobre el precio reservado, con sus garantías transaccionales e idempotencia. El recorrido histórico entero conserva su comportamiento anterior.
+La integración actual habilita `POST /reservations/:id/confirm` para ofertas y reservas fraccionarias sobre el esquema decimal oficial. La doble confirmación y el pago exacto conservan las garantías transaccionales e idempotencia descritas abajo. Las solicitudes históricas sin oferta siguen admitidas con `id_oferta: null`.
 
 ## Fase 5: doble confirmación y pago exacto
 
-Este apartado actualiza la confirmación del ensayo decimal. La demo habitual en `http://127.0.0.1:4103` conserva nueve INTEGER, su flujo histórico y el bloqueo para contratar ofertas. En `http://127.0.0.1:4105` el esquema decimal provisional permite liquidar reservas de oferta. La entrega acordada de BD sigue pendiente; el ensayo permanece fuera de las migraciones oficiales. Mantener `VITE_TUTORING_API_ENABLED=false`: completar este recorrido no habilita automáticamente los otros frentes de esa bandera conjunta.
+Este apartado describe la confirmación vigente sobre las migraciones oficiales. El cierre local en `http://127.0.0.1:4106` utiliza PostgreSQL del puerto 55436; los montajes de defensa anteriores se conservan. El 22/11/2026 se verificaron instalación limpia y actualización poblada conservando saldo 10 y UUID, retención/pago de 3.7 y cancelación con liberación exacta. `npm run test:postgres` recorre los verificadores sobre el esquema oficial, sin aplicar el SQL provisional. La orden 2B añade HU-08 según el apartado anterior; quedan pendientes el caso económico señalado, el precio dinámico HU-06 y banners #47. Este sprint no genera deudas.
 
 Cada participante envía `POST /reservations/{id_reserva}/confirm` con su propio `Authorization: Bearer <access_token>`, `Content-Type: application/json`, una `Idempotency-Key` de 16–128 caracteres y cuerpo `{}`. El servidor toma la identidad de la sesión: el cuerpo no recibe usuario ni importe. Un ADMIN ajeno tampoco puede confirmar. La clase debe haber terminado; un intento anticipado devuelve 409 sin cambiar marcas, estado, cuentas ni movimientos.
 

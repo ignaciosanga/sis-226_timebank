@@ -8,7 +8,23 @@ const store = useAppStore()
 const participation = ref('learned'), selected = ref(null)
 const classes = computed(() => store.myReservations.filter((row) => row.estado === 'Completada' &&
   (participation.value === 'learned' ? row.id_solicitante === store.user.id : row.id_ofertante === store.user.id)))
-const other = (row) => store.findUser(participation.value === 'learned' ? row.id_ofertante : row.id_solicitante)
+const other = (row) => {
+  const isLearned = participation.value === 'learned'
+  const userId = isLearned ? row.id_ofertante : row.id_solicitante
+  const user = store.findUser(userId)
+
+  const nombre = isLearned
+    ? row.nombre_ofertante
+    : row.nombre_solicitante
+
+  const apellido = isLearned
+    ? row.apellido_ofertante
+    : row.apellido_solicitante
+
+  return nombre
+    ? { ...user, nombre, apellido: apellido ?? '' }
+    : user
+}
 const reviewFor = (row) => store.ownReviews.find((review) => review.id_reserva === row.id_reserva)
 watch(() => store.authenticated, (authenticated) => { if (!authenticated) selected.value = null })
 </script>

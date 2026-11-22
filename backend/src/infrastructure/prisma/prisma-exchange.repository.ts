@@ -158,21 +158,34 @@ export class PrismaExchangeRepository implements ExchangeRepository {
           fingerprint: data.fingerprint,
           result: data.result,
         });
-      else if (
-        row.accion === 'BACKEND_METADATA' &&
-        typeof data.availabilityId === 'string'
-      ) {
-        if (row.entidad === 'SOLICITUDES_INTERCAMBIO')
+      else if (row.accion === 'BACKEND_METADATA') {
+        if (
+          row.entidad === 'SOLICITUDES_INTERCAMBIO' &&
+          typeof data.availabilityId === 'string'
+        )
           state.requestMetadata.set(row.entidad_id, {
             availabilityId: data.availabilityId,
             descripcion:
               typeof data.descripcion === 'string' ? data.descripcion : '',
           });
-        if (row.entidad === 'RESERVAS')
+        if (row.entidad === 'RESERVAS') {
+          const classification = data.clasificacionCancelacion;
           state.reservationMetadata.set(row.entidad_id, {
-            availabilityId: data.availabilityId,
+            availabilityId:
+              typeof data.availabilityId === 'string'
+                ? data.availabilityId
+                : null,
             administrativa: data.administrativa === true,
+            ...(['sin_multa', 'injustificada', 'administrativa'].includes(
+              String(classification),
+            )
+              ? {
+                  clasificacionCancelacion: classification as
+                    'sin_multa' | 'injustificada' | 'administrativa',
+                }
+              : {}),
           });
+        }
       }
     }
     // Datos creados por otros clientes pueden carecer de metadata de API.
@@ -318,6 +331,9 @@ export class PrismaExchangeRepository implements ExchangeRepository {
         where: { id_solicitud: row.id_solicitud },
         create: integerRow,
         update: integerRow,
+        // En el esquema previo a la migración todavía no existe id_oferta.
+        // No leer esa columna mediante RETURNING con el cliente ya actualizado.
+        select: { id_solicitud: true },
       });
     });
     await write(before.reservations, after.reservations, (row) => {

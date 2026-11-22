@@ -40,6 +40,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
           'OFFER_NOT_AVAILABLE',
           'OFFER_SNAPSHOT_REQUIRED',
           'DECIMAL_SETTLEMENT_PENDING',
+          'CANCELLATION_BALANCE_POLICY_PENDING',
           'ASSISTANT_QUOTA_EXCEEDED',
         ].includes(body.code)
       )

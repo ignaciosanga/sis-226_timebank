@@ -1,5 +1,162 @@
 # Banco de Tiempo Universitario — Backend v0.4.0
 
+**Estado vigente del cierre técnico (22/11/2026):** esta rama parte de la integración
+`e6642bc`. La migración oficial `20261121000000_creditos_decimales` convierte los nueve
+importes a NUMERIC y añade la oferta opcional de la solicitud; Prisma usa `Decimal`
+sin precisión/escala adicional y conserva las restricciones SQL. El flujo de oferta
+`"3.7"`, retención, cancelación y doble confirmación se ejecuta sobre las migraciones
+oficiales. Ver [capacidades actuales](#8-qué-funciona-con-las-migraciones-oficiales-y-qué-falta)
+y [contrato de integración](docs/frontend-integration.md#fase-4-solicitud-a-precio-publicado-y-retención-exacta).
+Las secciones fechadas y los informes de fases anteriores conservan su contexto histórico.
+
+Referencia conservada de la orden 2A: Prisma validate/generate, build y lint aprobados;
+**273 unitarias**, **194 E2E**, `npm run test:postgres` completo con salida **0** y
+flujo de integración con PostgreSQL/Mailpit aprobado en una base desechable. El clon
+de revisión conserva `nexou_cierre_s3` en 55436, API 4106 y Mailpit 58026;
+la base persistente mantuvo los mismos registros al terminar las pruebas.
+
+## Orden 2B — HU-08 parcialmente validada
+
+La cancelación conserva permisos, motivo, actor, fecha, liberación íntegra y
+reapertura del horario. Un participante puede cancelar antes del inicio: con
+**5 horas exactas o más**, `sin_multa`; con **menos de 5 horas**, `injustificada`.
+Desde el inicio sigue requiriendo ADMIN. ADMIN siempre registra
+`administrativa`, incluso si es participante, y no multa a nadie.
+No hay excepciones manuales ni cambios del precio publicado o pactado.
+
+La multa corresponde exclusivamente al actor de la cancelación injustificada:
+un movimiento `Penalizacion` de `"-0.5"` si alcanza el disponible, o un único
+`penalizacion_sin_saldo` de `"0"` si no alcanza. No hay cobro parcial, deuda ni
+cobro posterior. Si cancela el tutor, se libera la reserva del estudiante y
+la multa se registra en la cuenta del tutor. Los importes siguen siendo NUMERIC
+en unidades de crédito; no se multiplica ningún saldo por diez.
+
+La clasificación se persiste en `AUDITORIA`, acción `BACKEND_METADATA`, entidad
+`RESERVAS`, campo JSON `clasificacionCancelacion`; se devuelve como
+`cancelacion.clasificacion`. El historial anterior conserva `null` y no se
+reclasifica. Cancelación, liberación, clasificación, multa e idempotencia
+comparten la transacción PostgreSQL y el bloqueo existente. Analytics economía,
+ranking y reputación cuentan la clasificación persistida y excluyen las
+administrativas. Economía expone además el historial `sin_clasificar`.
+
+**Responsable del cobro comprobado: Backend.** Las nueve migraciones versionadas
+y el PostgreSQL local `nexou_cierre_s3` no contienen triggers de cobro; la inspección
+de `pg_trigger` sin triggers internos devolvió cero filas. El verificador oficial
+repite esa inspección antes de los casos HU-08 sobre su base desechable.
+No se agregó un trigger ni se modificaron migraciones históricas.
+Antes de desplegar otro mecanismo, BD debe coordinar un único responsable de
+cobro, clasificación y liberación; activar su trigger junto al cobro de Backend
+puede descontar dos veces. Este cierre no autoriza ese despliegue.
+
+**Pendiente de Alan y BD: qué disponible evaluar cuando la liberación cambia si
+alcanza para pagar.** La referencia de BD en
+[`database/db/init/sql/07_economia_dinamica.sql`, función `fn_aplicar_penalizacion_cancelacion`](https://github.com/ignaciosanga/sis-226_timebank/blob/9d56fa3bdd12f003146dba1daf6217267845c0f8/database/db/init/sql/07_economia_dinamica.sql#L170)
+lee `USUARIOS.saldo, creditos_retenidos FOR UPDATE`, calcula
+`v_disponibles := v_saldo_anterior - v_retenidos` (línea 231) y se ejecuta
+`AFTER INSERT OR UPDATE OF estado, cancelado_por` sobre `RESERVAS` (línea 270).
+No contiene una liberación ni fija su orden respecto de esa lectura. Además usa
+la representación INTEGER en décimas; ese SQL no se ejecutó en la integración
+NUMERIC. `10_penalizaciones_pendientes.sql` propone deuda, excluida de este sprint.
+
+Para solicitante con saldo `"3.7"`, retenido `"3.7"` y disponible `"0"`:
+
+| Criterio aún sin aprobar | Resultado posible después de liberar |
+| --- | --- |
+| Evaluar antes de liberar | Saldo `"3.7"`, retenido `"0"`; `penalizacion_sin_saldo` de `"0"` |
+| Evaluar después de liberar | Saldo `"3.2"`, retenido `"0"`; `Penalizacion` de `"-0.5"` |
+
+Hasta recibir respuesta, si ambos criterios producirían resultados diferentes,
+la API devuelve **409 `CANCELLATION_BALANCE_POLICY_PENDING`**, sin modificar
+reserva, horario, retención, ledger, clasificación ni idempotencia. Es un bloqueo
+temporal de integración, no una política económica definitiva. Los casos donde
+ambos criterios coinciden continúan. HU-08 permanece **parcialmente validada**.
+El 409 deja la reserva **Confirmada**, con su retención todavía activa; no
+representa una cancelación completada.
+HU-06 dinámica requiere el acuerdo Frontend/BD y banners #47 se trata por separado.
+
+Validación final de 2B: `prisma:validate`, `prisma:generate`, `build`, `lint`,
+**284/284 unitarias (29 suites)**, **194/194 E2E (11 suites)** y
+**`npm run test:postgres` completo: salida 0, 121.676 s**. PostgreSQL ejecutó el
+núcleo inicial y 46 casos de cinco verificadores: 32 anteriores y 14 HU-08.
+Se conservaron las comprobaciones Prisma/SQL/HTTP de nueve importes decimales,
+retención/liquidación exacta de 3.7 y contrato histórico sin oferta.
+
+Resultados reales con PostgreSQL y `Date.now` controlado. `E` es solicitante,
+`T` es tutor y `S/R` significa saldo/retención final. Los movimientos indicados
+son los ligados a esa reserva, incluida su retención inicial; el precio es 3.7
+salvo el caso señalado de 0.1. En cada cancelación aprobada se comprobaron actor,
+motivo, fecha, clasificación persistida y horario reabierto.
+
+| Escenario | Resultado / clasificación | E S/R | T S/R | Movimientos finales |
+| --- | --- | --- | --- | --- |
+| 5 h exactas, cancela E o T (dos casos) | 200, `sin_multa` | 10/0 | 2/0 | 2: Retencion 3.7 + Liberacion 3.7 |
+| 4 h 59, E dispone exactamente de 0.5, saldo inicial 4.2 | 200, `injustificada` | 3.7/0 | 2/0 | 3: retención + liberación + Penalizacion -0.5 a E |
+| 4 h 59, T dispone exactamente de 0.5 | 200, `injustificada` | 10/0 | 0/0 | 3: retención + liberación a E + Penalizacion -0.5 a T |
+| 4 h 59, T dispone de 0.4 | 200, `injustificada` | 10/0 | 0.4/0 | 3: retención + liberación + penalizacion_sin_saldo 0 a T |
+| 4 h 59, E tiene 0.4; reserva de 0.1 | 200, `injustificada` | 0.4/0 | 2/0 | 3: retención 0.1 + liberación 0.1 + penalizacion_sin_saldo 0 a E |
+| ADMIN ajeno, solicitante o tutor; después del inicio (tres casos) | 200, `administrativa` | 3.7/0 | 2/0 | 2; ninguna multa |
+| Misma clave concurrente en dos instancias; replay tras reinicio | 200/200 y respuesta idéntica; nueva clave 409 | 10/0 | 0/0 | Una liberación y una multa -0.5 al tutor, mismos registros |
+| Dos actores concurrentes, claves distintas | 200/409; ganó E, `injustificada` | 9.5/0 | 2/0 | Una liberación y una multa -0.5 a E |
+| FK real falla al insertar multa; reintento tras reinicio | Primer 409 sin cambios en ninguna tabla; después 200 | 10/0 | 1.5/0 | Tras reintentar: 3, una sola multa -0.5 a T |
+| Carrera con liquidación: gana ADMIN | 200/409, `administrativa` | 10/0 | 0/0 | 2: retención + liberación; ningún pago ni multa |
+| Carrera con liquidación: gana segunda confirmación | 200/409, `Completada` | 6.3/0 | 3.7/0 | 3: Retencion 3.7 + Consumo -3.7 + Transferencia 3.7 |
+| Participante cancela desde el inicio (ambos actores) | 409/409, sin efectos | 3.7/3.7 | 2/0 | Solo la retención original |
+| E con 3.7 totalmente retenidos, cancelación tardía | 409 con código pendiente; resultado económico sin aprobar | 3.7/3.7 | 2/0 | Solo Retencion 3.7; sin clasificación ni multa nuevas |
+| Analytics economía y ranking | 6 injustificadas persistidas; administrativas excluidas | — | — | Auditoría de integridad global sin incidencias |
+
+La base persistente conserva las huellas de sus **22 tablas**; no quedaron bases
+temporales del runner. Los puertos/procesos 4103–4105 se conservaron. La API local
+4106 quedó actualizada, lista y con la clasificación en Swagger. La evidencia
+privada está en `.local/order2b/`: `resultados.json`, `resultado-cierre.txt`, logs
+de comandos, `isolation-before.json`, `isolation-after.json` y `preservation.json`.
+
+Archivos creados o ampliados en la orden 2B (rutas relativas a `backend/`):
+
+| Área | Archivos |
+| --- | --- |
+| Cancelación y contrato | [cancellation-policy.ts](src/modules/exchanges/cancellation-policy.ts), [exchanges.service.ts](src/modules/exchanges/exchanges.service.ts), [exchange.types.ts](src/modules/exchanges/exchange.types.ts), [exchange-responses.dto.ts](src/modules/exchanges/dto/exchange-responses.dto.ts), [integrity.ts](src/modules/exchanges/integrity.ts) |
+| Persistencia y errores | [prisma-exchange.repository.ts](src/infrastructure/prisma/prisma-exchange.repository.ts), [http-exception.filter.ts](src/common/filters/http-exception.filter.ts) |
+| Indicadores | [academic.repository.ts](src/modules/academic/academic.repository.ts), [reviews.service.ts](src/modules/academic/reviews.service.ts) |
+| Pruebas PostgreSQL | [test-cancellations.cjs](scripts/test-cancellations.cjs), [test-postgres.cjs](scripts/test-postgres.cjs), [test-reservation-settlement.cjs](scripts/test-reservation-settlement.cjs) |
+| Pruebas unitarias y E2E | [cancellation-policy.spec.ts](src/modules/exchanges/cancellation-policy.spec.ts), [exchanges-integrity.e2e-spec.ts](test/exchanges-integrity.e2e-spec.ts) |
+| Documentación | Este README y [frontend-integration.md](docs/frontend-integration.md) |
+
+Se conservaron los diez archivos modificados de 2A: cinco idénticos al inicio de
+2B y cinco ampliados. Prisma, sus verificaciones de nueve importes decimales,
+scripts de activación/ofertas/solicitudes y documentos mantienen la integración
+2A. La validación de estas órdenes se realizó localmente, sin despliegue ni acceso
+a Neon. Su publicación posterior reúne ambos cambios en
+`feat/backend-cierre-parcial3`, para revisión mediante un PR en borrador hacia
+`apis/integracion-parcial3`.
+
+## Reproducir 2A y 2B desde un clon limpio
+
+En `backend/`, usar Node `>=26.8.2 <27` y npm 11. Configurar en el entorno privado
+`DATABASE_URL` y `TEST_DATABASE_URL` hacia un PostgreSQL local de pruebas cuyo
+usuario tenga permiso CREATE DATABASE. El inicio rápido de este README explica
+cómo preparar ese servidor y sus variables. No copiar `.local/`, dependencias,
+archivos generados ni credenciales del clon de cierre.
+
+```powershell
+npm.cmd ci
+npm.cmd run prisma:validate
+npm.cmd run prisma:generate
+npm.cmd run build
+npm.cmd run lint
+npm.cmd test
+npm.cmd run test:e2e
+npm.cmd run test:postgres
+```
+
+El script versionado `scripts/test-postgres.cjs` crea su propia base
+`timebank_test_<16 hex>`, aplica dos veces las migraciones oficiales y ejecuta
+los cinco verificadores versionados; finalmente elimina esa base. No requiere
+ningún auxiliar ni evidencia de `.local/`. Los correos de esta prueba se capturan
+dentro del proceso, sin SMTP externo. Unitarias y E2E usan su configuración de
+pruebas en memoria. Los resultados de la copia limpia del commit publicado se
+registran en la descripción del PR; no confundirlos con las evidencias locales
+históricas indicadas arriba.
+
 ## Continuación académica — puntos 6 y 7 del plan (20/11/2026)
 
 **Resultado de la revisión completa del 21/11:** todavía no se cumplen todos los
@@ -164,7 +321,7 @@ npm.cmd run build
 npm.cmd start
 ```
 
-`db:migrate` ejecuta `prisma migrate deploy`: aplica las **seis migraciones oficiales**, sin reset. La semilla idempotente añade una carrera, categorías y habilidades; no añade usuarios ni saldos. Quedan **15 tablas de negocio** (las 12 originales, verificación, ofertas y banners), además de `_prisma_migrations`. Conserva el volumen al reiniciar.
+`db:migrate` ejecuta `prisma migrate deploy`: aplica las **nueve migraciones oficiales**, sin reset, incluida la conversión decimal, la ampliación académica y el perfil del asistente. La semilla local idempotente añade una carrera, categorías y habilidades; no añade usuarios ni saldos. Para cargar el pensum, ejecutar además `npm.cmd run db:seed:academic` con `LOCAL_DEVELOPMENT_SEED=true`. Conserva el volumen al reiniciar.
 
 Con la API activa, abre otra terminal en `backend/`:
 
@@ -230,17 +387,18 @@ El **solicitante aprende**, el **ofertante enseña** y `RESERVAS` enlaza ambos c
 
 ### 8. Qué funciona con las migraciones oficiales y qué falta
 
-Funcionan cuentas institucionales/verificación/bono, sesión y permisos actuales, catálogos/perfil, disponibilidad, publicación/consulta de ofertas y banners, intercambios históricos, retención, cancelación y doble confirmación/pago entero. Las ofertas ya guardan precio total decimal y aceptan `costoCreditos: "3.7"` como **cadena**; publicar no prueba que el ledger oficial pueda contratarla.
+Funcionan cuentas institucionales/verificación/bono, sesión y permisos actuales, catálogos/perfil, disponibilidad, ofertas, intercambios históricos y contratación con precio total decimal. `costoCreditos: "3.7"` es una **cadena**: se copia a solicitud y reserva, se retiene al aceptar y se liquida después del fin con ambas confirmaciones. Cambiar el precio del catálogo no cambia el pacto anterior.
 
-Las **nueve columnas de crédito siguen INTEGER** en las migraciones y Prisma oficiales. Al solicitar una disponibilidad ligada a oferta, el backend devuelve **409 `OFFER_PRICE_FLOW_PENDING`** sobre ese esquema, sin crear solicitud ni retención. No evadas el control calculando un precio desde Frontend ni enviando una disponibilidad parcial. El flujo histórico sin oferta mantiene **1 crédito = 15 minutos**, con duración múltiplo de 15 minutos hasta ocho horas; una clase histórica de 45 minutos cuesta `"3"`.
+Las nueve columnas de crédito son **NUMERIC sin typmod**, representadas por `Decimal @db.Decimal` en Prisma. Los CHECK SQL admiten una décima y conservan la cota técnica de `2147483647`; no redondean centésimas. `SOLICITUDES_INTERCAMBIO.id_oferta` es UUID nullable, con FK `ON DELETE RESTRICT / ON UPDATE NO ACTION`. Las solicitudes históricas conservan `id_oferta: null` y su cálculo de un crédito cada 15 minutos; 45 minutos cuestan `"3"`. Los esquemas antiguos todavía INTEGER mantienen los códigos de capacidad pendientes hasta aplicar la migración oficial.
 
-El recorrido decimal se comprobó en PostgreSQL aislado: precio total `"3.7"`, snapshot en solicitud/reserva, retención al aceptar, primera marca sin pago, segunda confirmación después del fin con Consumo/Transferencia únicos, replay/reinicio y cancelación con liberación. **No se deriva ese precio de los minutos.** El [SQL provisional](scripts/fixtures/phase4-decimal-provisional.sql) permanece fuera de `prisma/migrations`; solo admite `nexo_u_phase4_ensayo` y bases `timebank_test_<16 hex>`. No está autorizado para la base del inicio rápido ni reemplaza una migración oficial.
+El recorrido decimal se comprobó localmente con PostgreSQL 16: alumno `"10"`, retención `"3.7"`, disponible `"6.3"`, primera confirmación sin pago y segunda confirmación con saldo alumno `"6.3"` y tutor `"3.7"`. Una reserva independiente cancelada libera exactamente `"3.7"`. **El precio de una oferta no se deriva de sus minutos.** La actualización poblada conserva saldo `"10"`, UUID e historial. El [SQL provisional](scripts/fixtures/phase4-decimal-provisional.sql) se conserva como referencia histórica y no se aplica sobre las migraciones oficiales. Tampoco debe ejecutarse la conversión INTEGER por diez de la otra representación de BD.
 
-Para reproducir automáticamente ese ensayo desde el repositorio, usa `npm.cmd run test:postgres` con el servidor local de pruebas descrito abajo. El script aplica primero las seis migraciones y verifica INTEGER; después aplica el SQL provisional exclusivamente a su base temporal y ejecuta [solicitudes de ofertas](scripts/test-offer-requests.cjs) y [liquidación](scripts/test-reservation-settlement.cjs), con concurrencia, rollback y replay. Al terminar borra esa base, incluidos los datos decimales. El montaje persistente 4105 y sus preparadores privados pertenecen a la PC de Gonzalo; no forman parte del inicio rápido portable.
+Para reproducir la integración, usa `npm.cmd run test:postgres` con el servidor local de pruebas descrito abajo. El script crea una base temporal, aplica dos veces las migraciones oficiales y ejecuta activación/bono único, ofertas, [solicitudes](scripts/test-offer-requests.cjs) y [liquidación](scripts/test-reservation-settlement.cjs), con dos instancias, concurrencia, rollback y replay tras reiniciar. Contrasta los nueve importes como Decimal en Prisma y texto exacto en SQL/HTTP, incluida la relación de oferta. Al terminar elimina únicamente esa base temporal.
 
 Pendientes para integración general:
 
-- **BD + Backend:** migración incremental decimal de los nueve campos y `SOLICITUDES_INTERCAMBIO.id_oferta`, adaptación de vistas/funciones y conservación de UUID/historial/permisos; coordinar los nueve `Int` a `Decimal` y la relación de oferta en Prisma. Probar instalación limpia y actualización de una copia poblada. PO debe acordar precisión definitiva, máximo de negocio y bono.
+- **HU-08 / Alan y BD:** resolver el disponible antes/después de liberar cuando cambia la posibilidad de cobrar; coordinar un solo mecanismo de cobro antes de desplegar. Ver la orden 2B al inicio. No se generan deudas.
+- **HU-06 / Frontend y BD:** acordar precio sugerido u obligatorio, factores y vigencia. Se conserva el precio publicado y pactado. El almacenamiento durable de banners (#47) se tratará por separado.
 - **Frontend:** preservar cadenas exactas y `code` de error, enviar disponibilidad/intervalo completos de la oferta, mantener claves de idempotencia al reintentar y manejar cuenta pendiente/verificación. El contrato auditado y sus archivos están en fase 6.
 - **APIs/académico:** implementar opiniones/calificaciones y reputación acordadas con Frontend; la existencia de su tabla no demuestra endpoints funcionales.
 - **Integración visual:** probar conjuntamente la UI correcta contra el backend acordado; Google real y Calendar remoto requieren configuración propia. Mantener **`VITE_TUTORING_API_ENABLED=false`** mientras la bandera compartida dependa de contratos todavía pendientes. Esa variable es del entorno de Frontend, no habilita capacidades en Nest.
@@ -252,7 +410,7 @@ Backend NestJS para tutorías y habilidades mediante créditos. Parte del [model
 - `src/modules`: controladores, DTO, servicios y contratos por dominio.
 - `src/infrastructure/prisma`: persistencia PostgreSQL; repositorios de memoria para datos efímeros.
 - `src/common` y `src/config`: permisos, validación, errores, protección de campos, CORS y entorno.
-- `prisma/schema.prisma`, `prisma/migrations`: esquema y seis migraciones oficiales.
+- `prisma/schema.prisma`, `prisma/migrations`: esquema y nueve migraciones oficiales.
 - `scripts`: instalación local, semilla, auxiliar académico y pruebas PostgreSQL.
 
 USUARIOS integra rol, saldo y retenidos. RESERVAS integra confirmaciones y cancelación. MOVIMIENTOS_CREDITO guarda cantidades y snapshots; no hay tablas separadas de cuentas o transferencias. Roles persistidos: Estudiante, Profesor y Administrador; `roles` en JWT/perfil proyecta capacidades y no representa una relación M:N. Niveles de habilidad: Basico, Intermedio, Avanzado y Experto.
@@ -263,7 +421,7 @@ El adaptador usa transacciones y bloqueo asesor compartido entre instancias; ide
 
 El frontend recibe una URL HTTP, por ejemplo `VITE_API_URL=http://127.0.0.1:4200`; nunca `DATABASE_URL`, contraseña PostgreSQL ni JWT_SECRET. Configura `CORS_ORIGINS` con el origen real de la UI. El acceso protegido usa `Authorization: Bearer <access_token>`. No hay refresh token: iniciar sesión al vencer. `SWAGGER_ENABLED=false` deshabilita `/docs` y `/docs-json`.
 
-Los importes HTTP son texto exacto, incluyendo enteros `"8"`. El dominio de créditos usa aritmética entera escalada; el ledger decimal de ensayo admite una décima, sin flotantes binarios. Las nueve columnas oficiales permanecen INTEGER; `OFERTAS.costo_creditos` tiene su representación propia. No convertir cantidades a `Number` para sumar, restar o pagar.
+Los importes HTTP son texto exacto, incluyendo enteros `"8"`. El dominio de créditos usa aritmética entera escalada y el ledger oficial NUMERIC admite una décima, sin flotantes binarios. El adaptador normaliza los créditos antes de clonar el estado; los objetos `Prisma.Decimal` no forman parte del contrato HTTP. No convertir cantidades a `Number` para sumar, restar o pagar.
 
 POST de `/exchanges`, sus acciones, confirmación/cancelación de `/reservations`, `/credits/grants` y publicación de ofertas requieren `Idempotency-Key` de 16–128 caracteres alfanuméricos o `. _ : -`. Conservar la clave para la misma acción/contenido; una clave reutilizada con contenido diferente devuelve 409. El ámbito incluye actor y operación. El estado de negocio evita efectos nuevos aunque se use otra clave. Una respuesta perdida se recupera repitiendo la clave; GET consulta el estado actual.
 

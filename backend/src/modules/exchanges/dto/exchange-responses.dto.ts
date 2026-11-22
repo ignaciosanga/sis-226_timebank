@@ -60,6 +60,14 @@ export class CancellationResponse {
   @ApiProperty({ maxLength: 500 }) motivo!: string;
   @ApiProperty(date) fecha!: Date;
   @ApiProperty() administrativa!: boolean;
+  @ApiProperty({
+    type: String,
+    enum: ['sin_multa', 'injustificada', 'administrativa'],
+    nullable: true,
+    description:
+      'Clasificacion persistida en AUDITORIA; NULL en historial sin clasificar',
+  })
+  clasificacion!: string | null;
 }
 
 export class ReservationResponse extends ExchangeParticipantsResponse {
@@ -97,7 +105,7 @@ export class ReservationResponse extends ExchangeParticipantsResponse {
   @ApiProperty({
     type: () => CancellationResponse,
     nullable: true,
-    description: 'Vista derivada de campos de RESERVAS',
+    description: 'Campos de RESERVAS y clasificacion persistida en AUDITORIA',
   })
   cancelacion!: CancellationResponse | null;
 }
@@ -125,6 +133,7 @@ export class MovementResponse {
       'BonoInicial',
       'Recompensa',
       'Penalizacion',
+      'penalizacion_sin_saldo',
       'Transferencia',
       'Ajuste',
       'Retencion',

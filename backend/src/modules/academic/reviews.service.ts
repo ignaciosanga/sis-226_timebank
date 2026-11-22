@@ -134,7 +134,16 @@ export class ReviewsService {
       skillId: query.skillId,
       ...offerMetrics(state, query.tutorId, query.skillId),
       knowledge_score: null,
-      cancelaciones_injustificadas: null,
+      cancelaciones_injustificadas: [...state.reservations.values()].filter(
+        (reservation) =>
+          reservation.estado === ReservationStatus.CANCELADA &&
+          reservation.cancelado_por === query.tutorId &&
+          reservation.id_habilidad === query.skillId &&
+          state.reservationMetadata.get(reservation.id_reserva)
+            ?.clasificacionCancelacion === 'injustificada' &&
+          !state.reservationMetadata.get(reservation.id_reserva)
+            ?.administrativa,
+      ).length,
       formula_estado: 'pendiente_aprobacion_PO',
     }));
   }
