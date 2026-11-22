@@ -6,6 +6,19 @@ const documentation = readFileSync(
   resolve('documentaci_n_de_la_base_de_datos.md'),
   'utf8',
 );
+// Ampliación del modelo documentado por la migración decimal oficial.
+const decimalCredits: Record<string, string[]> = {
+  USUARIOS: ['saldo', 'creditos_retenidos'],
+  SOLICITUDES_INTERCAMBIO: ['creditos_requeridos'],
+  RESERVAS: ['creditos'],
+  MOVIMIENTOS_CREDITO: [
+    'cantidad',
+    'saldo_anterior',
+    'saldo_posterior',
+    'retenidos_anterior',
+    'retenidos_posterior',
+  ],
+};
 
 function documentedTables(): Map<string, Map<string, string>> {
   const diagram = documentation.match(/```mermaid\s*([\s\S]*?)```/)?.[1] ?? '';
@@ -54,9 +67,12 @@ function prismaTables(): Map<string, Map<string, string>> {
 }
 
 describe('Contrato Prisma del modelo optimizado elegido', () => {
-  it('incluye las 12 tablas y todas sus columnas con los tipos de la documentacion', () => {
+  it('conserva el modelo base y los tipos de la migración decimal oficial', () => {
     const tables = documentedTables();
     expect(tables.size).toBe(12);
+    for (const [table, columns] of Object.entries(decimalCredits))
+      for (const column of columns) tables.get(table)!.set(column, 'numeric');
+    tables.get('SOLICITUDES_INTERCAMBIO')!.set('id_oferta', 'uuid');
     const actual = prismaTables();
     const verification = actual.get('VERIFICACIONES_CORREO');
     expect(verification).toEqual(
@@ -142,6 +158,28 @@ describe('Contrato Prisma del modelo optimizado elegido', () => {
       user.delete(column);
     }
     expect(actual).toEqual(tables);
+  });
+
+  it('declara NUMERIC sin typmod y la FK nullable de oferta sin alterar sus acciones SQL', () => {
+    const models = new Map(
+      [...schema.matchAll(/^model\s+\w+\s*\{([\s\S]*?)^\}/gm)].map(
+        ([, body]) => [body!.match(/@@map\("([A-Z_]+)"\)/)?.[1], body!],
+      ),
+    );
+    for (const [table, columns] of Object.entries(decimalCredits))
+      for (const column of columns)
+        expect(models.get(table)).toMatch(
+          new RegExp(
+            `^[ \\t]+${column}\\s+Decimal\\s+[^\\n]*@db\\.Decimal(?:[ \\t]*\\r?$)`,
+            'm',
+          ),
+        );
+    const request = models.get('SOLICITUDES_INTERCAMBIO')!;
+    expect(request).toMatch(/id_oferta\s+String\?\s+@db.Uuid/);
+    expect(request).toMatch(
+      /oferta\s+OfertaTutoria\?\s+@relation\(fields: \[id_oferta\], references: \[id_oferta\], onDelete: Restrict, onUpdate: NoAction\)/,
+    );
+    expect(request).toContain('@@index([id_oferta])');
   });
 
   it('evita tablas legadas y vincula movimientos directamente al usuario', () => {

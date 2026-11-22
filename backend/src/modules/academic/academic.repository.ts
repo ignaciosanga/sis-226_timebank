@@ -34,6 +34,13 @@ const validRating = `r.estado='Completada' AND r.fecha_fin <= now()
 const courseFilter = `m.curriculum='systems' AND NOT m.externo
   AND ($3::text IS NULL OR m.codigo=$3) AND ($4::text IS NULL OR m.area=$4)
   AND ($5::integer IS NULL OR m.semestre=$5)`;
+const cancellationMetadata = `LEFT JOIN LATERAL (
+  SELECT a.datos_nuevos FROM "AUDITORIA" a
+  WHERE a.accion='BACKEND_METADATA' AND a.entidad='RESERVAS' AND a.entidad_id=r.id_reserva
+  ORDER BY a.created_at DESC,a.id_auditoria DESC LIMIT 1
+) cancellation ON true`;
+const unjustifiedCancellation = `cancellation.datos_nuevos->>'clasificacionCancelacion'='injustificada'
+  AND COALESCE(cancellation.datos_nuevos->>'administrativa','false')='false'`;
 
 @Injectable()
 export class AcademicRepository {
@@ -204,10 +211,21 @@ export class AcademicRepository {
       query.area ?? null,
       query.semestre ?? null,
     );
+    const [cancellations] = await db.$queryRawUnsafe<{ count: number }[]>(
+      `SELECT count(*)::integer count FROM "RESERVAS" r
+      JOIN "MATERIAS_ACADEMICAS" m ON m.id_habilidad=r.id_habilidad ${cancellationMetadata}
+      WHERE ${courseFilter} AND r.estado='Cancelada' AND ${unjustifiedCancellation}
+      AND r.cancelled_at >= $1 AND r.cancelled_at < $2`,
+      period.from,
+      period.to,
+      query.codigo ?? null,
+      query.area ?? null,
+      query.semestre ?? null,
+    );
     return {
       period,
       knowledge_score: null,
-      cancelaciones_injustificadas: null,
+      cancelaciones_injustificadas: cancellations!.count,
       formula_estado: 'pendiente_aprobacion_PO',
       data,
     };
@@ -328,13 +346,17 @@ export class AcademicRepository {
           period.from,
           period.to,
         )) as Record<string, unknown>[];
-        const cancellations = await tx.$queryRawUnsafe(
+        const cancellations = await tx.$queryRawUnsafe<
+          { injustificadas: number }[]
+        >(
           `SELECT count(*)::integer registradas,
-        count(*) FILTER(WHERE r.cancelado_por=r.id_solicitante)::integer por_solicitante,
-        count(*) FILTER(WHERE r.cancelado_por=r.id_ofertante)::integer por_ofertante,
-        count(*) FILTER(WHERE r.cancelado_por<>r.id_solicitante AND r.cancelado_por<>r.id_ofertante)::integer por_administrador,
+        count(*) FILTER(WHERE r.cancelado_por=r.id_solicitante AND COALESCE(cancellation.datos_nuevos->>'administrativa','false')='false')::integer por_solicitante,
+        count(*) FILTER(WHERE r.cancelado_por=r.id_ofertante AND COALESCE(cancellation.datos_nuevos->>'administrativa','false')='false')::integer por_ofertante,
+        count(*) FILTER(WHERE cancellation.datos_nuevos->>'clasificacionCancelacion'='administrativa' OR (r.cancelado_por<>r.id_solicitante AND r.cancelado_por<>r.id_ofertante))::integer por_administrador,
+        count(*) FILTER(WHERE ${unjustifiedCancellation})::integer injustificadas,
+        count(*) FILTER(WHERE cancellation.datos_nuevos->>'clasificacionCancelacion' IS NULL)::integer sin_clasificar,
         avg(r.horas_anticipacion_cancelacion)::float anticipacion_media_horas
-        FROM "RESERVAS" r JOIN "MATERIAS_ACADEMICAS" m ON m.id_habilidad=r.id_habilidad
+        FROM "RESERVAS" r JOIN "MATERIAS_ACADEMICAS" m ON m.id_habilidad=r.id_habilidad ${cancellationMetadata}
         WHERE ${courseFilter} AND r.estado='Cancelada' AND r.cancelled_at >= $1 AND r.cancelled_at < $2`,
           period.from,
           period.to,
@@ -348,10 +370,10 @@ export class AcademicRepository {
           horarios: hours,
           cancelaciones: cancellations,
           reglas_economia: {
-            estado: 'pendiente_migracion_BD',
+            estado: 'HU08_parcial_HU06_pendiente_acuerdo',
             factores: null,
-            umbral_cancelacion_horas: null,
-            penalizacion: null,
+            umbral_cancelacion_horas: 5,
+            penalizacion: '0.5',
           },
           inactividad: {
             ...inactivity,
@@ -361,7 +383,7 @@ export class AcademicRepository {
               'Sin movimientos en el período; saldos actuales, no históricos',
             criterio_sin_uso_PO: null,
           },
-          cancelaciones_injustificadas: null,
+          cancelaciones_injustificadas: cancellations[0]!.injustificadas,
           incentivos: 'No aplicados',
         };
       },

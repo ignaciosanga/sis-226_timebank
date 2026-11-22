@@ -542,26 +542,34 @@ describe('Reservas y creditos atomicos por HTTP con memoria y JWT reales', () =>
     expect(await reservations(requester)).toHaveLength(1);
   });
 
-  it('cancelar y reintentar libera una sola vez y no cobra ni transfiere credito', async () => {
+  it('cancelar tarde y reintentar libera una sola vez y multa al actor una sola vez', async () => {
     const reservation = await acceptExchange(await createExchange());
     const path = `/reservations/${reservation.id_reserva}/cancel`;
     const key = randomUUID();
     const body = { motivo: 'Cambio de horario antes del inicio' };
     const canceled = await post(requester, path, body, key).expect(200);
     expect(canceled.body.estado).toBe('Cancelada');
+    expect(canceled.body.cancelacion).toMatchObject({
+      id_usuario: requester.id,
+      clasificacion: 'injustificada',
+      administrativa: false,
+    });
     const retry = await post(requester, path, body, key).expect(200);
     expect(retry.body).toEqual(canceled.body);
     // HU-08: solo la misma clave reproduce éxito; otra operación es un conflicto.
     await post(requester, path, body).expect(409);
     expect(await wallet(requester)).toMatchObject({
-      saldo: '8',
+      saldo: '7.5',
       creditos_retenidos: '0',
-      disponibles: '8',
+      disponibles: '7.5',
     });
     expect((await wallet(provider)).saldo).toBe('0');
     const entries = await movements(requester);
     expect(entries.filter((m) => m.tipo === 'Liberacion')).toHaveLength(1);
     expect(entries.filter((m) => m.tipo === 'Consumo')).toEqual([]);
+    expect(entries.filter((m) => m.tipo === 'Penalizacion')).toMatchObject([
+      { cantidad: '-0.5', id_reserva: reservation.id_reserva },
+    ]);
   });
 
   it('dos confirmaciones de participantes y sus reintentos completan y transfieren una sola vez', async () => {

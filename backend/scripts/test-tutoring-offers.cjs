@@ -95,7 +95,7 @@ async function verifyTutoringOffers({ open, mailbox, connectionString }) {
   const financialState = async () => ({
     balances: (
       await db.query(
-        'SELECT id_usuario,saldo,creditos_retenidos,bono_decidido_at FROM "USUARIOS" ORDER BY id_usuario',
+        'SELECT id_usuario,saldo::text,creditos_retenidos::text,bono_decidido_at FROM "USUARIOS" ORDER BY id_usuario',
       )
     ).rows,
     movements: (
@@ -139,7 +139,7 @@ async function verifyTutoringOffers({ open, mailbox, connectionString }) {
     const balancesBefore = await financialState();
     assert.equal(
       balancesBefore.balances.find((row) => row.id_usuario === tutor.id).saldo,
-      0,
+      '0',
     );
 
     const key = randomUUID();
@@ -179,7 +179,7 @@ async function verifyTutoringOffers({ open, mailbox, connectionString }) {
       precio: stored.price,
       ofertas: 1,
       horarios: 1,
-      saldoTutor: 0,
+      saldoTutor: '0',
     });
 
     await publish(
@@ -188,8 +188,8 @@ async function verifyTutoringOffers({ open, mailbox, connectionString }) {
       input({ titulo: 'Contenido distinto' }),
       key,
     ).expect(409);
-    const beforeGuard = await transactionCounts();
-    const rejected = await api
+    const beforeRequest = await transactionCounts();
+    const requested = await api
       .post('/exchanges')
       .auth(secondTutor.token, { type: 'bearer' })
       .set('Idempotency-Key', randomUUID())
@@ -200,15 +200,20 @@ async function verifyTutoringOffers({ open, mailbox, connectionString }) {
         fechaInicio,
         fechaFin,
       })
-      .expect(409);
-    assert.equal(rejected.body.code, 'OFFER_PRICE_FLOW_PENDING');
-    assert.deepEqual(await transactionCounts(), beforeGuard);
+      .expect(201);
+    assert.equal(requested.body.id_oferta, offer.id_oferta);
+    assert.equal(requested.body.creditos_requeridos, '3.7');
+    assert.deepEqual(await transactionCounts(), {
+      ...beforeRequest,
+      requests: beforeRequest.requests + 1,
+    });
     assert.deepEqual(await financialState(), balancesBefore);
     results.push({
-      caso: 'flujo por duracion bloqueado',
-      estadoHTTP: 409,
-      code: rejected.body.code,
-      efectosNuevos: 0,
+      caso: 'availabilityId resuelve oferta y precio pactado sin retener',
+      estadoHTTP: 201,
+      precio: requested.body.creditos_requeridos,
+      reservasNuevas: 0,
+      movimientosNuevos: 0,
     });
 
     for (const value of [
