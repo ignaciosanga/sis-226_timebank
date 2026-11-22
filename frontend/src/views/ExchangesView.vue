@@ -1,11 +1,12 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeftRight, BookOpenCheck, CalendarCheck2, CalendarDays, CalendarPlus, CheckCircle2, Clock3 } from '@lucide/vue'
+import { ArrowLeftRight, BookOpenCheck, CalendarCheck2, CalendarDays, CalendarPlus, CheckCircle2, Clock3, RefreshCw } from '@lucide/vue'
 import { useAppStore } from '../stores/app'
 import Dialog from '../features/admin/AdminDialog.vue'
 import { dateLabel, fullName, initials, timeLabel } from '../features/timebank/format'
 import { useClock } from '../features/timebank/use-clock'
+import { useLiveRefresh } from '../features/timebank/use-live-refresh'
 import { downloadReservationIcs } from '../features/timebank/ics'
 const store = useAppStore(), route = useRoute(), router = useRouter()
 const now = useClock()
@@ -78,9 +79,10 @@ async function submitAction() {
     } else error.value = failure.message
   } finally { busy.value = false }
 }
+const { refreshing, refresh } = useLiveRefresh(() => store.refreshLive())
 </script>
 <template>
-  <header class="workspace-header"><div><h1>Mis intercambios</h1><p>De una solicitud a un momento para aprender juntos.</p></div><RouterLink class="button button-outline" to="/">Explorar habilidades</RouterLink></header>
+  <header class="workspace-header"><div><h1>Mis intercambios</h1><p>De una solicitud a un momento para aprender juntos.</p></div><button class="button button-outline refresh-button" type="button" :disabled="refreshing" @click="refresh"><RefreshCw :size="16" :class="{ spinning: refreshing }" aria-hidden="true" />{{ refreshing ? 'Actualizando…' : 'Actualizar' }}</button><RouterLink class="button button-outline" to="/">Explorar habilidades</RouterLink></header>
   <div class="workspace-tabs" role="group" aria-label="Sección de intercambios"><button type="button" data-dialog-return-focus :aria-pressed="tab === 'solicitudes'" :class="{active: tab === 'solicitudes'}" @click="setTab('solicitudes')"><ArrowLeftRight :size="18" />Solicitudes<span>{{ store.myRequests.length }}</span></button><button type="button" :aria-pressed="tab === 'reservas'" :class="{active: tab === 'reservas'}" @click="setTab('reservas')"><CalendarCheck2 :size="18" />Reservas<span>{{ store.myReservations.length }}</span></button><button type="button" :aria-pressed="tab === 'clases'" :class="{active: tab === 'clases'}" @click="setTab('clases')"><BookOpenCheck :size="18" />Mis clases</button></div>
   <RouterView v-if="tab === 'clases'" />
   <div v-if="tab !== 'clases'" class="exchange-toolbar"><div v-if="tab === 'solicitudes'" class="segmented" role="group" aria-label="Dirección de solicitudes"><button type="button" :class="{active: direction === 'recibidas'}" :aria-pressed="direction === 'recibidas'" @click="direction = 'recibidas'">Recibidas</button><button type="button" :class="{active: direction === 'enviadas'}" :aria-pressed="direction === 'enviadas'" @click="direction = 'enviadas'">Enviadas</button></div><p v-else class="subtle-label">Horario de La Paz. Las reservas se crean al aceptar una solicitud.</p><label class="select-wrap"><span class="sr-only">Filtrar por estado</span><select v-model="status"><option value="">Todos los estados</option><option v-for="value in tab === 'solicitudes' ? ['Solicitada','Aceptada','Rechazada','Cancelada'] : ['Confirmada','Completada','Cancelada']" :key="value" :value="value">{{ value }}</option></select></label></div>

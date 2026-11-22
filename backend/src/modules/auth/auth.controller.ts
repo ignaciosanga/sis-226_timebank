@@ -2,6 +2,8 @@ import { Body, Controller, Get, HttpCode, Post, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { randomBytes } from 'node:crypto';
 import { Throttle } from '@nestjs/throttler';
+import { ConfigService } from '@nestjs/config';
+import { Environment } from '../../config/environment';
 import {
   ApiAcceptedResponse,
   ApiBadRequestResponse,
@@ -56,6 +58,7 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly googleAuth: GoogleAuthService,
     private readonly verification: EmailVerificationService,
+    private readonly config: ConfigService<Environment, true>,
   ) {}
   @Post('register')
   @ApiCreatedResponse({
@@ -96,11 +99,18 @@ export class AuthController {
     const nonce = randomBytes(18).toString('base64');
     response.setHeader(
       'Content-Security-Policy',
-      `default-src 'none'; script-src 'nonce-${nonce}'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'`,
+      `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'`,
     );
     response.setHeader('Cache-Control', 'no-store');
     response.setHeader('Referrer-Policy', 'no-referrer');
-    response.type('html').send(renderVerificationPage(nonce));
+    response
+      .type('html')
+      .send(
+        renderVerificationPage(
+          nonce,
+          this.config.get('FRONTEND_URL', { infer: true }),
+        ),
+      );
   }
   @Post('login')
   @HttpCode(200)
