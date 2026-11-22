@@ -7,7 +7,12 @@ import {
 import { map, Observable } from 'rxjs';
 import { isDate } from 'node:util/types';
 
-const blocked = new Set(['password', 'password_hash', 'passwordHash']);
+const blocked = new Set([
+  'password',
+  'password_hash',
+  'passwordHash',
+  'token_hash',
+]);
 
 export function redactSensitiveFields(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(redactSensitiveFields);

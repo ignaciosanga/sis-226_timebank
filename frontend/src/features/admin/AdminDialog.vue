@@ -4,6 +4,7 @@ import { X } from '@lucide/vue'
 
 const props = defineProps({
   open: Boolean,
+  wide: Boolean,
   labelledby: { type: String, required: true },
   describedby: { type: String, default: undefined },
 })
@@ -65,7 +66,7 @@ onBeforeUnmount(release)
 <template>
   <Teleport to="body">
     <div v-if="open" class="admin-dialog-backdrop" @click.self="emit('close')">
-      <section ref="dialog" class="admin-dialog" role="dialog" aria-modal="true" :aria-labelledby="labelledby" :aria-describedby="describedby" tabindex="-1" @keydown="onKeydown">
+      <section ref="dialog" class="admin-dialog" :class="{ 'admin-dialog-wide': wide }" role="dialog" aria-modal="true" :aria-labelledby="labelledby" :aria-describedby="describedby" tabindex="-1" @keydown="onKeydown">
         <button class="admin-dialog-close icon-button" type="button" aria-label="Cerrar ventana" @click="emit('close')"><X :size="20" /></button>
         <slot />
       </section>

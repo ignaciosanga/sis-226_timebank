@@ -2,9 +2,9 @@
 // El SQL/JSON de sis-226_timebank describe el modelo legado de 18 tablas.
 // Compose aplica las migraciones versionadas a su PostgreSQL local independiente.
 generator client {
-  provider     = "prisma-client"
-  output       = "../src/generated/prisma"
-  moduleFormat = "cjs"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "cjs"
   importFileExtension = ""
 }
 
@@ -13,6 +13,7 @@ datasource db {
 }
 
 model Carrera {
+  curriculos Curriculo[]
   id_carrera String    @id @default(uuid()) @db.Uuid
   nombre     String    @db.VarChar
   facultad   String    @db.VarChar
@@ -34,19 +35,29 @@ model Categoria {
 }
 
 model Usuario {
-  id_usuario         String    @id @default(uuid()) @db.Uuid
-  nombre             String    @db.VarChar
-  apellido           String    @db.VarChar
-  correo             String    @unique @db.VarChar
-  password_hash      String    @db.VarChar
-  rol                String    @db.VarChar
-  id_carrera         String?   @db.Uuid
-  semestre           Int?
-  saldo              Int       @default(0)
-  creditos_retenidos Int       @default(0)
-  fecha_registro     DateTime  @default(now()) @db.Timestamptz(6)
-  ultimo_acceso      DateTime? @db.Timestamptz(6)
-  estado             String    @db.VarChar
+  progresoAcademico ProgresoAcademico[]
+  id_usuario          String               @id @default(uuid()) @db.Uuid
+  nombre              String               @db.VarChar
+  apellido            String               @db.VarChar
+  correo              String               @unique @db.VarChar
+  password_hash       String               @db.VarChar
+  rol                 String               @db.VarChar
+  id_carrera          String?              @db.Uuid
+  semestre            Int?
+  saldo               Int                  @default(0)
+  creditos_retenidos  Int                  @default(0)
+  fecha_registro      DateTime             @default(now()) @db.Timestamptz(6)
+  ultimo_acceso       DateTime?            @db.Timestamptz(6)
+  estado              String               @db.VarChar
+  // Fase 2: las filas anteriores conservan evidencia desconocida y su acceso.
+  cuenta_previa       Boolean              @default(false)
+  email_verificado_at DateTime?            @db.Timestamptz(6)
+  metodo_verificacion String?              @db.VarChar
+  bono_decidido_at    DateTime?            @db.Timestamptz(6)
+  google_sub          String?              @unique @db.VarChar(255)
+  verificaciones      VerificacionCorreo[]
+  ofertas             OfertaTutoria[]
+  banners             BannerTutoria[]
 
   carrera                 Carrera?               @relation(fields: [id_carrera], references: [id_carrera], onDelete: Restrict)
   habilidades             UsuarioHabilidad[]
@@ -67,7 +78,21 @@ model Usuario {
   @@map("USUARIOS")
 }
 
+model VerificacionCorreo {
+  id_verificacion String    @id @default(uuid()) @db.Uuid
+  id_usuario      String    @db.Uuid
+  token_hash      String    @unique @db.VarChar(64)
+  created_at      DateTime  @default(now()) @db.Timestamptz(6)
+  expires_at      DateTime  @db.Timestamptz(6)
+  consumed_at     DateTime? @db.Timestamptz(6)
+  usuario         Usuario   @relation(fields: [id_usuario], references: [id_usuario], onDelete: Restrict)
+
+  @@index([id_usuario, created_at])
+  @@map("VERIFICACIONES_CORREO")
+}
+
 model Habilidad {
+  materia      MateriaAcademica?
   id_habilidad String                 @id @default(uuid()) @db.Uuid
   nombre       String                 @unique @db.VarChar
   id_categoria String                 @db.Uuid
@@ -75,6 +100,7 @@ model Habilidad {
   categoria    Categoria              @relation(fields: [id_categoria], references: [id_categoria], onDelete: Restrict)
   usuarios     UsuarioHabilidad[]
   solicitudes  SolicitudIntercambio[]
+  ofertas      OfertaTutoria[]
   reservas     Reserva[]
 
   @@index([id_categoria, estado])
@@ -94,15 +120,57 @@ model UsuarioHabilidad {
 }
 
 model Disponibilidad {
-  id_disponibilidad String   @id @default(uuid()) @db.Uuid
-  id_usuario        String   @db.Uuid
-  fecha_inicio      DateTime @db.Timestamptz(6)
-  fecha_fin         DateTime @db.Timestamptz(6)
-  estado            String   @db.VarChar
-  usuario           Usuario  @relation(fields: [id_usuario], references: [id_usuario], onDelete: Restrict)
+  id_disponibilidad String         @id @default(uuid()) @db.Uuid
+  id_usuario        String         @db.Uuid
+  fecha_inicio      DateTime       @db.Timestamptz(6)
+  fecha_fin         DateTime       @db.Timestamptz(6)
+  estado            String         @db.VarChar
+  usuario           Usuario        @relation(fields: [id_usuario], references: [id_usuario], onDelete: Restrict)
+  oferta            OfertaTutoria?
 
   @@index([id_usuario, estado, fecha_inicio, fecha_fin])
   @@map("DISPONIBILIDADES")
+}
+
+// Precio publicado independiente de los nueve créditos INTEGER históricos.
+// NUMERIC sin typmod: los CHECK SQL rechazan exceso de escala sin redondear.
+model OfertaTutoria {
+  id_oferta         String         @id @default(uuid()) @db.Uuid
+  id_tutor          String         @db.Uuid
+  id_habilidad      String         @db.Uuid
+  id_disponibilidad String         @unique @db.Uuid
+  id_banner         String?        @unique @db.Uuid
+  nivel             String         @db.VarChar
+  titulo            String         @db.VarChar(100)
+  descripcion       String         @db.VarChar(1500)
+  costo_creditos    Decimal        @db.Decimal
+  estado            String         @default("Activa") @db.VarChar
+  created_at        DateTime       @default(now()) @db.Timestamptz(6)
+  tutor             Usuario        @relation(fields: [id_tutor], references: [id_usuario], onDelete: Restrict)
+  habilidad         Habilidad      @relation(fields: [id_habilidad], references: [id_habilidad], onDelete: Restrict)
+  disponibilidad    Disponibilidad @relation(fields: [id_disponibilidad], references: [id_disponibilidad], onDelete: Restrict)
+  banner            BannerTutoria? @relation(fields: [id_banner], references: [id_banner], onDelete: Restrict)
+
+  @@index([estado, created_at])
+  @@map("OFERTAS")
+}
+
+model BannerTutoria {
+  id_banner         String         @id @default(uuid()) @db.Uuid
+  id_tutor          String         @db.Uuid
+  storage_name      String         @unique @db.VarChar
+  mime_type         String         @db.VarChar
+  byte_size         Int
+  sha256            String         @db.VarChar(64)
+  created_at        DateTime       @default(now()) @db.Timestamptz(6)
+  expires_at        DateTime       @db.Timestamptz(6)
+  attached_offer_id String?        @db.Uuid
+  deleted_at        DateTime?      @db.Timestamptz(6)
+  tutor             Usuario        @relation(fields: [id_tutor], references: [id_usuario], onDelete: Restrict)
+  oferta            OfertaTutoria?
+
+  @@index([expires_at])
+  @@map("BANNERS_TUTORIA")
 }
 
 model SolicitudIntercambio {
@@ -228,4 +296,63 @@ model Auditoria {
   @@index([id_usuario, created_at])
   @@index([entidad, entidad_id])
   @@map("AUDITORIA")
+}
+
+// Propuesta académica; SQL incremental en prisma/proposals, pendiente de BD.
+model Curriculo {
+  codigo String @id @db.VarChar(32)
+  nombre String @db.VarChar(120)
+  id_carrera String @db.Uuid
+  carrera Carrera @relation(fields: [id_carrera], references: [id_carrera], onDelete: Restrict)
+  materias MateriaAcademica[]
+  @@map("CURRICULOS")
+}
+
+model AreaAcademica {
+  codigo String @id @db.VarChar(32)
+  nombre String @db.VarChar(120)
+  materias MateriaAcademica[]
+  @@map("AREAS_ACADEMICAS")
+}
+
+model MateriaAcademica {
+  curriculum String @db.VarChar(32)
+  codigo String @db.VarChar(16)
+  nombre String @db.VarChar(160)
+  semestre Int
+  area String @db.VarChar(32)
+  externo Boolean @default(false)
+  id_habilidad String? @unique @db.Uuid
+  plan Curriculo @relation(fields: [curriculum], references: [codigo], onDelete: Restrict)
+  areaAcademica AreaAcademica @relation(fields: [area], references: [codigo], onDelete: Restrict)
+  habilidad Habilidad? @relation(fields: [id_habilidad], references: [id_habilidad], onDelete: Restrict)
+  requisitos PrerrequisitoAcademico[] @relation("MateriaRequisitos")
+  requeridaPor PrerrequisitoAcademico[] @relation("RequisitoMateria")
+  progreso ProgresoAcademico[]
+  @@id([curriculum, codigo])
+  @@index([curriculum, semestre, area])
+  @@map("MATERIAS_ACADEMICAS")
+}
+
+model PrerrequisitoAcademico {
+  curriculum String @db.VarChar(32)
+  codigo String @db.VarChar(16)
+  requisito String @db.VarChar(16)
+  materia MateriaAcademica @relation("MateriaRequisitos", fields: [curriculum, codigo], references: [curriculum, codigo], onDelete: Restrict)
+  previo MateriaAcademica @relation("RequisitoMateria", fields: [curriculum, requisito], references: [curriculum, codigo], onDelete: Restrict)
+  @@id([curriculum, codigo, requisito])
+  @@map("PRERREQUISITOS_ACADEMICOS")
+}
+
+model ProgresoAcademico {
+  id_usuario String @db.Uuid
+  curriculum String @db.VarChar(32)
+  codigo String @db.VarChar(16)
+  estado String @db.VarChar(16)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  usuario Usuario @relation(fields: [id_usuario], references: [id_usuario], onDelete: Restrict)
+  materia MateriaAcademica @relation(fields: [curriculum, codigo], references: [curriculum, codigo], onDelete: Restrict)
+  @@id([id_usuario, curriculum, codigo])
+  @@index([curriculum, codigo, estado])
+  @@map("PROGRESO_ACADEMICO")
 }

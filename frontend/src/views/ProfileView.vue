@@ -13,62 +13,21 @@ import Dialog from '../features/admin/AdminDialog.vue'
 import UcbLogo from '../components/ui/UcbLogo.vue'
 import ReportPanel from '../features/metrics/ReportPanel.vue'
 import CreditsView from './CreditsView.vue'
+import RoadmapView from './RoadmapView.vue'
 import { fullName, initials } from '../features/timebank/format'
-import {
-  SKILL_LEVELS,
-  levelLabel,
-} from '../features/timebank/catalogs'
+import { levelLabel } from '../features/timebank/catalogs'
+import CoursePublishDialog from '../features/curriculum/CoursePublishDialog.vue'
 
 const store = useAppStore()
 const route = useRoute()
 const showingSummary = computed(() => route.name === 'student-metrics')
+const showingRoadmap = computed(() => route.name === 'learning-path')
 const showingProfile = computed(() => route.name === 'profile')
 
-// Publicación de habilidades.
+// Selección de materias del pensum; la publicación conserva el contrato de habilidades.
 const open = ref(false)
-const skillId = ref('')
-const level = ref('')
-const error = ref('')
-const publishing = ref(false)
-
-const availableSkills = computed(() =>
-  store.skills.filter(
-    (skill) =>
-      skill.estado === 'activo' &&
-      !store.mySkills.some(
-        (row) => row.id_habilidad === skill.id_habilidad,
-      ),
-  ),
-)
-
 function showForm() {
-  if (!store.requireSession()) return
-
-  skillId.value = ''
-  level.value = ''
-  error.value = ''
-  open.value = true
-}
-
-async function submit() {
-  if (publishing.value || !store.requireSession()) return
-
-  publishing.value = true
-  error.value = ''
-
-  try {
-    await store.publishSkill({
-      skillId: skillId.value,
-      nivel: level.value,
-    })
-
-    open.value = false
-    store.showToast('Habilidad publicada.')
-  } catch (failure) {
-    error.value = failure.message
-  } finally {
-    publishing.value = false
-  }
+  if (store.requireSession()) open.value = true
 }
 
 // Retiro de habilidades.
@@ -78,11 +37,11 @@ const removeError = ref('')
 const withdrawing = ref(false)
 
 const selectedSkillName = computed(() => {
-  if (!selectedSkill.value) return 'esta habilidad'
+  if (!selectedSkill.value) return 'esta materia'
 
   return (
     store.findSkill(selectedSkill.value.id_habilidad)?.nombre ||
-    'esta habilidad'
+    'esta materia'
   )
 })
 
@@ -111,7 +70,7 @@ async function confirmRemove() {
 
     removeOpen.value = false
     selectedSkill.value = null
-    store.showToast('Habilidad retirada.')
+    store.showToast('Materia retirada.')
   } catch (failure) {
     removeError.value = failure.message
   } finally {
@@ -208,7 +167,7 @@ async function saveProfile() {
 <template>
   <div class="profile-layout" :class="{ 'profile-layout-wide': !showingProfile }">
     <section class="profile-main">
-      <article class="panel profile-hero">
+      <article v-if="!showingRoadmap" class="panel profile-hero">
         <div class="profile-banner">
           <div class="banner-pattern"></div>
         </div>
@@ -239,19 +198,12 @@ async function saveProfile() {
             <button
               class="button button-primary"
               type="button"
-              :disabled="(store.authenticated && !availableSkills.length) || publishing"
+              aria-haspopup="dialog"
               @click="showForm"
             >
               <Plus :size="18" />
-              Compartir una habilidad
+              Añadir habilidad
             </button>
-
-            <RouterLink
-              class="button button-outline"
-              to="/disponibilidad"
-            >
-              Publicar disponibilidad
-            </RouterLink>
 
             <button
               v-if="store.authenticated"
@@ -268,6 +220,7 @@ async function saveProfile() {
 
       <nav class="metrics-navigation profile-tabs" aria-label="Apartados de mi perfil">
         <RouterLink to="/perfil">Mi perfil</RouterLink>
+        <RouterLink to="/perfil/ruta">Mi ruta</RouterLink>
         <RouterLink to="/perfil/resumen">Mi resumen</RouterLink>
         <RouterLink to="/perfil/creditos">Créditos</RouterLink>
       </nav>
@@ -280,7 +233,7 @@ async function saveProfile() {
         <div class="section-heading">
           <div>
             <h2 id="my-skills-title">
-              Habilidades que comparto
+              Materias que comparto
             </h2>
             <p>
               El conocimiento que pones a disposición de otros.
@@ -319,7 +272,7 @@ async function saveProfile() {
             }`"
             @click="askRemove(row)"
           >
-            Retirar habilidad
+            Retirar materia
           </button>
         </article>
 
@@ -328,12 +281,13 @@ async function saveProfile() {
           class="empty-state"
         >
           <p>
-            Aún no publicaste habilidades. Elige una del catálogo
+            Aún no compartes materias. Elige una del pensum
             para empezar.
           </p>
         </div>
       </section>
 
+      <RoadmapView v-else-if="showingRoadmap" />
       <ReportPanel v-else-if="showingSummary" audience="student" />
       <section v-else aria-label="Mis créditos">
         <CreditsView />
@@ -361,7 +315,7 @@ async function saveProfile() {
 
         <RouterLink
           class="profile-activity-link"
-          to="/intercambios"
+          to="/intercambios/mis-clases"
         >
           <ArrowLeftRight :size="19" />
           <span>Intercambios completados</span>
@@ -390,94 +344,7 @@ async function saveProfile() {
     </aside>
   </div>
 
-  <Dialog
-    :open="open"
-    labelledby="publish-skill-title"
-    describedby="publish-skill-description"
-    @close="!publishing && (open = false)"
-  >
-    <h2 id="publish-skill-title">Compartir una habilidad</h2>
-
-    <p id="publish-skill-description" class="lead-copy">
-      Elige una habilidad del catálogo e indica tu nivel.
-    </p>
-
-    <form class="flow-form" @submit.prevent="submit">
-      <div class="field">
-        <label for="publish-skill">Habilidad</label>
-
-        <select
-          id="publish-skill"
-          v-model="skillId"
-          required
-          :disabled="publishing"
-          data-autofocus
-        >
-          <option disabled value="">
-            Selecciona una habilidad
-          </option>
-
-          <option
-            v-for="skill in availableSkills"
-            :key="skill.id_habilidad"
-            :value="skill.id_habilidad"
-          >
-            {{ skill.nombre }}
-          </option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label for="publish-level">Tu nivel</label>
-
-        <select
-          id="publish-level"
-          v-model="level"
-          required
-          :disabled="publishing"
-        >
-          <option disabled value="">
-            Selecciona un nivel
-          </option>
-
-          <option
-            v-for="value in SKILL_LEVELS"
-            :key="value"
-            :value="value"
-          >
-            {{ levelLabel(value) }}
-          </option>
-        </select>
-      </div>
-
-      <p
-        v-if="error"
-        class="notice notice-error"
-        role="alert"
-      >
-        {{ error }}
-      </p>
-
-      <footer class="admin-dialog-actions">
-        <button
-          class="button button-outline"
-          type="button"
-          :disabled="publishing"
-          @click="open = false"
-        >
-          Cancelar
-        </button>
-
-        <button
-          class="button button-primary"
-          type="submit"
-          :disabled="publishing"
-        >
-          {{ publishing ? 'Publicando…' : 'Publicar habilidad' }}
-        </button>
-      </footer>
-    </form>
-  </Dialog>
+  <CoursePublishDialog :open="open" @close="open = false" />
 
   <Dialog
     :open="removeOpen"
@@ -485,7 +352,7 @@ async function saveProfile() {
     describedby="remove-skill-description"
     @close="!withdrawing && (removeOpen = false)"
   >
-    <h2 id="remove-skill-title">Retirar habilidad</h2>
+    <h2 id="remove-skill-title">Retirar materia</h2>
 
     <p id="remove-skill-description">
       ¿Quieres retirar {{ selectedSkillName }} de tus
@@ -516,7 +383,7 @@ async function saveProfile() {
         :disabled="withdrawing"
         @click="confirmRemove"
       >
-        {{ withdrawing ? 'Retirando…' : 'Retirar habilidad' }}
+        {{ withdrawing ? 'Retirando…' : 'Retirar materia' }}
       </button>
     </footer>
   </Dialog>

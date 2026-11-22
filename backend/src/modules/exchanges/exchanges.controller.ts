@@ -39,7 +39,7 @@ import {
 
 export const IdempotencyHeader = () =>
   ApiHeader({
-    name: 'Idempotency-Key',
+    name: 'idempotency-key',
     required: true,
     description:
       '16–128 caracteres; conservar la misma clave al reintentar la misma operación',
@@ -62,7 +62,9 @@ export class ExchangesController {
   @IdempotencyHeader()
   @ApiOperation({
     summary:
-      'Solicitar intercambio; no retiene créditos hasta que el ofertante acepte',
+      'Solicitar una clase y guardar su precio; no retiene hasta la aceptacion',
+    description:
+      'availabilityId resuelve la oferta. offerId es opcional y debe coincidir. El servidor copia costo_creditos a creditos_requeridos e id_oferta; no se admite un importe del cliente. Fechas exactas de la clase completa. En esquema entero las ofertas devuelven 409 OFFER_PRICE_FLOW_PENDING. Los horarios sin oferta conservan la tarifa historica.',
   })
   create(
     @CurrentUser() user: PublicUser,
@@ -88,6 +90,11 @@ export class ExchangesController {
     return this.exchanges.audit(user.id);
   }
   @Post(':id/accept')
+  @ApiOperation({
+    summary: 'El tutor acepta y retiene una sola vez el precio pactado',
+    description:
+      'Cuerpo vacio {}. Actualiza solicitud y horario, crea una reserva y retiene atomicamente el importe guardado en la solicitud, aunque cambie el catalogo. No paga al tutor. Un reintento recupera la misma reserva; conflictos de horario o saldo devuelven 409 sin efectos parciales.',
+  })
   @ApiOkResponse({ type: ReservationResponse })
   @Roles(Role.ESTUDIANTE)
   @HttpCode(200)

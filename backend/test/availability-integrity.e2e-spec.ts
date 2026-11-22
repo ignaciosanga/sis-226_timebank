@@ -4,6 +4,11 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/config/configure-app';
+import { VerificationMailer } from '../src/modules/auth/verification-mailer';
+import {
+  mailCapture,
+  confirmFromMailbox,
+} from './support/verification.fixture';
 import {
   AVAILABILITY_REPOSITORY,
   AvailabilityRepository,
@@ -17,6 +22,7 @@ interface AvailabilityResponse {
 }
 
 describe('Integridad de disponibilidad por HTTP con memoria y JWT reales', () => {
+  const mailbox = mailCapture();
   let app: INestApplication;
   let repository: AvailabilityRepository;
   let token: string;
@@ -67,13 +73,16 @@ describe('Integridad de disponibilidad por HTTP con memoria y JWT reales', () =>
   beforeEach(async () => {
     const module = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(VerificationMailer)
+      .useValue(mailbox)
+      .compile();
     app = module.createNestApplication({ logger: false });
     configureApp(app);
     await app.init();
     repository = app.get<AvailabilityRepository>(AVAILABILITY_REPOSITORY);
 
-    const correo = `integridad-${randomUUID()}@example.test`;
+    const correo = `integridad-${randomUUID()}@ucb.edu.bo`;
     const password = randomBytes(24).toString('base64url');
     await client()
       .post('/auth/register')
@@ -86,6 +95,7 @@ describe('Integridad de disponibilidad por HTTP con memoria y JWT reales', () =>
         semestre: 3,
       })
       .expect(201);
+    await confirmFromMailbox(app, mailbox, correo);
     const login = await client()
       .post('/auth/login')
       .send({ correo, password })

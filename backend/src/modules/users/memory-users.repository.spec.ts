@@ -67,17 +67,17 @@ describe('MemoryUsersRepository', () => {
       user: state.users.get(created.id),
       entries: [...state.movements.values()],
     }));
-    expect(saved.user).toMatchObject({ saldo: 10, creditos_retenidos: 0 });
+    expect(saved.user).toMatchObject({ saldo: '10', creditos_retenidos: '0' });
     expect(saved.entries).toEqual([
       expect.objectContaining({
         id_usuario: created.id,
         id_reserva: null,
         tipo: 'BonoInicial',
-        cantidad: 10,
-        saldo_anterior: 0,
-        saldo_posterior: 10,
-        retenidos_anterior: 0,
-        retenidos_posterior: 0,
+        cantidad: '10',
+        saldo_anterior: '0',
+        saldo_posterior: '10',
+        retenidos_anterior: '0',
+        retenidos_posterior: '0',
       }),
     ]);
   });

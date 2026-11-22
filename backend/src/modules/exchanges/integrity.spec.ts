@@ -8,6 +8,7 @@ import { ExchangeState, ReservationStatus } from './exchange.types';
 import { inspectIntegrity } from './integrity';
 import { MemoryExchangeRepository } from './memory-exchange.repository';
 import { addReservation } from './test-fixtures';
+import { SkillLevel } from '../user-skills/user-skill.types';
 
 async function fixture(
   status = ReservationStatus.CONFIRMADA,
@@ -257,5 +258,57 @@ describe('Integridad de las 12 tablas optimizadas', () => {
     const s = await fixture();
     addReservation(s, { id: 'r2', hour: 11 });
     expect(inspectIntegrity(s)).toEqual([]);
+  });
+  it('valida el snapshot decimal de oferta aunque cambie el precio publicado', async () => {
+    const state = await fixture();
+    const request = state.requests.get('request-r1')!;
+    const reservation = state.reservations.get('r1')!;
+    const availability = state.availability.get('availability-provider')!;
+    request.id_oferta = 'offer-r1';
+    request.creditos_requeridos = '3.7';
+    request.fecha_fin_propuesta = new Date(
+      request.fecha_inicio_propuesta.getTime() + 45 * 60000,
+    );
+    reservation.creditos = '3.7';
+    reservation.fecha_fin = request.fecha_fin_propuesta;
+    state.users.get('student')!.creditos_retenidos = '3.7';
+    const hold = state.movements.get('hold-r1')!;
+    hold.cantidad = '3.7';
+    hold.retenidos_posterior = '3.7';
+    availability.fecha_inicio = reservation.fecha_inicio;
+    availability.fecha_fin = reservation.fecha_fin;
+    availability.estado = AvailabilityStatus.RESERVADO;
+    state.offers.set('offer-r1', {
+      id_oferta: 'offer-r1',
+      id_tutor: 'provider',
+      id_habilidad: 'skill',
+      id_disponibilidad: availability.id_disponibilidad,
+      id_banner: null,
+      nivel: SkillLevel.INTERMEDIO,
+      titulo: 'Oferta',
+      descripcion: 'Prueba',
+      costo_creditos: '9.1',
+      estado: 'Activa',
+      created_at: request.created_at,
+    });
+    expect(inspectIntegrity(state)).toEqual([]);
+    hold.retenidos_posterior = '3.6';
+    expect(
+      inspectIntegrity(state).some(
+        (issue) => issue.code === 'MOVEMENT_SNAPSHOT_DELTA_MISMATCH',
+      ),
+    ).toBe(true);
+  });
+  it('reporta precisión monetaria inválida sin lanzar ni modificar el snapshot', async () => {
+    const state = await fixture();
+    state.users.get('student')!.saldo = '40.01';
+    state.movements.get('hold-r1')!.cantidad = '4.01';
+    const before = serialize(state);
+    expect(
+      inspectIntegrity(state).some(
+        (issue) => issue.code === 'USER_INVALID_BALANCE',
+      ),
+    ).toBe(true);
+    expect(serialize(state)).toBe(before);
   });
 });

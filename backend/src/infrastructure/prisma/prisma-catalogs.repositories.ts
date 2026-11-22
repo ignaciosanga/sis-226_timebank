@@ -147,7 +147,22 @@ export class PrismaSkillsRepository implements SkillsRepository {
       select: skillSelect,
       orderBy: [{ nombre: 'asc' }, { id_habilidad: 'asc' }],
     });
-    return records.map(mapStatus);
+    // El esquema base sigue siendo utilizable antes de integrar la propuesta BD.
+    const [schema] = await client.$queryRawUnsafe<{ ready: boolean }[]>(
+      `SELECT to_regclass('public."MATERIAS_ACADEMICAS"') IS NOT NULL AS ready`,
+    );
+    const mapping = schema?.ready
+      ? await client.$queryRawUnsafe<
+          { id_habilidad: string; codigo: string }[]
+        >(
+          `SELECT id_habilidad,codigo FROM "MATERIAS_ACADEMICAS" WHERE curriculum='systems' AND NOT externo`,
+        )
+      : [];
+    const codes = new Map(mapping.map((row) => [row.id_habilidad, row.codigo]));
+    return records.map((row) => ({
+      ...mapStatus(row),
+      codigo: codes.get(row.id_habilidad) ?? null,
+    }));
   }
 
   async findById(id: string): Promise<Skill | null> {
