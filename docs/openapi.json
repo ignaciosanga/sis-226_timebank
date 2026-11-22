@@ -5878,10 +5878,10 @@
           "estilo": {
             "type": "string",
             "enum": [
-              "orbe",
-              "gota",
+              "bolita",
+              "cuadradito",
               "burbuja",
-              "chispa"
+              "gota"
             ]
           },
           "color": {
@@ -5890,7 +5890,18 @@
               "azul",
               "amarillo",
               "verde",
-              "coral"
+              "coral",
+              "lila",
+              "nube"
+            ]
+          },
+          "accesorio": {
+            "type": "string",
+            "enum": [
+              "ninguno",
+              "chispa",
+              "birrete",
+              "audifonos"
             ]
           },
           "nombre": {
@@ -5902,6 +5913,7 @@
         "required": [
           "estilo",
           "color",
+          "accesorio",
           "nombre"
         ]
       },

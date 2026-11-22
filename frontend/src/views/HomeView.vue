@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { CalendarDays, Clock3, GraduationCap, Plus, Search } from '@lucide/vue'
+import { CalendarDays, Clock3, GraduationCap, Plus, RefreshCw, Search } from '@lucide/vue'
 import { useAppStore } from '../stores/app'
 import OfferDialog from '../features/offers/OfferDialog.vue'
 import TutorOfferDialog from '../features/tutoring/TutorOfferDialog.vue'
@@ -11,6 +11,7 @@ import { dateLabel, fullName, initials, timeLabel } from '../features/timebank/f
 import { isSingleCredit, offerCreditCost } from '../features/offers/tutoring-model'
 import { SYSTEMS_CURRICULUM } from '../features/curriculum/systems-curriculum'
 import { levelLabel } from '../features/timebank/catalogs'
+import { useLiveRefresh } from '../features/timebank/use-live-refresh'
 const store = useAppStore()
 const route = useRoute()
 const router = useRouter()
@@ -51,6 +52,7 @@ watch([() => route.query.oferta, () => allOffers.value.length], ([id]) => {
   delete nextQuery.oferta
   router.replace({ path: route.path, query: nextQuery, hash: route.hash })
 }, { immediate: true })
+const { refreshing, refresh } = useLiveRefresh(() => store.refreshLive())
 </script>
 <template>
   <div class="linkedin-grid home-layout" :class="{ 'home-layout-public': !store.authenticated }">
@@ -68,7 +70,7 @@ watch([() => route.query.oferta, () => allOffers.value.length], ([id]) => {
     </aside>
     <section class="feed-column"><header class="discover-card"><div class="discover-heading"><h1>¿Qué quieres aprender hoy?</h1><p>Conecta con alguien que comparte lo que sabe.</p></div><label class="catalog-search" data-tour="buscar-ofertas"><Search :size="20" aria-hidden="true" /><input v-model="query" type="search" placeholder="Buscar materia por nombre" aria-label="Buscar materia por nombre" /></label><label class="skill-category-filter select-wrap" for="skill-category"><span>Área</span><select id="skill-category" v-model="category"><option value="">Todas</option><option v-for="item in store.categories" :key="item.id_categoria" :value="item.id_categoria">{{ item.nombre }}</option></select></label></header>
       <div class="section-heading feed-heading offer-catalog-heading">
-        <div><h2>Habilidades para intercambiar</h2><p role="status">{{ offers.length }} {{ offers.length === 1 ? 'oferta disponible' : 'ofertas disponibles' }}</p></div>
+        <div><h2>Habilidades para intercambiar</h2><p role="status">{{ offers.length }} {{ offers.length === 1 ? 'oferta disponible' : 'ofertas disponibles' }}<button class="refresh-link" type="button" :disabled="refreshing" :aria-label="refreshing ? 'Actualizando ofertas' : 'Actualizar ofertas'" @click="refresh"><RefreshCw :size="14" :class="{ spinning: refreshing }" aria-hidden="true" />{{ refreshing ? 'Actualizando…' : 'Actualizar' }}</button></p></div>
         <button v-if="canOffer" class="button button-offer" data-tour="ofertar" type="button" aria-haspopup="dialog" @click="openOffer"><Plus :size="18" aria-hidden="true" />Ofertar una habilidad</button>
         <span v-else class="feed-community"><GraduationCap :size="16" />Comunidad UCB</span>
       </div>

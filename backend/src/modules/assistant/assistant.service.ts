@@ -103,6 +103,7 @@ export class AssistantService {
       avatar: {
         estilo: profile.avatar_estilo,
         color: profile.avatar_color,
+        accesorio: profile.avatar_accesorio,
         nombre: profile.avatar_nombre,
       },
       llavePista: profile.groq_key_pista,
@@ -126,6 +127,7 @@ export class AssistantService {
       await this.store.saveAvatar(userId, {
         avatar_estilo: input.estilo,
         avatar_color: input.color,
+        avatar_accesorio: input.accesorio,
         avatar_nombre: input.nombre,
       }),
     );

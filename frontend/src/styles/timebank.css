@@ -227,3 +227,11 @@
   .availability-list .section-heading { flex-wrap: wrap; }
   .profile-identity .identity-copy .ucb-logo { display: block; }
 }
+.workspace-header .refresh-button { margin-left: auto; }
+.refresh-button, .refresh-link { display: inline-flex; align-items: center; gap: 6px; }
+.refresh-link { margin-left: 12px; padding: 2px 8px; border: 0; border-radius: 999px; background: transparent; color: var(--ucb-blue); font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; }
+.refresh-link:hover { background: #eaf4fc; }
+.refresh-link:disabled, .refresh-button:disabled { opacity: .65; cursor: default; }
+.spinning { animation: nexo-spin 1s linear infinite; }
+@keyframes nexo-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinning { animation: none; } }

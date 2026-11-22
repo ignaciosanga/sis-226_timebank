@@ -127,3 +127,5 @@
 @media (max-width: 560px) {
   .vd-hbar-row { grid-template-columns: 1fr; gap: 4px; }
 }
+.vd-demo-notice { margin: 0 0 16px; padding: 12px 16px; border: 1px solid #f0d98a; border-radius: 10px; background: #fffaeb; color: #5e532c; font-size: .9rem; line-height: 1.5; }
+.vd-demo-notice strong { color: #3f3613; }

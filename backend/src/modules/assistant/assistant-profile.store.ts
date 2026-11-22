@@ -3,14 +3,34 @@ import { ConfigService } from '@nestjs/config';
 import { Environment } from '../../config/environment';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 
-export const AVATAR_STYLES = ['orbe', 'gota', 'burbuja', 'chispa'] as const;
-export const AVATAR_COLORS = ['azul', 'amarillo', 'verde', 'coral'] as const;
+export const AVATAR_STYLES = [
+  'bolita',
+  'cuadradito',
+  'burbuja',
+  'gota',
+] as const;
+export const AVATAR_COLORS = [
+  'azul',
+  'amarillo',
+  'verde',
+  'coral',
+  'lila',
+  'nube',
+] as const;
+export const AVATAR_ACCESSORIES = [
+  'ninguno',
+  'chispa',
+  'birrete',
+  'audifonos',
+] as const;
 export type AvatarStyle = (typeof AVATAR_STYLES)[number];
 export type AvatarColor = (typeof AVATAR_COLORS)[number];
+export type AvatarAccessory = (typeof AVATAR_ACCESSORIES)[number];
 
 export interface AssistantProfile {
   avatar_estilo: AvatarStyle;
   avatar_color: AvatarColor;
+  avatar_accesorio: AvatarAccessory;
   avatar_nombre: string;
   groq_key_cifrada: string | null;
   groq_key_pista: string | null;
@@ -19,8 +39,9 @@ export interface AssistantProfile {
 }
 
 const defaults = (): AssistantProfile => ({
-  avatar_estilo: 'orbe',
+  avatar_estilo: 'bolita',
   avatar_color: 'azul',
+  avatar_accesorio: 'chispa',
   avatar_nombre: 'Nexo',
   groq_key_cifrada: null,
   groq_key_pista: null,
@@ -28,7 +49,7 @@ const defaults = (): AssistantProfile => ({
   mensajes_usados: 0,
 });
 
-const COLUMNS = `avatar_estilo, avatar_color, avatar_nombre, groq_key_cifrada, groq_key_pista,
+const COLUMNS = `avatar_estilo, avatar_color, avatar_accesorio, avatar_nombre, groq_key_cifrada, groq_key_pista,
   to_char(mensajes_dia, 'YYYY-MM-DD') AS mensajes_dia, mensajes_usados`;
 
 @Injectable()
@@ -90,7 +111,7 @@ export class AssistantProfileStore {
     userId: string,
     avatar: Pick<
       AssistantProfile,
-      'avatar_estilo' | 'avatar_color' | 'avatar_nombre'
+      'avatar_estilo' | 'avatar_color' | 'avatar_accesorio' | 'avatar_nombre'
     >,
   ) {
     return this.upsert(userId, avatar);

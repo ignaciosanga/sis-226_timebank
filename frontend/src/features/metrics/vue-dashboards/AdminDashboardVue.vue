@@ -59,6 +59,7 @@ const activitySeries = computed(() =>
 
 <template>
   <div class="vd-shell">
+    <p class="vd-demo-notice" role="note"><strong>Datos de demostración.</strong> Estos gráficos usan 100 registros sintéticos para mostrar cómo funcionará el panel; no reflejan la actividad real de Nexo U.</p>
     <div class="vd-tabs" role="tablist" aria-label="Secciones del informe administrador">
       <button
         v-for="tab in tabs"

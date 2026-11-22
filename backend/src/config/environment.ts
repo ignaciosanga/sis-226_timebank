@@ -67,8 +67,11 @@ export class Environment {
   @IsBoolean()
   SWAGGER_ENABLED = true;
 
-  @IsIn(['disabled', 'smtp'])
+  @IsIn(['disabled', 'smtp', 'brevo'])
   MAIL_TRANSPORT = 'disabled';
+  @IsOptional()
+  @IsString()
+  BREVO_API_KEY?: string;
   @IsString()
   PUBLIC_API_URL = 'http://localhost:4000';
   @IsString()
@@ -263,6 +266,15 @@ export function validateEnvironment(
   )
     throw new Error(
       'Configuracion invalida: correo de produccion requiere HTTPS y TLS',
+    );
+  if (
+    config.MAIL_TRANSPORT === 'brevo' &&
+    (!config.BREVO_API_KEY ||
+      (config.NODE_ENV === 'production' &&
+        !config.PUBLIC_API_URL.startsWith('https://')))
+  )
+    throw new Error(
+      'Configuracion invalida: Brevo requiere BREVO_API_KEY y HTTPS',
     );
   if (Boolean(config.SMTP_USER) !== Boolean(config.SMTP_PASSWORD))
     throw new Error('Configuracion invalida: credenciales SMTP incompletas');

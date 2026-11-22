@@ -12,8 +12,10 @@ import {
   ValidateNested,
 } from 'class-validator';
 import {
+  AVATAR_ACCESSORIES,
   AVATAR_COLORS,
   AVATAR_STYLES,
+  type AvatarAccessory,
   type AvatarColor,
   type AvatarStyle,
 } from '../assistant-profile.store';
@@ -71,6 +73,10 @@ export class AssistantAvatarDto {
   @ApiProperty({ enum: AVATAR_COLORS })
   @IsIn(AVATAR_COLORS)
   color!: AvatarColor;
+
+  @ApiProperty({ enum: AVATAR_ACCESSORIES })
+  @IsIn(AVATAR_ACCESSORIES)
+  accesorio!: AvatarAccessory;
 
   @ApiProperty({ example: 'Nexo', maxLength: 24 })
   @Transform(trim)

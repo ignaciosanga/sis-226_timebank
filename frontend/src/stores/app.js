@@ -160,6 +160,10 @@ export const useAppStore = defineStore('app', {
       this.communityAvailability = results.flatMap((result) => result.slots)
     },
     loadSessionData() { return Promise.all([this.loadMine(), this.loadCommunity()]) },
+    async refreshLive() {
+      const community = Promise.allSettled([this.fetchCommunity()]).then(() => this.loadTutoring())
+      await Promise.allSettled([community, this.authenticated ? this.loadMine() : Promise.resolve()])
+    },
     async login(correo, password) {
       this.profile = await auth.login(correo, password)
       this.authenticated = true
