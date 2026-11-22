@@ -11,7 +11,7 @@
 -- 3) El script usa APP_ENCRYPTION_KEY y APP_HASH_PEPPER del entorno Docker.
 -- 4) Se puede volver a ejecutar: elimina y recrea unicamente las filas con
 --    los UUID reservados para este conjunto DEMO.
--- 5) Todos los importes de credito estan en decimas: 10 = 1.0 credito.
+-- 5) Todos los importes de credito estan en créditos reales: 10 = 1.0 credito.
 --
 -- Ejecucion desde CMD, situado en la carpeta del proyecto:
 -- docker compose exec -T db psql -U skillswap_admin -d skillswap -v ON_ERROR_STOP=1 < 03_datos_demo_skillswap.sql
@@ -161,12 +161,12 @@ INSERT INTO public."USUARIOS" (
     "id_usuario", "nombre", "apellido", "correo", "password_hash", "rol",
     "id_carrera", "semestre", "saldo", "creditos_retenidos", "estado"
 ) VALUES
-('82000000-0000-4000-8000-000000000001', 'Ana',    'Torres',       'ana.torres@skillswap.test',    '!DEMO_NO_LOGIN!', 'Estudiante', '30000000-0000-4000-8000-000000000001', 5,  76, 0, 'Activo'),
-('82000000-0000-4000-8000-000000000002', 'Mateo',  'Rivas',        'mateo.rivas@skillswap.test',   '!DEMO_NO_LOGIN!', 'Estudiante', '30000000-0000-4000-8000-000000000001', 4,   0, 0, 'Activo'),
-('82000000-0000-4000-8000-000000000003', 'Bruno',  'Salvatierra',  'bruno.salvatierra@skillswap.test', '!DEMO_NO_LOGIN!', 'Estudiante', '30000000-0000-4000-8000-000000000001', 6,  25, 0, 'Activo'),
-('82000000-0000-4000-8000-000000000004', 'Diego',  'Rojas',        'diego.rojas@skillswap.test',   '!DEMO_NO_LOGIN!', 'Estudiante', '30000000-0000-4000-8000-000000000002', 3,   0, 0, 'Activo'),
-('82000000-0000-4000-8000-000000000005', 'Carla',  'Mendez',       'carla.mendez@skillswap.test',  '!DEMO_NO_LOGIN!', 'Estudiante', '30000000-0000-4000-8000-000000000001', 2,  24, 0, 'Activo'),
-('82000000-0000-4000-8000-000000000006', 'Elena',  'Vargas',       'elena.vargas@skillswap.test',  '!DEMO_NO_LOGIN!', 'Estudiante', '30000000-0000-4000-8000-000000000002', 3,  75, 0, 'Activo');
+('82000000-0000-4000-8000-000000000001', 'Ana',    'Torres',       'ana.torres@skillswap.test',    '!DEMO_NO_LOGIN!', 'Estudiante', '30000000-0000-4000-8000-000000000001', 5,  7.6, 0.0, 'Activo'),
+('82000000-0000-4000-8000-000000000002', 'Mateo',  'Rivas',        'mateo.rivas@skillswap.test',   '!DEMO_NO_LOGIN!', 'Estudiante', '30000000-0000-4000-8000-000000000001', 4, 0.0, 0.0, 'Activo'),
+('82000000-0000-4000-8000-000000000003', 'Bruno',  'Salvatierra',  'bruno.salvatierra@skillswap.test', '!DEMO_NO_LOGIN!', 'Estudiante', '30000000-0000-4000-8000-000000000001', 6,  2.5, 0.0, 'Activo'),
+('82000000-0000-4000-8000-000000000004', 'Diego',  'Rojas',        'diego.rojas@skillswap.test',   '!DEMO_NO_LOGIN!', 'Estudiante', '30000000-0000-4000-8000-000000000002', 3, 0.0, 0.0, 'Activo'),
+('82000000-0000-4000-8000-000000000005', 'Carla',  'Mendez',       'carla.mendez@skillswap.test',  '!DEMO_NO_LOGIN!', 'Estudiante', '30000000-0000-4000-8000-000000000001', 2,  2.4, 0.0, 'Activo'),
+('82000000-0000-4000-8000-000000000006', 'Elena',  'Vargas',       'elena.vargas@skillswap.test',  '!DEMO_NO_LOGIN!', 'Estudiante', '30000000-0000-4000-8000-000000000002', 3,  7.5, 0.0, 'Activo');
 
 -- ---------------------------------------------------------------------
 -- 3) Habilidades ofrecidas por tutores.
@@ -206,16 +206,16 @@ INSERT INTO public."SOLICITUDES_INTERCAMBIO" (
     "fecha_inicio_propuesta", "fecha_fin_propuesta", "creditos_requeridos",
     "estado", "respondida_at"
 ) VALUES
-('84000000-0000-4000-8000-000000000001', '82000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000001', '81000000-0000-4000-8000-000000000001', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 7) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 7) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 38, 'Completada', clock_timestamp()),
-('84000000-0000-4000-8000-000000000002', '82000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000001', '81000000-0000-4000-8000-000000000001', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 5) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 5) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 38, 'Completada', clock_timestamp()),
-('84000000-0000-4000-8000-000000000003', '82000000-0000-4000-8000-000000000006', '82000000-0000-4000-8000-000000000003', '81000000-0000-4000-8000-000000000002', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 6) + TIME '16:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 6) + TIME '17:00') AT TIME ZONE 'America/La_Paz', 25, 'Completada', clock_timestamp()),
-('84000000-0000-4000-8000-000000000004', '82000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000001', '81000000-0000-4000-8000-000000000001', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 7) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 7) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 10, 'Aceptada', clock_timestamp()),
-('84000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000006', '82000000-0000-4000-8000-000000000003', '81000000-0000-4000-8000-000000000002', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 10) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 10) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 25, 'Solicitada', NULL),
-('84000000-0000-4000-8000-000000000006', '82000000-0000-4000-8000-000000000006', '82000000-0000-4000-8000-000000000004', '81000000-0000-4000-8000-000000000003', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 9) + TIME '14:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 9) + TIME '15:00') AT TIME ZONE 'America/La_Paz', 25, 'Solicitada', NULL),
-('84000000-0000-4000-8000-000000000007', '82000000-0000-4000-8000-000000000006', '82000000-0000-4000-8000-000000000002', '81000000-0000-4000-8000-000000000001', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 7) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 7) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 38, 'Solicitada', NULL);
+('84000000-0000-4000-8000-000000000001', '82000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000001', '81000000-0000-4000-8000-000000000001', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 7) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 7) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 3.8, 'Completada', clock_timestamp()),
+('84000000-0000-4000-8000-000000000002', '82000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000001', '81000000-0000-4000-8000-000000000001', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 5) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 5) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 3.8, 'Completada', clock_timestamp()),
+('84000000-0000-4000-8000-000000000003', '82000000-0000-4000-8000-000000000006', '82000000-0000-4000-8000-000000000003', '81000000-0000-4000-8000-000000000002', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 6) + TIME '16:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 6) + TIME '17:00') AT TIME ZONE 'America/La_Paz', 2.5, 'Completada', clock_timestamp()),
+('84000000-0000-4000-8000-000000000004', '82000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000001', '81000000-0000-4000-8000-000000000001', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 7) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 7) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 1.0, 'Aceptada', clock_timestamp()),
+('84000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000006', '82000000-0000-4000-8000-000000000003', '81000000-0000-4000-8000-000000000002', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 10) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 10) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 2.5, 'Solicitada', NULL),
+('84000000-0000-4000-8000-000000000006', '82000000-0000-4000-8000-000000000006', '82000000-0000-4000-8000-000000000004', '81000000-0000-4000-8000-000000000003', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 9) + TIME '14:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 9) + TIME '15:00') AT TIME ZONE 'America/La_Paz', 2.5, 'Solicitada', NULL),
+('84000000-0000-4000-8000-000000000007', '82000000-0000-4000-8000-000000000006', '82000000-0000-4000-8000-000000000002', '81000000-0000-4000-8000-000000000001', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 7) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 7) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 3.8, 'Solicitada', NULL);
 
 -- ---------------------------------------------------------------------
--- 6) Reservas: 3 completadas, 1 confirmada (10 decimas retenidas) y 2 canceladas.
+-- 6) Reservas: 3 completadas, 1 confirmada (10 créditos retenidas) y 2 canceladas.
 -- Las cancelaciones usan clock_timestamp() para probar los umbrales reales:
 -- R05 se cancela con 4 horas de anticipacion (<5) y R06 con 6 horas (>5).
 -- ---------------------------------------------------------------------
@@ -223,11 +223,11 @@ INSERT INTO public."RESERVAS" (
     "id_reserva", "id_solicitud", "id_solicitante", "id_ofertante", "id_habilidad",
     "fecha_inicio", "fecha_fin", "creditos", "modalidad", "lugar", "estado", "created_at", "completed_at"
 ) VALUES
-('85000000-0000-4000-8000-000000000001', '84000000-0000-4000-8000-000000000001', '82000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000001', '81000000-0000-4000-8000-000000000001', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 7) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 7) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 38, 'Virtual', 'Sesion DEMO Python 1', 'Completada', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 9) + TIME '10:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 7) + TIME '19:00') AT TIME ZONE 'America/La_Paz'),
-('85000000-0000-4000-8000-000000000002', '84000000-0000-4000-8000-000000000002', '82000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000001', '81000000-0000-4000-8000-000000000001', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 5) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 5) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 38, 'Virtual', 'Sesion DEMO Python 2', 'Completada', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 7) + TIME '10:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 5) + TIME '19:00') AT TIME ZONE 'America/La_Paz'),
-('85000000-0000-4000-8000-000000000003', '84000000-0000-4000-8000-000000000003', '82000000-0000-4000-8000-000000000006', '82000000-0000-4000-8000-000000000003', '81000000-0000-4000-8000-000000000002', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 6) + TIME '16:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 6) + TIME '17:00') AT TIME ZONE 'America/La_Paz', 25, 'Virtual', 'Sesion DEMO SQL', 'Completada', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 8) + TIME '10:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 6) + TIME '17:00') AT TIME ZONE 'America/La_Paz'),
-('85000000-0000-4000-8000-000000000004', '84000000-0000-4000-8000-000000000004', '82000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000001', '81000000-0000-4000-8000-000000000001', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 7) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 7) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 10, 'Virtual', 'Sesion DEMO Python futura', 'Confirmada', clock_timestamp(), NULL),
-('85000000-0000-4000-8000-000000000006', NULL, '82000000-0000-4000-8000-000000000006', '82000000-0000-4000-8000-000000000004', '81000000-0000-4000-8000-000000000003', clock_timestamp() + interval '6 hours', clock_timestamp() + interval '7 hours', 25, 'Virtual', 'Cancelacion DEMO sin penalizacion', 'Cancelada', clock_timestamp(), NULL);
+('85000000-0000-4000-8000-000000000001', '84000000-0000-4000-8000-000000000001', '82000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000001', '81000000-0000-4000-8000-000000000001', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 7) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 7) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 3.8, 'Virtual', 'Sesion DEMO Python 1', 'Completada', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 9) + TIME '10:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 7) + TIME '19:00') AT TIME ZONE 'America/La_Paz'),
+('85000000-0000-4000-8000-000000000002', '84000000-0000-4000-8000-000000000002', '82000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000001', '81000000-0000-4000-8000-000000000001', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 5) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 5) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 3.8, 'Virtual', 'Sesion DEMO Python 2', 'Completada', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 7) + TIME '10:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 5) + TIME '19:00') AT TIME ZONE 'America/La_Paz'),
+('85000000-0000-4000-8000-000000000003', '84000000-0000-4000-8000-000000000003', '82000000-0000-4000-8000-000000000006', '82000000-0000-4000-8000-000000000003', '81000000-0000-4000-8000-000000000002', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 6) + TIME '16:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 6) + TIME '17:00') AT TIME ZONE 'America/La_Paz', 2.5, 'Virtual', 'Sesion DEMO SQL', 'Completada', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 8) + TIME '10:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date - 6) + TIME '17:00') AT TIME ZONE 'America/La_Paz'),
+('85000000-0000-4000-8000-000000000004', '84000000-0000-4000-8000-000000000004', '82000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000001', '81000000-0000-4000-8000-000000000001', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 7) + TIME '18:00') AT TIME ZONE 'America/La_Paz', ((date_trunc('week', CURRENT_DATE::timestamp)::date + 7) + TIME '19:00') AT TIME ZONE 'America/La_Paz', 1.0, 'Virtual', 'Sesion DEMO Python futura', 'Confirmada', clock_timestamp(), NULL),
+('85000000-0000-4000-8000-000000000006', NULL, '82000000-0000-4000-8000-000000000006', '82000000-0000-4000-8000-000000000004', '81000000-0000-4000-8000-000000000003', clock_timestamp() + interval '6 hours', clock_timestamp() + interval '7 hours', 2.5, 'Virtual', 'Cancelacion DEMO sin penalizacion', 'Cancelada', clock_timestamp(), NULL);
 
 -- Historial de calificaciones: Ana = 4.5; Bruno = 4.0; Diego = sin notas.
 INSERT INTO public."CALIFICACIONES" (
@@ -239,25 +239,24 @@ INSERT INTO public."CALIFICACIONES" (
 
 -- ---------------------------------------------------------------------
 -- 7) Libro de movimientos historicos.
--- Saldos en decimas. Los saldos finales previos a la cancelacion R05 son:
--- Carla 24, Ana 76, Elena 75 y Bruno 25.
+-- Saldos en créditos reales. Los saldos finales previos a la cancelacion R05 son:
+-- Carla 2.4, Ana 7.6, Elena 7.5 y Bruno 2.5.
 -- R05 insertada a continuacion descontara 5 unidades a Carla.
 -- ---------------------------------------------------------------------
 INSERT INTO public."MOVIMIENTOS_CREDITO" (
     "id_movimiento", "id_usuario", "id_reserva", "tipo", "cantidad",
     "saldo_anterior", "saldo_posterior", "retenidos_anterior", "retenidos_posterior", "descripcion"
 ) VALUES
-('86000000-0000-4000-8000-000000000001', '82000000-0000-4000-8000-000000000005', NULL, 'recarga_demo', 100, 0, 100, 0, 0, 'Saldo inicial de demostracion: 10.0 creditos.'),
-('86000000-0000-4000-8000-000000000002', '82000000-0000-4000-8000-000000000005', '85000000-0000-4000-8000-000000000001', 'pago_tutoria', -38, 100, 62, 0, 0, 'Pago de R01: 3.8 creditos.'),
-('86000000-0000-4000-8000-000000000003', '82000000-0000-4000-8000-000000000005', '85000000-0000-4000-8000-000000000002', 'pago_tutoria', -38, 62, 24, 0, 0, 'Pago de R02: 3.8 creditos.'),
-('86000000-0000-4000-8000-000000000004', '82000000-0000-4000-8000-000000000001', '85000000-0000-4000-8000-000000000001', 'ingreso_tutoria', 38, 0, 38, 0, 0, 'Ingreso por R01: 3.8 creditos.'),
-('86000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000001', '85000000-0000-4000-8000-000000000002', 'ingreso_tutoria', 38, 38, 76, 0, 0, 'Ingreso por R02: 3.8 creditos.'),
-('86000000-0000-4000-8000-000000000006', '82000000-0000-4000-8000-000000000006', NULL, 'recarga_demo', 100, 0, 100, 0, 0, 'Saldo inicial de demostracion: 10.0 creditos.'),
-('86000000-0000-4000-8000-000000000007', '82000000-0000-4000-8000-000000000006', '85000000-0000-4000-8000-000000000003', 'pago_tutoria', -25, 100, 75, 0, 0, 'Pago de R03: 2.5 creditos.'),
-('86000000-0000-4000-8000-000000000008', '82000000-0000-4000-8000-000000000003', '85000000-0000-4000-8000-000000000003', 'ingreso_tutoria', 25, 0, 25, 0, 0, 'Ingreso por R03: 2.5 creditos.');
+('86000000-0000-4000-8000-000000000001', '82000000-0000-4000-8000-000000000005', NULL, 'recarga_demo', 10.0, 0.0, 10.0, 0.0, 0.0, 'Saldo inicial de demostracion: 10.0 creditos.'),
+('86000000-0000-4000-8000-000000000002', '82000000-0000-4000-8000-000000000005', '85000000-0000-4000-8000-000000000001', 'pago_tutoria', -3.8, 10.0, 6.2, 0.0, 0.0, 'Pago de R01: 3.8 creditos.'),
+('86000000-0000-4000-8000-000000000003', '82000000-0000-4000-8000-000000000005', '85000000-0000-4000-8000-000000000002', 'pago_tutoria', -3.8, 6.2, 2.4, 0.0, 0.0, 'Pago de R02: 3.8 creditos.'),
+('86000000-0000-4000-8000-000000000004', '82000000-0000-4000-8000-000000000001', '85000000-0000-4000-8000-000000000001', 'ingreso_tutoria', 3.8, 0.0, 3.8, 0.0, 0.0, 'Ingreso por R01: 3.8 creditos.'),
+('86000000-0000-4000-8000-000000000005', '82000000-0000-4000-8000-000000000001', '85000000-0000-4000-8000-000000000002', 'ingreso_tutoria', 3.8, 3.8, 7.6, 0.0, 0.0, 'Ingreso por R02: 3.8 creditos.'),
+('86000000-0000-4000-8000-000000000006', '82000000-0000-4000-8000-000000000006', NULL, 'recarga_demo', 10.0, 0.0, 10.0, 0.0, 0.0, 'Saldo inicial de demostracion: 10.0 creditos.'),
+('86000000-0000-4000-8000-000000000007', '82000000-0000-4000-8000-000000000006', '85000000-0000-4000-8000-000000000003', 'pago_tutoria', -2.5, 10.0, 7.5, 0.0, 0.0, 'Pago de R03: 2.5 creditos.'),
+('86000000-0000-4000-8000-000000000008', '82000000-0000-4000-8000-000000000003', '85000000-0000-4000-8000-000000000003', 'ingreso_tutoria', 2.5, 0.0, 2.5, 0.0, 0.0, 'Ingreso por R03: 2.5 creditos.');
 
--- R05: cancelacion tardia. El trigger debe restar 5 decimas a Carla,
--- crear el movimiento tipo 'penalizacion' y dejar su saldo en 19.
+-- R05: cancelación tardía. El trigger resta 0.5 créditos a Carla y deja su saldo en 1.9.
 INSERT INTO public."RESERVAS" (
     "id_reserva", "id_solicitud", "id_solicitante", "id_ofertante", "id_habilidad",
     "fecha_inicio", "fecha_fin", "creditos", "modalidad", "lugar", "estado",
@@ -285,12 +284,12 @@ INSERT INTO public."RESERVAS" (
 -- ---------------------------------------------------------------------
 DO $$
 DECLARE
-    v_saldo_carla integer;
-    v_saldo_ana integer;
-    v_saldo_elena integer;
-    v_saldo_bruno integer;
+    v_saldo_carla numeric(12,2);
+    v_saldo_ana numeric(12,2);
+    v_saldo_elena numeric(12,2);
+    v_saldo_bruno numeric(12,2);
     v_penalizaciones integer;
-    v_retenidos_carla integer;
+    v_retenidos_carla numeric(12,2);
     v_notas_ana numeric;
 BEGIN
     SELECT "saldo" INTO v_saldo_carla FROM public."USUARIOS" WHERE "id_usuario" = '82000000-0000-4000-8000-000000000005';
@@ -301,19 +300,19 @@ BEGIN
       FROM public."USUARIOS"
       WHERE "id_usuario" = '82000000-0000-4000-8000-000000000005';
     SELECT COUNT(*) INTO v_penalizaciones FROM public."MOVIMIENTOS_CREDITO"
-      WHERE "id_reserva" = '85000000-0000-4000-8000-000000000005' AND "tipo" = 'penalizacion' AND "cantidad" = -5;
+      WHERE "id_reserva" = '85000000-0000-4000-8000-000000000005' AND "tipo" = 'penalizacion' AND "cantidad" = -0.5;
     SELECT AVG("puntuacion") INTO v_notas_ana FROM public."CALIFICACIONES"
       WHERE "id_evaluado" = '82000000-0000-4000-8000-000000000001';
 
-    IF v_saldo_carla <> 19 OR v_saldo_ana <> 76 OR v_saldo_elena <> 75 OR v_saldo_bruno <> 25 THEN
+    IF v_saldo_carla <> 1.9 OR v_saldo_ana <> 7.6 OR v_saldo_elena <> 7.5 OR v_saldo_bruno <> 2.5 THEN
         RAISE EXCEPTION 'Saldos DEMO inesperados: Carla %, Ana %, Elena %, Bruno %.',
             v_saldo_carla, v_saldo_ana, v_saldo_elena, v_saldo_bruno;
     END IF;
-    IF v_retenidos_carla <> 10 THEN
-        RAISE EXCEPTION 'La reserva futura R04 debia retener 10 decimas a Carla; se encontraron %.', v_retenidos_carla;
+    IF v_retenidos_carla <> 1.0 THEN
+        RAISE EXCEPTION 'La reserva futura R04 debia retener 1.0 crédito a Carla; se encontraron %.', v_retenidos_carla;
     END IF;
     IF v_penalizaciones <> 1 THEN
-        RAISE EXCEPTION 'Se esperaba exactamente una penalizacion de 5 decimas para R05; se encontraron %.', v_penalizaciones;
+        RAISE EXCEPTION 'Se esperaba exactamente una penalización de 0.5 créditos para R05; se encontraron %.', v_penalizaciones;
     END IF;
     IF v_notas_ana <> 4.5 THEN
         RAISE EXCEPTION 'El promedio de Ana debia ser 4.5 y se obtuvo %.', v_notas_ana;
@@ -323,16 +322,16 @@ $$;
 
 COMMIT;
 
-\echo 'Datos DEMO cargados correctamente.'
+\echo 'Datos DEMO cargados correctamente con créditos decimales reales.'
 \echo 'Usuarios: 6 | Habilidades: 4 | Reservas: 6 | Calificaciones: 3.'
-\echo 'Carla debe quedar con 1.9 creditos (19 decimas).'
+\echo 'Carla debe quedar con 1.9 créditos y 1.0 crédito retenido por R04.'
 
 -- ---------------------------------------------------------------------
 -- 9) Consultas de evidencia. Deben mostrar resultados con datos.
 -- ---------------------------------------------------------------------
 SELECT
-    u."nombre", u."apellido", u."saldo" AS saldo_decimas,
-    ROUND(u."saldo"::numeric / 10, 1) AS saldo_creditos
+    u."nombre", u."apellido", u."saldo" AS saldo_créditos,
+    u."saldo" AS saldo_creditos
 FROM public."USUARIOS" u
 WHERE u."id_usuario" IN (
     '82000000-0000-4000-8000-000000000001', '82000000-0000-4000-8000-000000000002',

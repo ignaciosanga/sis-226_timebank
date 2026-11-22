@@ -78,7 +78,7 @@ BEGIN
     (v_tutor, 'Tutor HU06', 'Prueba', 'hu06-tutor-' || v_tutor::text || '@test.invalid',
      'hash-inicial-no-utilizable', 'Estudiante', v_carrera, 4, 0, 0, 'Activo'),
     (v_estudiante, 'Estudiante HU06', 'Prueba', 'hu06-estudiante-' || v_estudiante::text || '@test.invalid',
-     'hash-inicial-no-utilizable', 'Estudiante', v_carrera, 4, 100, 0, 'Activo');
+     'hash-inicial-no-utilizable', 'Estudiante', v_carrera, 4, 10.0, 0.0, 'Activo');
   INSERT INTO public."USUARIO_HABILIDADES" ("id_usuario", "id_habilidad", "nivel")
   VALUES (v_tutor, v_habilidad, 'avanzado');
 
@@ -87,7 +87,7 @@ BEGIN
     "fecha_inicio_propuesta", "fecha_fin_propuesta", "creditos_requeridos", "estado", "respondida_at"
   ) VALUES (
     v_solicitud, v_estudiante, v_tutor, v_habilidad,
-    v_inicio, v_inicio + interval '1 hour', 37, 'Aceptada', clock_timestamp()
+    v_inicio, v_inicio + interval '1 hour', 3.7, 'Aceptada', clock_timestamp()
   );
 
   INSERT INTO hu06_context (actor_id, tutor_id, solicitud_id, reserva_id, marca)
@@ -116,7 +116,7 @@ INSERT INTO public."RESERVAS" (
 )
 SELECT :'hu06_reserva_id'::uuid, c.solicitud_id, c.actor_id, c.tutor_id,
        s."id_habilidad", clock_timestamp() + interval '8 hours',
-       clock_timestamp() + interval '9 hours', 37, 'Virtual', :'hu06_marca', 'Confirmada'
+       clock_timestamp() + interval '9 hours', 3.7, 'Virtual', :'hu06_marca', 'Confirmada'
 FROM hu06_context c
 JOIN public."SOLICITUDES_INTERCAMBIO" s ON s."id_solicitud" = c.solicitud_id;
 
@@ -165,7 +165,7 @@ BEGIN
   FROM public."MOVIMIENTOS_CREDITO" m
   WHERE m."id_reserva" = current_setting('app.hu06_reserva_id')::uuid
     AND m."tipo" = 'liberacion_retencion'
-    AND m."retenidos_anterior" = 37
+    AND m."retenidos_anterior" = 3.7
     AND m."retenidos_posterior" = 0;
   IF v_liberaciones <> 1 THEN
     RAISE EXCEPTION 'HU06-01 FALLA: se esperaba una liberación de retención; se obtuvo %.', v_liberaciones;

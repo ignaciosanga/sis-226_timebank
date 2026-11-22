@@ -1,288 +1,129 @@
-# SkillSwap – PostgreSQL listo para Docker (base corregida)
+# SkillSwap / Nexo U — PostgreSQL 16 (V6: créditos decimales reales + hardening solo BD)
 
-## Qué incluye
+## Modelo de créditos acordado con Backend, Frontend, API y BI
 
-- PostgreSQL 16 (imagen oficial Alpine).
-- Esquema y catálogo de carreras originales de SkillSwap.
-- Funciones criptográficas basadas en `pgcrypto` (AES-256 PGP).
-- Pepper de búsqueda separado de la clave de cifrado.
-- Backfill cifrado de datos existentes y triggers BEFORE INSERT/UPDATE.
-- Vistas desencriptadas y búsqueda de usuario por hash de correo.
-- Auditoría automática, incluida la PK compuesta de `USUARIO_HABILIDADES`.
-- Roles `rol_app` y `rol_lectura` con privilegios diferenciados.
-- Inicialización en una sola transacción SQL.
+Los importes se guardan directamente en PostgreSQL como `NUMERIC(12,2)`. La regla de negocio acepta una sola cifra decimal: `3.0`, `3.5`, `3.7`, `4.2`, `0.5`. Un valor como `3.75` debe rechazarse. No se multiplica ni se divide entre diez y no se usa `INTEGER × 10`. Todos los saldos, retenciones, precios, importes de solicitudes, reservas y movimientos están en créditos reales.
 
+Se utiliza `NUMERIC(12,2)` con restricciones `CHECK` que limitan los valores persistidos a una cifra decimal. La API también debe validar el valor recibido antes de mapearlo a la columna, para evitar redondeos de entrada. Prisma debe representar estos campos como `Decimal @db.Decimal(12,2)`.
 
-## Modulos nuevos del parcial 3 (adaptados a la primera base)
+### Campos de créditos
 
-Se agregan dos scripts al esquema original, sin cambiar los tipos de creditos de `01_base_a_schema.sql`:
+- `USUARIOS.saldo`
+- `USUARIOS.creditos_retenidos`
+- `SOLICITUDES_INTERCAMBIO.creditos_requeridos`
+- `RESERVAS.creditos`
+- `MOVIMIENTOS_CREDITO.cantidad`, `saldo_anterior`, `saldo_posterior`, `retenidos_anterior`, `retenidos_posterior`
+- `OFERTAS_TUTORIA.costo_creditos`
+- `PENALIZACIONES_PENDIENTES.monto`
+- `config_economia.valor` (incluye también parámetros enteros, que tienen una validación propia)
 
-- `07_economia_dinamica.sql`: crea `config_economia`, la sugerencia `fn_sugerir_precio_clase` y los triggers de cancelacion/penalizacion. La funcion legada `fn_calcular_costo_clase` ya no es el precio de cobro.
-- `08_impacto_match_brechas.sql`: crea `v_knowledge_score`, `fn_obtener_top_tutores`, `v_knowledge_gap_index` y `v_command_center_resumen`.
-- `09_vistas_bi_hu07.sql`: completa HU-07 con horarios pico en `America/La_Paz`, materias con oferta cero y Knowledge Score con promedio `NULL` cuando no hay calificaciones.
-- `tests/13_pruebas_bi_hu07.sql`: validaciones de aceptación para las vistas BI y sus permisos.
-- `tests/12_pruebas_economia_match.sql`: pruebas transaccionales con datos ficticios; al final hace `ROLLBACK` y no conserva las filas de prueba.
+## Regla de precio de tutoría
 
-### Escala de creditos (IMPORTANTE PARA BACKEND Y FRONTEND)
+El tutor define el precio de la oferta y el estudiante acepta ese importe. Ese precio queda guardado como snapshot en `SOLICITUDES_INTERCAMBIO.creditos_requeridos` y después en `RESERVAS.creditos`. Si el tutor modifica su oferta, no cambia las solicitudes ya aceptadas.
 
-Los campos de creditos del esquema original se conservan como `INTEGER`, pero **no representan creditos enteros directamente**: almacenan decimas de credito para admitir importes como 1.5 sin cambiar los tipos de datos ni romper los contratos con los otros equipos.
+`fn_sugerir_precio_clase()` calcula una sugerencia basada en costo base, escasez, demanda e impacto. Es orientativa: no sustituye el precio elegido por el tutor ni calcula el cargo definitivo. `fn_validar_precio_creditos()` valida importes positivos con una sola cifra decimal.
 
-La regla es:
+## Ciclo de retención y pago (HU-10)
 
-- `10` en PostgreSQL = `1.0` credito en la aplicacion.
-- `15` en PostgreSQL = `1.5` creditos en la aplicacion.
-- `13` en PostgreSQL = `1.3` creditos en la aplicacion.
-- `12` en PostgreSQL = `1.2` creditos en la aplicacion.
-- `5` en PostgreSQL = `0.5` creditos en la aplicacion.
+1. Al crear una reserva confirmada, la base retiene el precio en `USUARIOS.creditos_retenidos`; el saldo total no baja.
+2. La primera confirmación solamente registra su fecha.
+3. La segunda confirmación transfiere el importe una sola vez: baja el saldo y la retención del estudiante, y aumenta el saldo del tutor.
+4. Si se cancela antes de transferir, se libera la retención. El tutor no recibe créditos por esa reserva.
+5. La penalización acordada es `0.5` créditos cuando la cancelación se realiza con menos de cinco horas. Si el saldo libre no alcanza, queda como penalización pendiente según el módulo 10.
 
-Se aplica a todos estos campos: `USUARIOS.saldo`, `USUARIOS.creditos_retenidos`, `SOLICITUDES_INTERCAMBIO.creditos_requeridos`, `RESERVAS.creditos` y `MOVIMIENTOS_CREDITO.cantidad`, `saldo_anterior`, `saldo_posterior`, `retenidos_anterior`, `retenidos_posterior`.
+La idempotencia se protege con validaciones y un índice único parcial sobre los movimientos de cada etapa.
 
-**No redondear los importes a un credito entero.** `fn_sugerir_precio_clase` devuelve una sugerencia `INTEGER` escalada en decimas, pero no define el precio definitivo de una clase. El precio de cobro es el que publica el tutor y acepta el estudiante, guardado en `OFERTAS_TUTORIA.costo_decimas` y copiado a `SOLICITUDES_INTERCAMBIO.creditos_requeridos` y `RESERVAS.creditos`. La app divide entre 10 exclusivamente para mostrar; las operaciones conservan el entero escalado.
+## Módulos de inicialización
 
-Ejemplo de la diapositiva:
+`initdb/00_init.sh` ejecuta `initdb/sql/00_bootstrap.sql` en una única transacción. El orden incluye esquema, cifrado, auditoría, economía, vistas BI, penalizaciones, ofertas, ciclo de pago y permisos generales.
 
-| Concepto | Visible en la app | Entero guardado |
-|---|---:|---:|
-| Clase estandar | +1.0 | +10 |
-| Materia con pocos tutores | +1.5 | +15 |
-| Horario de alta demanda | +1.3 | +13 |
-| Tutor con alto impacto | +1.2 | +12 |
-| Cancelacion injustificada | -0.5 | -5 |
+Las cuentas de equipos preparadas para la fase final permanecen separadas de la inicialización automática, según el acuerdo previo del equipo.
 
-Cuando se aplican todos los bonos a una clase: `10 + 15 + 13 + 12 = 50` unidades internas; la app muestra `50 / 10 = 5.0` creditos. La penalizacion de `-0.5` se registra como movimiento `cantidad = -5`.
+## Inicio de PostgreSQL
 
-La penalizacion se activa cuando la cancelacion ocurre a **menos de 5 horas** del inicio. Con 5 horas exactas o mas no se aplica. La regla se compara usando la marca temporal exacta de cancelacion; `horas_anticipacion_cancelacion` conserva el numero de horas completas como dato informativo. Por defecto, se descuenta `5` unidades internas (`0.5` creditos). Si el saldo libre no alcanza para cubrir las 5 decimas completas, no se realiza un descuento parcial: se registra `penalizacion_sin_saldo` con cantidad `0`.
-
-#### Conversion en la aplicacion
-
-JavaScript / TypeScript:
-
-```ts
-// PostgreSQL/API -> mostrar en pantalla
-const creditosVisibles = (creditosDecimas / 10).toFixed(1);
-
-// Valor ingresado/confirmado en pantalla -> enviar a backend/guardar
-const creditosDecimas = Math.round(Number(creditosVisibles) * 10);
-```
-
-No hagas la division antes de guardar una reserva, actualizar un saldo o insertar un movimiento. Por ejemplo, para guardar una reserva de `2.5` creditos, `RESERVAS.creditos` debe recibir `25`, no `2.5` ni `3`.
-
-Para facilitar el consumo de datos, se incluyen las vistas `v_cuentas_credito_app` y `v_movimientos_credito_app`: exponen tanto los enteros internos (`*_decimas`) como los importes listos para mostrar (`*_creditos`). En `v_command_center_resumen`, `creditos_en_cuentas_decimas` contiene el total interno y `creditos_en_cuentas` el total dividido entre 10.
-
-Los parametros de `config_economia` guardan importes tambien en decimas (`costo_base=10`, `mult_escasez=15`, `mult_demanda=13`, `mult_impacto=12`, `penalizacion_creditos=5`). Los umbrales no monetarios (`umbral_tutores_escasez`, `horas_minimas_cancelacion`) se guardan en unidades naturales.
-
-```sql
-SELECT clave, valor, descripcion
-FROM public.config_economia
-ORDER BY clave;
-
--- Ejemplo: cambiar la penalizacion a 0.7 creditos (7 decimas internas)
-UPDATE public.config_economia
-SET valor = 7, actualizado_at = now()
-WHERE clave = 'penalizacion_creditos';
-```
-
-### Ejecutar las pruebas
-
-Con PostgreSQL ya iniciado y desde la carpeta del proyecto, ejecuta el archivo como administrador de la base. En Windows PowerShell:
-
-```powershell
-Get-Content .\tests\12_pruebas_economia_match.sql -Raw | docker compose exec -T db psql -U skillswap_admin -d skillswap
-```
-
-En Linux/macOS:
-
-```bash
-docker compose exec -T db psql -U skillswap_admin -d skillswap < tests/12_pruebas_economia_match.sql
-```
-
-Las pruebas verifican que 1.0 + 1.5 se guarda como 25 (y se muestra como 2.5), que la suma de todos los bonos llega a 50 (se muestra como 5.0), que las vistas convierten los importes entre decimas y creditos, el matching, Knowledge Gap, Knowledge Score y la penalizacion de -5 unidades (se muestra como -0.5) solo al cancelar con menos de 5 horas. Todas las filas temporales se revierten.
-
-> Importante: la prueba usa `skillswap_admin` y `skillswap` como valores predeterminados del `.env.example`. Si cambiaste esos nombres, adapta el comando. El SQL de pruebas debe ejecutarse después de una inicialización exitosa.
-
-### HU-07: contrato de vistas para BI
-
-Las vistas nuevas son:
-
-- `v_bi_reservas_por_hora`: devuelve las 24 horas del dia y cuenta las reservas por hora de inicio convertida explicitamente a `America/La_Paz`. Incluye el total y el desglose por estado.
-- `v_bi_reservas_dia_hora`: complemento para un mapa de calor de 7 dias por 24 horas.
-- `v_bi_materias_oferta_demanda`: devuelve cada materia/habilidad activa del catalogo, incluso cuando no tiene tutores.
-- `v_bi_materias_sin_tutores`: devuelve directamente las materias activas con `oferta_tutores = 0`.
-- `v_bi_knowledge_score`: version para BI sin nombre, apellido ni correo; un tutor con `total_calificaciones = 0` tiene `promedio_estrellas = NULL`.
-
-**Alcance del catalogo:** el esquema acordado no contiene una tabla independiente llamada `PENSUM` o `MATERIAS`; por eso estas vistas toman el catalogo desde `HABILIDADES`, que es la entidad relacionada con `USUARIO_HABILIDADES`, `SOLICITUDES_INTERCAMBIO` y `RESERVAS`. Para que aparezcan todas las materias del pensum, incluso las que ningun tutor ofrece, el catalogo `HABILIDADES` debe cargarse con todas esas materias activas, no solamente con las que ya tienen tutores. El esquema original no tiene una tabla independiente `PENSUM`; si el contrato de datos exige una tabla separada, ese cambio debe acordarse primero con Backend y Frontend.
-
-Permisos: `rol_lectura` recibe `SELECT` sobre las vistas BI agregadas. `v_bi_knowledge_score` expone el UUID del tutor para relacionar metricas, pero no nombre, apellido ni correo.
-
-Pruebas HU-07:
-
-```bash
-docker compose exec -T db psql -U skillswap_admin -d skillswap < tests/13_pruebas_bi_hu07.sql
-```
-
-La prueba valida que existan las cinco vistas, que la vista horaria devuelva 24 filas, que la vista de mapa de calor devuelva 168 combinaciones, que las materias sin tutor tengan oferta cero, que el promedio de quien no tiene calificaciones sea `NULL` y que `rol_lectura` tenga permiso de consulta. Para demostrar visualmente los dos casos alternativos, deben existir en los datos de prueba al menos una materia sin tutor y un tutor sin calificaciones.
-
-
-### Precio de la oferta: regla acordada con Backend y Frontend
-
-El precio que publica el tutor en `OFERTAS_TUTORIA.costo_decimas` es el precio definitivo de esa oferta. La función `fn_sugerir_precio_clase` puede calcular una referencia dinamica (por ejemplo, por escasez, demanda o impacto), pero **no sustituye ni modifica** el precio escrito por el tutor.
-
-Flujo obligatorio:
-
-1. El tutor publica un precio, por ejemplo 3.7 creditos = 37 decimas.
-2. Al crear la solicitud, Backend copia ese importe a `SOLICITUDES_INTERCAMBIO.creditos_requeridos` (snapshot de la cotizacion aceptada por el estudiante).
-3. Si el tutor cambia despues el precio de la oferta a 4.2 (42 decimas), la solicitud existente sigue en 37.
-4. Al aceptar la solicitud y crear `RESERVAS`, `RESERVAS.creditos` debe coincidir con `SOLICITUDES_INTERCAMBIO.creditos_requeridos`.
-5. La retencion y el pago en dos confirmaciones usan el importe congelado de la reserva. No vuelven a consultar la oferta ni recalculan el precio.
-
-Los precios admiten una sola cifra decimal: 3, 3.5 y 3.7 son validos; 3.75 se rechaza. PostgreSQL almacena decimas como INTEGER (37 = 3.7). La conversion se realiza exactamente una vez en la frontera de API/Backend.
-
-`fn_calcular_costo_clase` queda como nombre legado, sin permiso de ejecución para `rol_app`; no debe usarse como precio de cobro. La aplicacion puede consultar `fn_sugerir_precio_clase` solamente para mostrar una recomendacion orientativa. El precio definitivo siempre es el elegido por el tutor y aceptado por el estudiante.
-
-### Pruebas de aceptación relacionadas
-
-- `tests/16_pruebas_auditoria_hu06.sql`: crea sus propios datos, comprueba la auditoría de cancelación y cambio de contraseña, las columnas JSON cifradas y la denegación de UPDATE/DELETE. Requiere pasar `enc_key` desde `APP_ENCRYPTION_KEY`.
-- `tests/17_pruebas_ofertas_hu04.sql`: prueba precio manual del tutor, sugerencia dinámica separada, snapshot de la solicitud, edición posterior de la oferta y rechazo de 3.75/costo cero/horario inválido.
-- `tests/18_pruebas_pago_clases_hu10.sql`: prueba retención al aceptar, primera confirmación sin pago, segunda confirmación con transferencia única, liberación tras cancelación antes de la segunda confirmación y rechazo por saldo insuficiente.
-
-Comandos de ejecución desde la raíz del proyecto (ajusta usuario/base si cambiaste los valores del Compose):
-
-```bash
-docker compose exec -T db psql -U skillswap_admin -d skillswap < tests/17_pruebas_ofertas_hu04.sql
-docker compose exec -T db psql -U skillswap_admin -d skillswap < tests/18_pruebas_pago_clases_hu10.sql
-docker compose exec -T db sh -lc 'psql --no-psqlrc -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v "enc_key=$APP_ENCRYPTION_KEY"' < tests/16_pruebas_auditoria_hu06.sql
-```
-
-Para una V4 ya inicializada, aplicar una vez `migrations/03_politica_precio_tutor_autoritativo.sql` como administrador. En una inicialización desde cero, los cambios ya están incorporados en `07_economia_dinamica.sql` y `05_seguridad_roles.sql.tpl`.
-
-## Preparación
-
-1. Copia `.env.example` a `.env`.
-2. Cambia todas las contraseñas de ejemplo.
-3. Genera dos secretos diferentes, por ejemplo con `openssl rand -hex 32`:
-   - uno para `APP_ENCRYPTION_KEY`;
-   - otro para `APP_HASH_PEPPER`.
-4. No subas `.env` a Git ni compartas esos secretos.
-
-Ejemplo de generación (ejecutar dos veces, guardar cada salida en su variable correspondiente):
-
-```bash
-openssl rand -hex 32
-```
-
-## Iniciar PostgreSQL
-
-Desde esta carpeta:
+Configure `.env` tomando `.env.example` como base y use secretos distintos para la clave de cifrado y el pepper. Después ejecute:
 
 ```bash
 docker compose up -d db
 docker compose logs -f db
 ```
 
-Cuando el log indique que SkillSwap fue inicializado, PostgreSQL estará listo.
-
-Comprobar estado:
+El seed de demostración se carga de forma separada:
 
 ```bash
-docker compose ps
+docker compose exec -T db psql -U skillswap_admin -d skillswap < 03_datos_demo_skillswap.sql
 ```
 
-Conectarse como administrador (ajusta usuario y base si cambiaste los valores predeterminados del `.env`):
+## Pruebas
+
+El seed y los archivos HU-04/HU-06/HU-10 usan créditos reales (ej.: 3.7), nunca 37. El seed de demostración es para una base de pruebas limpia; si se vuelve a cargar, primero debe restablecerse esa base para evitar duplicados.
+
+
+Ejecute como administrador en la base de pruebas:
 
 ```bash
-docker compose exec db psql -U skillswap_admin -d skillswap
+docker compose exec -T db psql -U skillswap_admin -d skillswap < tests/12_pruebas_economia_match.sql
+docker compose exec -T db psql -U skillswap_admin -d skillswap < tests/13_pruebas_bi_hu07.sql
+docker compose exec -T db psql -U skillswap_admin -d skillswap < tests/14_pruebas_penalizaciones_pendientes.sql
+docker compose exec -T db psql -U skillswap_admin -d skillswap < tests/17_pruebas_ofertas_hu04.sql
+docker compose exec -T db psql -U skillswap_admin -d skillswap < tests/18_pruebas_pago_clases_hu10.sql
+docker compose exec -T db psql -U skillswap_admin -d skillswap < tests/19_pruebas_hardening.sql
 ```
 
-Conectarse desde otra herramienta o el backend con `rol_app` o `rol_lectura`, usando las contraseñas guardadas en `.env`.
+HU-06 requiere pasar `APP_ENCRYPTION_KEY` como variable `enc_key`:
 
-## Scripts anteriores reemplazados por el orquestador
-
-En este paquete, `initdb/00_init.sh` ejecuta todos los SQL en el orden correcto y dentro de una sola transacción. Por eso no ejecutes además el `05_seguridad_roles.sh` antiguo: su plantilla ya se ejecuta desde `00_bootstrap.sql`.
-
-Tampoco ejecutes el `99_encriptacion.sh` antiguo. Ese script guardaba `app.encryption_key` en la configuración de roles con `ALTER ROLE`; esta versión no persiste secretos en PostgreSQL y exige que el backend los establezca por conexión, como se explica abajo.
-
-## Configuración obligatoria del backend
-
-Las claves criptográficas NO se guardan con `ALTER ROLE` ni en tablas. El backend debe configurar ambas variables en **cada conexión nueva del pool** antes de usar funciones o vistas cifradas:
-
-```sql
-SELECT set_config('app.encryption_key', '<APP_ENCRYPTION_KEY>', false);
-SELECT set_config('app.hash_pepper', '<APP_HASH_PEPPER>', false);
+```bash
+docker compose exec -T db sh -lc 'psql --no-psqlrc -v ON_ERROR_STOP=1 -v enc_key="$APP_ENCRYPTION_KEY" -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < tests/16_pruebas_auditoria_hu06.sql
 ```
 
-Sustituye los marcadores por los secretos de entorno del backend; usa parámetros del driver, no concatenes entradas de usuario en SQL. Si el pool recicla una conexión, vuelve a establecerlas al inicializar esa conexión.
+Todas las pruebas usan transacciones que terminan con `ROLLBACK`, salvo el seed de demostración.
 
-Para atribuir las acciones a un usuario, establece el UUID dentro de cada transacción de negocio:
+## Prisma 7
 
-```sql
-SELECT set_config('app.usuario_actual', '<UUID_DEL_USUARIO>', true);
+En `schema.prisma`, cambia los campos de créditos de `Int` a `Decimal @db.Decimal(12,2)`. Ejemplo:
+
+```prisma
+saldo              Decimal @default(0) @db.Decimal(12, 2)
+creditos_retenidos Decimal @default(0) @db.Decimal(12, 2)
+creditos_requeridos Decimal @db.Decimal(12, 2)
+creditos            Decimal @db.Decimal(12, 2)
+cantidad            Decimal @db.Decimal(12, 2)
+saldo_anterior      Decimal @db.Decimal(12, 2)
+saldo_posterior     Decimal @db.Decimal(12, 2)
+retenidos_anterior  Decimal @db.Decimal(12, 2)
+retenidos_posterior Decimal @db.Decimal(12, 2)
 ```
 
-El tercer argumento `true` limita el valor a la transacción actual. Si no se establece, la auditoría registra `id_usuario = NULL`.
+El modelo de ofertas nuevo debe declarar `costo_creditos Decimal @db.Decimal(12,2)`. Las validaciones de una sola cifra decimal deben mantenerse en API y PostgreSQL.
 
-## Importante sobre la protección de datos
+## Hardening de la base (V6, solo BD, sin coordinar con backend)
 
-El esquema original conserva `USUARIOS.nombre`, `USUARIOS.apellido`, `USUARIOS.correo` y algunos otros campos en texto plano por compatibilidad con las consultas y el modelo de aplicación actuales. Los triggers mantienen también columnas cifradas `*_enc`, y el login utiliza `correo_hash`, pero **esto no equivale a cifrado completo en reposo de esos campos** mientras los originales continúen en claro.
+`initdb/sql/13_hardening_search_path.sql` se ejecuta al final del bootstrap (después de los roles). Solo hace lo siguiente:
 
-La tabla `AUDITORIA` sí guarda `datos_anteriores` y `datos_nuevos` en columnas cifradas y deja los JSON originales en `NULL`. Para completar el cifrado en reposo de los demás campos hay que adaptar el backend para leer/escribir exclusivamente mediante vistas/funciones y después retirar o hacer nulas las columnas heredadas; no conviene hacerlo sin revisar el código de la aplicación.
+- Fija `search_path = pg_catalog, public, pg_temp` en las 23 funciones `SECURITY DEFINER` del paquete (antes terminaban en `public`, sin `pg_temp`).
+- Antes de modificar nada comprueba la versión (PostgreSQL 16), el superusuario, que existan las funciones esperadas y que ningún rol de aplicación tenga `CREATE` en `public` ni acceso a las claves o al ETL. Si algo no cuadra, aborta la inicialización.
 
-El rol `rol_lectura` sólo recibe catálogos y una lista blanca de vistas agregadas. No recibe acceso a vistas con nombres, correos, identificadores de usuarios, mensajes individuales ni datos de auditoría individuales.
+**No cambia**: tablas, datos, vistas, créditos, triggers, penalizaciones, ni ningún `GRANT`/`REVOKE` de `rol_app` o `rol_lectura`. No crea funciones que el backend deba adoptar.
 
-## Inicialización y datos existentes
+**No resuelve** inyección SQL en el backend: se deben usar siempre parámetros del driver (`$1`, `$2`…). Tampoco restringe el DML amplio de `rol_app`, sus vistas descifradas, ni evita que SQL arbitrario lea `app.encryption_key`/`app.hash_pepper` desde una sesión que las tenga configuradas. Eso requiere una segunda fase coordinada con el backend.
 
-Los scripts de `docker-entrypoint-initdb.d` se ejecutan sólo cuando el volumen de PostgreSQL está vacío. Este paquete está preparado para **crear una base nueva**. No lo uses como migración directa sobre una base que ya contiene datos.
+Para una base **ya inicializada** (sin recrear el volumen) aplicar una sola vez, como administrador:
 
-Para reiniciar desde cero en desarrollo:
+```bash
+docker compose exec -T db psql -X -v ON_ERROR_STOP=1 -U skillswap_admin -d skillswap < migrations/01_hardening_search_path_solo_bd.sql
+```
+
+Es idempotente y transaccional. Si en el futuro se agrega otra función `SECURITY DEFINER`, el script emite un `WARNING` con su nombre para que se añada a la lista.
+
+`tests/19_pruebas_hardening.sql` verifica el `search_path` de todas las funciones, que `rol_app` no pueda crear objetos en `public`, que no acceda a las claves ni al ETL, la política de precio (solo `fn_sugerir_precio_clase`) y que los permisos funcionales existentes se conserven.
+
+## Importante al actualizar un volumen local
+
+Los scripts dentro de `docker-entrypoint-initdb.d` solo se ejecutan cuando PostgreSQL inicializa un directorio de datos vacío. Como este proyecto está en entorno de pruebas sin datos reales, para aplicar el esquema limpio se puede recrear el volumen local. **Esto elimina los datos locales de ese volumen**:
 
 ```bash
 docker compose down -v
 docker compose up -d db
 ```
 
-`docker compose down -v` elimina permanentemente el volumen y todos sus datos. Haz un backup antes. En producción, usa migraciones específicas y un gestor de secretos.
-
-## Si ya tienes una base anterior con datos
-
-El paquete Docker inicializa un volumen vacio. Si ya tienes una base poblada y sus `INTEGER` de credito guardan creditos completos (por ejemplo, `5` significa `5.0`), **no borres el volumen**. Haz primero un backup y revisa que los importes todavia no esten en decimas.
-
-En ese caso, usa manualmente `migrations/01_convertir_creditos_a_decimas.sql` una sola vez. El script multiplica por 10 saldos, creditos requeridos, creditos de reservas y movimientos, y deja una marca para impedir que se repita. Si ya guardabas `15` para representar `1.5`, NO ejecutes esa migracion porque multiplicaria los saldos otra vez.
-
-Despues de la migracion, aplica los modulos `07_economia_dinamica.sql`, `08_impacto_match_brechas.sql` y `09_vistas_bi_hu07.sql` con el usuario administrador. Si `rol_lectura` ya existe, el modulo 09 concede sus permisos BI; si no existe, los concede despues `05_seguridad_roles.sql.tpl` al inicializar desde cero. El modulo 09 tambien requiere otorgar a `rol_lectura` los permisos de consulta sobre las vistas BI nuevas:
-
-```sql
-GRANT SELECT ON public.config_economia,
-  public.v_cuentas_credito_app,
-  public.v_movimientos_credito_app TO rol_app;
-GRANT EXECUTE ON FUNCTION public.fn_sugerir_precio_clase(uuid, uuid, timestamptz),
-  public.fn_obtener_top_tutores(uuid, timestamptz, timestamptz, text) TO rol_app;
-REVOKE EXECUTE ON FUNCTION public.fn_calcular_costo_clase(uuid, uuid, timestamptz) FROM rol_app;
-GRANT SELECT ON public.v_knowledge_gap_index,
-  public.v_command_center_resumen,
-  public.v_bi_reservas_por_hora,
-  public.v_bi_reservas_dia_hora,
-  public.v_bi_materias_oferta_demanda,
-  public.v_bi_materias_sin_tutores,
-  public.v_bi_knowledge_score TO rol_lectura;
-```
-
-Esta ruta es para bases preexistentes. En una instalacion nueva con Docker, no ejecutes la migracion manual: el bootstrap crea directamente la escala de decimas.
-
-## Pruebas recomendadas después del arranque
-
-```sql
--- Debe devolver ambos roles:
-SELECT rolname FROM pg_roles WHERE rolname IN ('rol_app', 'rol_lectura');
-
--- Debe existir el índice de búsqueda:
-SELECT indexname FROM pg_indexes WHERE indexname = 'ux_usuarios_correo_hash';
-
--- Los triggers sensibles deben existir:
-SELECT tgname FROM pg_trigger
-WHERE NOT tgisinternal AND tgname LIKE 'trg_encrypt_%';
-
--- La tabla de auditoría no debe conservar JSON en claro:
-SELECT count(*) FROM public."AUDITORIA"
-WHERE datos_anteriores IS NOT NULL OR datos_nuevos IS NOT NULL;
-```
-
-El último resultado debe ser `0`.
+No ejecute ningún archivo antiguo que multiplique saldos por diez. La base nueva guarda créditos reales directamente. No aplicar esta instrucción a un entorno compartido o a Neon sin coordinación y respaldo.

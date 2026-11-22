@@ -27,12 +27,12 @@ DECLARE
     v_inicio_alta_demanda timestamptz;
     v_inicio_match timestamptz;
     v_fin_match timestamptz;
-    v_costo integer;
-    v_saldo integer;
+    v_costo numeric(12,2);
+    v_saldo numeric(12,2);
     v_horas integer;
     v_count integer;
     v_tipo_credito text;
-    v_cantidad integer;
+    v_cantidad numeric(12,2);
     v_saldo_visible numeric;
     v_movimiento_visible numeric;
 BEGIN
@@ -51,15 +51,15 @@ BEGIN
     INSERT INTO public."HABILIDADES" ("id_habilidad", "nombre", "id_categoria", "estado")
     VALUES (v_habilidad, 'ZZ_TEST_SKILL_' || left(v_habilidad::text, 8), v_categoria, 'activo');
 
-    -- 50 unidades internas = 5.0 creditos que la app muestra como 5.0.
+    -- 5.0 créditos reales.
     INSERT INTO public."USUARIOS" (
         "id_usuario", "nombre", "apellido", "correo", "password_hash", "rol",
         "id_carrera", "semestre", "saldo", "creditos_retenidos", "estado"
     ) VALUES
       (v_tutor, 'Tutor', 'Prueba', 'tutor-' || v_tutor::text || '@test.invalid', 'hash-no-login',
-       'Estudiante', v_carrera, 4, 50, 0, 'Activo'),
+       'Estudiante', v_carrera, 4, 5.0, 0.0, 'Activo'),
       (v_solicitante, 'Solicitante', 'Prueba', 'solicitante-' || v_solicitante::text || '@test.invalid', 'hash-no-login',
-       'Estudiante', v_carrera, 4, 50, 0, 'Activo');
+       'Estudiante', v_carrera, 4, 5.0, 0.0, 'Activo');
 
     INSERT INTO public."USUARIO_HABILIDADES" ("id_usuario", "id_habilidad", "nivel")
     VALUES (v_tutor, v_habilidad, 'avanzado');
@@ -67,12 +67,12 @@ BEGIN
     -- La habilidad tiene un tutor: aplica escasez. A las 10:00 no aplica demanda.
     v_inicio_normal := ((CURRENT_DATE + 10) + TIME '10:00') AT TIME ZONE 'America/La_Paz';
     v_costo := public.fn_sugerir_precio_clase(v_habilidad, v_tutor, v_inicio_normal);
-    IF v_costo IS DISTINCT FROM 25 THEN
-        RAISE EXCEPTION 'FALLO escala de decimas: se esperaba 25 (2.5 creditos) y se obtuvo %.', v_costo;
+    IF v_costo IS DISTINCT FROM 2.5::numeric THEN
+        RAISE EXCEPTION 'FALLO precio sugerido base + escasez: se esperaba 2.5 créditos y se obtuvo %.', v_costo;
     END IF;
     INSERT INTO resultados_prueba (prueba, resultado, detalle)
-    VALUES ('Precio sugerido base + escasez en decimas', 'OK',
-            '10 + 15 = 25 unidades internas; la app muestra 25 / 10 = 2.5 creditos.');
+    VALUES ('Precio sugerido base + escasez', 'OK',
+            '1.0 + 1.5 = 2.5 créditos reales.');
 
     -- Crear historial completado y calificacion 5 para activar el bono de impacto.
     INSERT INTO public."RESERVAS" (
@@ -81,7 +81,7 @@ BEGIN
     ) VALUES (
         v_reserva_historial, v_solicitante, v_tutor, v_habilidad,
         clock_timestamp() - interval '3 days', clock_timestamp() - interval '2 days',
-        10, 'Virtual', 'Prueba historial', 'Completada', clock_timestamp()
+        1.0, 'Virtual', 'Prueba historial', 'Completada', clock_timestamp()
     );
 
     INSERT INTO public."CALIFICACIONES" (
@@ -91,15 +91,15 @@ BEGIN
     );
 
     -- A las 19:00 aplican escasez + demanda + alto impacto:
-    -- 10 + 15 + 13 + 12 = 50 unidades internas = 5.0 creditos visibles.
+    -- 1.0 + 1.5 + 1.3 + 1.2 = 5.0 créditos.
     v_inicio_alta_demanda := ((CURRENT_DATE + 10) + TIME '19:00') AT TIME ZONE 'America/La_Paz';
     v_costo := public.fn_sugerir_precio_clase(v_habilidad, v_tutor, v_inicio_alta_demanda);
-    IF v_costo IS DISTINCT FROM 50 THEN
-        RAISE EXCEPTION 'FALLO suma de bonificaciones: se esperaba 50 (5.0 creditos) y se obtuvo %.', v_costo;
+    IF v_costo IS DISTINCT FROM 5.0::numeric THEN
+        RAISE EXCEPTION 'FALLO suma de bonificaciones: se esperaba 5.0 créditos y se obtuvo %.', v_costo;
     END IF;
     INSERT INTO resultados_prueba (prueba, resultado, detalle)
     VALUES ('Suma de los componentes del precio sugerido', 'OK',
-            '10 + 15 + 13 + 12 = 50 unidades internas; la app muestra 50 / 10 = 5.0 creditos.');
+            '1.0 + 1.5 + 1.3 + 1.2 = 5.0 créditos reales.');
 
     -- Disponibilidad y solicitud para probar match y Knowledge Gap.
     v_inicio_match := clock_timestamp() + interval '2 hours';
@@ -116,7 +116,7 @@ BEGIN
         "fecha_inicio_propuesta", "fecha_fin_propuesta", "creditos_requeridos", "estado"
     ) VALUES (
         gen_random_uuid(), v_solicitante, v_tutor, v_habilidad,
-        v_inicio_match, v_fin_match, 10, 'Solicitada'
+        v_inicio_match, v_fin_match, 1.0, 'Solicitada'
     );
 
     SELECT COUNT(*) INTO v_count
@@ -150,7 +150,7 @@ BEGIN
     INSERT INTO resultados_prueba (prueba, resultado, detalle)
     VALUES ('Knowledge Score', 'OK', 'El tutor refleja una clase completada y promedio 5.0.');
 
-    -- Penalizacion: <5h, importe de 0.5 creditos = 5 unidades internas.
+    -- Penalización: <5h, importe de 0.5 créditos.
     INSERT INTO public."RESERVAS" (
         "id_reserva", "id_solicitante", "id_ofertante", "id_habilidad",
         "fecha_inicio", "fecha_fin", "creditos", "modalidad", "lugar", "estado"
@@ -158,7 +158,7 @@ BEGIN
         v_reserva_corta, v_solicitante, v_tutor, v_habilidad,
         clock_timestamp() + interval '4 hours',
         clock_timestamp() + interval '5 hours',
-        10, 'Virtual', 'Prueba automatizada', 'Confirmada'
+        1.0, 'Virtual', 'Prueba automatizada', 'Confirmada'
     );
 
     UPDATE public."RESERVAS"
@@ -173,18 +173,17 @@ BEGIN
     FROM public."RESERVAS" r WHERE r."id_reserva" = v_reserva_corta;
     SELECT m."tipo", m."cantidad" INTO v_tipo_credito, v_cantidad
     FROM public."MOVIMIENTOS_CREDITO" m
-    WHERE m."id_reserva" = v_reserva_corta
-    AND m."tipo" IN ('penalizacion', 'penalizacion_sin_saldo')
+    WHERE m."id_reserva" = v_reserva_corta AND m."tipo" = 'penalizacion'
     ORDER BY m."created_at" DESC LIMIT 1;
 
-    IF v_saldo IS DISTINCT FROM 45 OR v_horas IS NULL OR v_horas >= 5
-       OR v_tipo_credito IS DISTINCT FROM 'penalizacion' OR v_cantidad IS DISTINCT FROM -5 THEN
+    IF v_saldo IS DISTINCT FROM 4.5::numeric OR v_horas IS NULL OR v_horas >= 5
+       OR v_tipo_credito IS DISTINCT FROM 'penalizacion' OR v_cantidad IS DISTINCT FROM -0.5::numeric THEN
         RAISE EXCEPTION 'FALLO penalizacion: saldo %, horas %, movimiento %, cantidad %.',
             v_saldo, v_horas, v_tipo_credito, v_cantidad;
     END IF;
     INSERT INTO resultados_prueba (prueba, resultado, detalle)
     VALUES ('Penalizacion menor a 5 horas', 'OK',
-            'Saldo 50 -> 45 unidades; movimiento -5. La app muestra una baja de 0.5 creditos.');
+            'Saldo 5.0 -> 4.5; movimiento -0.5 créditos.');
 
     SELECT v.saldo_creditos INTO v_saldo_visible
     FROM public.v_cuentas_credito_app v
@@ -199,7 +198,7 @@ BEGIN
     END IF;
     INSERT INTO resultados_prueba (prueba, resultado, detalle)
     VALUES ('Vistas para mostrar creditos en la app', 'OK',
-            '45 unidades se muestran como 4.5 y -5 unidades como -0.5.');
+            'Los importes se consultan directamente como 4.5 y -0.5.');
 
     -- Repetir la actualizacion no debe cobrar la penalizacion por segunda vez.
     UPDATE public."RESERVAS"
@@ -207,7 +206,7 @@ BEGIN
     WHERE "id_reserva" = v_reserva_corta;
     SELECT u."saldo" INTO v_saldo
     FROM public."USUARIOS" u WHERE u."id_usuario" = v_tutor;
-    IF v_saldo IS DISTINCT FROM 45 THEN
+    IF v_saldo IS DISTINCT FROM 4.5::numeric THEN
         RAISE EXCEPTION 'FALLO idempotencia: la penalizacion se cobro mas de una vez.';
     END IF;
     INSERT INTO resultados_prueba (prueba, resultado, detalle)
@@ -221,7 +220,7 @@ BEGIN
         v_reserva_larga, v_solicitante, v_tutor, v_habilidad,
         clock_timestamp() + interval '6 hours',
         clock_timestamp() + interval '7 hours',
-        10, 'Virtual', 'Prueba automatizada', 'Confirmada'
+        1.0, 'Virtual', 'Prueba automatizada', 'Confirmada'
     );
 
     UPDATE public."RESERVAS"
@@ -234,44 +233,47 @@ BEGIN
     FROM public."USUARIOS" u WHERE u."id_usuario" = v_tutor;
     SELECT COUNT(*) INTO v_count
     FROM public."MOVIMIENTOS_CREDITO" m
-    WHERE m."id_reserva" = v_reserva_larga AND m."tipo" IN ('penalizacion', 'penalizacion_sin_saldo');
-    IF v_saldo IS DISTINCT FROM 45 OR v_count <> 0 THEN
-        RAISE EXCEPTION 'FALLO umbral 5 horas: saldo %, movimientos %.', v_saldo, v_count;
+    WHERE m."id_reserva" = v_reserva_larga AND m."tipo" = 'penalizacion';
+    IF v_saldo IS DISTINCT FROM 4.5::numeric OR v_count <> 0 THEN
+        RAISE EXCEPTION 'FALLO umbral 5 horas: saldo %, movimientos de penalizacion %.', v_saldo, v_count;
     END IF;
     INSERT INTO resultados_prueba (prueba, resultado, detalle)
-    VALUES ('Sin penalizacion con 5 horas o mas', 'OK', 'La cancelacion con 6 horas no genero descuento.');
+    VALUES ('Sin penalización con 5 horas o más', 'OK', 'La cancelación con 6 horas no generó descuento.');
 
-    -- Los importes configurados reflejan exactamente la escala x10.
+    -- Los importes de config_economia están en créditos reales.
     SELECT COUNT(*) INTO v_count
     FROM public.config_economia c
     WHERE (c.clave, c.valor) IN (
-        ('costo_base', 10), ('mult_escasez', 15),
-        ('mult_demanda', 13), ('mult_impacto', 12),
-        ('penalizacion_creditos', 5)
+        ('costo_base', 1.0), ('mult_escasez', 1.5),
+        ('mult_demanda', 1.3), ('mult_impacto', 1.2),
+        ('penalizacion_creditos', 0.5)
     );
     IF v_count <> 5 THEN
-        RAISE EXCEPTION 'FALLO escala de config_economia: faltan valores en decimas.';
+        RAISE EXCEPTION 'FALLO config_economia: faltan importes decimales reales.';
     END IF;
     INSERT INTO resultados_prueba (prueba, resultado, detalle)
-    VALUES ('Reglas configuradas en decimas', 'OK', '1.0=10; 1.5=15; 1.3=13; 1.2=12; 0.5=5.');
+    VALUES ('Reglas económicas en créditos reales', 'OK', '1.0; 1.5; 1.3; 1.2; 0.5.');
 
-    -- Verifica que los siete campos crediticios prioritarios siguen siendo INTEGER.
+    -- Verifica el tipo y la precisión de todas las columnas de créditos.
     SELECT COUNT(*) INTO v_count
     FROM information_schema.columns c
     WHERE c.table_schema = 'public'
       AND (c.table_name, c.column_name) IN (
           ('USUARIOS','saldo'), ('USUARIOS','creditos_retenidos'),
-          ('SOLICITUDES_INTERCAMBIO','creditos_requeridos'),
-          ('RESERVAS','creditos'), ('MOVIMIENTOS_CREDITO','cantidad'),
-          ('MOVIMIENTOS_CREDITO','saldo_anterior'), ('MOVIMIENTOS_CREDITO','saldo_posterior')
+          ('SOLICITUDES_INTERCAMBIO','creditos_requeridos'), ('RESERVAS','creditos'),
+          ('MOVIMIENTOS_CREDITO','cantidad'), ('MOVIMIENTOS_CREDITO','saldo_anterior'),
+          ('MOVIMIENTOS_CREDITO','saldo_posterior'), ('MOVIMIENTOS_CREDITO','retenidos_anterior'),
+          ('MOVIMIENTOS_CREDITO','retenidos_posterior'), ('OFERTAS_TUTORIA','costo_creditos'),
+          ('PENALIZACIONES_PENDIENTES','monto')
       )
-      AND c.data_type = 'integer';
-    IF v_count <> 7 THEN
-        RAISE EXCEPTION 'FALLO tipos de credito: se encontraron % columnas INTEGER de 7.', v_count;
+      AND c.data_type = 'numeric'
+      AND c.numeric_precision = 12 AND c.numeric_scale = 2;
+    IF v_count <> 11 THEN
+        RAISE EXCEPTION 'FALLO tipos de crédito: se encontraron % columnas NUMERIC(12,2) de 11.', v_count;
     END IF;
     INSERT INTO resultados_prueba (prueba, resultado, detalle)
-    VALUES ('Compatibilidad INTEGER y escala x10', 'OK',
-            'Los siete campos son INTEGER y almacenan decimas; la app divide entre 10.');
+    VALUES ('Créditos como NUMERIC(12,2)', 'OK',
+            'Todos los importes se guardan directamente en créditos reales; las restricciones limitan a una cifra decimal.');
 END;
 $$;
 

@@ -2,7 +2,7 @@
 -- SkillSwap / Opcion 3 de la reunion: cancelar sin descontar cuando no
 -- hay saldo, dejar la penalizacion PENDIENTE y cobrarla cuando el usuario
 -- tenga creditos libres.
--- Escala: todos los importes en DECIMAS de credito (5 = 0.5 creditos).
+-- Los importes se almacenan directamente en créditos reales NUMERIC(12,2).
 -- Se carga despues de 07 (redefine fn_aplicar_penalizacion_cancelacion)
 -- y antes de 05 (grants).
 -- =====================================================================
@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS public."PENALIZACIONES_PENDIENTES" (
     "id_penalizacion"     uuid        NOT NULL DEFAULT gen_random_uuid(),
     "id_usuario"          uuid        NOT NULL,
     "id_reserva"          uuid        NOT NULL,
-    "monto"               integer     NOT NULL,
+    "monto"               numeric(12,2) NOT NULL,
     "estado"              varchar     NOT NULL DEFAULT 'pendiente',
     "origen"              varchar     NOT NULL DEFAULT 'trigger',
     "id_movimiento_cobro" uuid,
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS public."PENALIZACIONES_PENDIENTES" (
     "cobrada_at"          timestamptz,
     CONSTRAINT "PENALIZACIONES_PENDIENTES_pkey" PRIMARY KEY ("id_penalizacion"),
     CONSTRAINT "PENALIZACIONES_PENDIENTES_reserva_key" UNIQUE ("id_reserva"),
-    CONSTRAINT "PENALIZACIONES_PENDIENTES_monto_pos" CHECK ("monto" > 0),
+    CONSTRAINT "PENALIZACIONES_PENDIENTES_monto_pos" CHECK ("monto" > 0 AND "monto" = trunc("monto", 1)),
     CONSTRAINT "PENALIZACIONES_PENDIENTES_estado_valido"
         CHECK ("estado" IN ('pendiente', 'cobrada', 'condonada')),
     CONSTRAINT "PENALIZACIONES_PENDIENTES_origen_valido"
@@ -42,9 +42,9 @@ CREATE INDEX IF NOT EXISTS "PENALIZACIONES_PENDIENTES_usuario_estado_idx"
     ON public."PENALIZACIONES_PENDIENTES" ("id_usuario", "estado", "created_at");
 
 COMMENT ON TABLE public."PENALIZACIONES_PENDIENTES" IS
-  'Penalizaciones por cancelacion tardia no cobradas por falta de saldo. Se cobran cuando el usuario tiene creditos libres. Importes en decimas de credito.';
+  'Penalizaciones por cancelacion tardia no cobradas por falta de saldo. Se cobran cuando el usuario tiene creditos libres. Importes en créditos reales.';
 COMMENT ON COLUMN public."PENALIZACIONES_PENDIENTES"."monto" IS
-  'Importe en decimas de credito (INTEGER): 5 = 0.5 creditos. La app divide entre 10 para mostrar.';
+  'Importe en créditos reales con una sola cifra decimal; por ejemplo 0.5.';
 COMMENT ON COLUMN public."PENALIZACIONES_PENDIENTES"."estado" IS
   'pendiente | cobrada | condonada.';
 COMMENT ON COLUMN public."PENALIZACIONES_PENDIENTES"."origen" IS
@@ -61,18 +61,18 @@ FOR EACH ROW EXECUTE FUNCTION public.fn_auditar('id_penalizacion');
 -- 2) Cobro de deudas pendientes -------------------------------------
 -- Cobra en orden cronologico. Mantiene la regla de 07: no hay cobro
 -- parcial; una deuda se cobra completa o sigue pendiente. Devuelve el
--- total cobrado en decimas.
+-- total cobrado en créditos.
 CREATE OR REPLACE FUNCTION public.fn_cobrar_penalizaciones_pendientes(p_id_usuario uuid)
-RETURNS integer
+RETURNS numeric(12,2)
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
 DECLARE
-    v_saldo integer;
-    v_retenidos integer;
-    v_saldo_nuevo integer;
-    v_total integer := 0;
+    v_saldo numeric(12,2);
+    v_retenidos numeric(12,2);
+    v_saldo_nuevo numeric(12,2);
+    v_total numeric(12,2) := 0;
     v_mov uuid;
     r record;
 BEGIN
@@ -110,8 +110,7 @@ BEGIN
         ) VALUES (
             v_mov, p_id_usuario, r."id_reserva", 'cobro_penalizacion_pendiente', -r."monto",
             v_saldo, v_saldo_nuevo, v_retenidos, v_retenidos,
-            format('Cobro de penalizacion pendiente: %s decimas (%s credito(s)).',
-                   r."monto", r."monto" / 10.0)
+            format('Cobro de penalización pendiente: %s créditos.', r."monto")
         );
 
         UPDATE public."PENALIZACIONES_PENDIENTES"
@@ -133,7 +132,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.fn_cobrar_penalizaciones_pendientes(uuid) IS
-  'Cobra penalizaciones pendientes del usuario si tiene saldo libre. Devuelve decimas cobradas.';
+  'Cobra penalizaciones pendientes del usuario si tiene saldo libre. Devuelve créditos cobrados.';
 
 -- Cobro automatico cuando el saldo libre (saldo - retenidos) aumenta.
 -- Al cobrar, el saldo libre baja, asi que el WHEN impide recursion.
@@ -166,11 +165,11 @@ SET search_path = pg_catalog, public
 AS $$
 DECLARE
     v_horas_minimas integer;
-    v_penalizacion integer;
-    v_saldo_anterior integer;
-    v_saldo_posterior integer;
-    v_retenidos integer;
-    v_disponibles integer;
+    v_penalizacion numeric(12,2);
+    v_saldo_anterior numeric(12,2);
+    v_saldo_posterior numeric(12,2);
+    v_retenidos numeric(12,2);
+    v_disponibles numeric(12,2);
 BEGIN
     IF NEW."estado" <> 'Cancelada' THEN
         RETURN NEW;
@@ -189,7 +188,7 @@ BEGIN
         RETURN NEW;
     END IF;
 
-    SELECT c.valor INTO v_horas_minimas
+    SELECT c.valor::integer INTO v_horas_minimas
     FROM public.config_economia c WHERE c.clave = 'horas_minimas_cancelacion';
     v_horas_minimas := COALESCE(v_horas_minimas, 5);
 
@@ -199,7 +198,7 @@ BEGIN
 
     SELECT c.valor INTO v_penalizacion
     FROM public.config_economia c WHERE c.clave = 'penalizacion_creditos';
-    v_penalizacion := GREATEST(0, COALESCE(v_penalizacion, 5));
+    v_penalizacion := GREATEST(0, COALESCE(v_penalizacion, 0.5));
 
     IF v_penalizacion = 0 THEN
         RETURN NEW;
@@ -229,8 +228,8 @@ BEGIN
         ) VALUES (
             NEW."cancelado_por", NEW."id_reserva", 'penalizacion', -v_penalizacion,
             v_saldo_anterior, v_saldo_posterior, v_retenidos, v_retenidos,
-            format('Penalizacion de %s decimas ( %s credito(s) ) por cancelar con menos de %s horas de anticipacion.',
-                   v_penalizacion, v_penalizacion / 10.0, v_horas_minimas)
+            format('Penalización de %s créditos por cancelar con menos de %s horas de anticipación.',
+                   v_penalizacion, v_horas_minimas)
         );
     ELSE
         -- Opcion 3: se cancela sin descontar y queda la deuda registrada.
@@ -241,7 +240,7 @@ BEGIN
         ) VALUES (
             NEW."cancelado_por", NEW."id_reserva", 'penalizacion_sin_saldo', 0,
             v_saldo_anterior, v_saldo_anterior, v_retenidos, v_retenidos,
-            format('Penalizacion de %s decimas no cobrada: saldo disponible insuficiente. Cancelacion con menos de %s horas.',
+            format('Penalización de %s créditos no cobrada: saldo disponible insuficiente. Cancelación con menos de %s horas.',
                    v_penalizacion, v_horas_minimas)
         );
 
@@ -256,33 +255,35 @@ $$;
 
 -- 4) ETL: carga historica desde MOVIMIENTOS_CREDITO ------------------
 -- Extract:   movimientos 'penalizacion_sin_saldo' con reserva.
--- Transform: monto = numero de decimas del texto de descripcion; si no
---            se puede leer, se usa config_economia.penalizacion_creditos.
+-- Transform: extrae el importe expresado en créditos reales desde la descripción;
+--            si no puede leerlo, utiliza el valor configurado. No hay conversión de escala.
 -- Load:      INSERT en PENALIZACIONES_PENDIENTES (origen etl_backfill),
 --            idempotente por id_reserva. Luego intenta cobrar a quienes
---            ya tengan saldo libre. Devuelve (cargadas, cobradas_decimas).
+--            ya tengan saldo libre. Devuelve (cargadas, créditos_cobrados).
 CREATE OR REPLACE FUNCTION public.fn_etl_penalizaciones_pendientes()
-RETURNS TABLE (filas_cargadas integer, decimas_cobradas integer)
+RETURNS TABLE (filas_cargadas integer, creditos_cobrados numeric(12,2))
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
 DECLARE
-    v_defecto integer;
+    v_defecto numeric(12,2);
     v_cargadas integer;
-    v_cobradas integer := 0;
+    v_cobradas numeric(12,2) := 0;
     v_usuario uuid;
 BEGIN
     SELECT c.valor INTO v_defecto
     FROM public.config_economia c WHERE c.clave = 'penalizacion_creditos';
-    v_defecto := GREATEST(1, COALESCE(v_defecto, 5));
+    v_defecto := GREATEST(0.1, COALESCE(v_defecto, 0.5));
 
     INSERT INTO public."PENALIZACIONES_PENDIENTES"
         ("id_usuario", "id_reserva", "monto", "origen", "created_at")
     SELECT m."id_usuario",
            m."id_reserva",
-           COALESCE(NULLIF((regexp_match(m."descripcion", 'Penalizacion de (\d+) decimas'))[1], '')::integer,
-                    v_defecto),
+           COALESCE(
+             NULLIF((regexp_match(COALESCE(m."descripcion", ''), 'de ([0-9]+([.][0-9]+)?)'))[1], '')::numeric,
+             v_defecto
+           ),
            'etl_backfill',
            m."created_at"
     FROM public."MOVIMIENTOS_CREDITO" m
@@ -310,16 +311,14 @@ COMMENT ON FUNCTION public.fn_etl_penalizaciones_pendientes() IS
 -- 5) Vistas ----------------------------------------------------------
 CREATE OR REPLACE VIEW public.v_penalizaciones_pendientes_app AS
 SELECT p."id_penalizacion", p."id_usuario", p."id_reserva",
-       p."monto"            AS monto_decimas,
-       p."monto" / 10.0     AS monto_creditos,
+       p."monto"            AS monto_creditos,
        p."estado", p."origen", p."created_at", p."cobrada_at"
 FROM public."PENALIZACIONES_PENDIENTES" p;
 
 CREATE OR REPLACE VIEW public.v_bi_penalizaciones_resumen AS
 SELECT p."estado",
        COUNT(*)::bigint            AS penalizaciones,
-       COALESCE(SUM(p."monto"), 0) AS total_decimas,
-       COALESCE(SUM(p."monto"), 0) / 10.0 AS total_creditos
+       COALESCE(SUM(p."monto"), 0)::numeric(14,2) AS total_creditos
 FROM public."PENALIZACIONES_PENDIENTES" p
 GROUP BY p."estado";
 

@@ -1,5 +1,7 @@
 -- ============================================================
 -- Setup local completo — SkillSwap / U.C.B.
+-- Créditos: NUMERIC(12,2) en créditos reales; las reglas CHECK limitan a 1 decimal.
+-- Ejemplo: 3.7 se almacena como 3.70; 3.75 se rechaza.
 -- Compatible con PostgreSQL 14, 15 y 16
 -- Ejecutar:  psql -U skillswap -d skillswap -v ON_ERROR_STOP=1 -f 00000000000000_local_setup.sql
 -- ============================================================
@@ -36,8 +38,8 @@ CREATE TABLE "USUARIOS" (
     "rol"                VARCHAR NOT NULL,
     "id_carrera"         UUID,
     "semestre"           INTEGER,
-    "saldo"              INTEGER NOT NULL DEFAULT 0,
-    "creditos_retenidos" INTEGER NOT NULL DEFAULT 0,
+    "saldo"              NUMERIC(12,2) NOT NULL DEFAULT 0,
+    "creditos_retenidos" NUMERIC(12,2) NOT NULL DEFAULT 0,
     "fecha_registro"     TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "ultimo_acceso"      TIMESTAMPTZ(6),
     "estado"             VARCHAR NOT NULL,
@@ -75,7 +77,7 @@ CREATE TABLE "SOLICITUDES_INTERCAMBIO" (
     "id_habilidad"             UUID NOT NULL,
     "fecha_inicio_propuesta"   TIMESTAMPTZ(6) NOT NULL,
     "fecha_fin_propuesta"      TIMESTAMPTZ(6) NOT NULL,
-    "creditos_requeridos"      INTEGER NOT NULL,
+    "creditos_requeridos"      NUMERIC(12,2) NOT NULL,
     "estado"                   VARCHAR NOT NULL,
     "created_at"               TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "respondida_at"            TIMESTAMPTZ(6),
@@ -90,7 +92,7 @@ CREATE TABLE "RESERVAS" (
     "id_habilidad"                   UUID NOT NULL,
     "fecha_inicio"                   TIMESTAMPTZ(6) NOT NULL,
     "fecha_fin"                      TIMESTAMPTZ(6) NOT NULL,
-    "creditos"                       INTEGER NOT NULL,
+    "creditos"                       NUMERIC(12,2) NOT NULL,
     "modalidad"                      VARCHAR NOT NULL,
     "lugar"                          VARCHAR NOT NULL,
     "estado"                         VARCHAR NOT NULL,
@@ -110,11 +112,11 @@ CREATE TABLE "MOVIMIENTOS_CREDITO" (
     "id_usuario"          UUID NOT NULL,
     "id_reserva"          UUID,
     "tipo"                VARCHAR NOT NULL,
-    "cantidad"            INTEGER NOT NULL,
-    "saldo_anterior"      INTEGER NOT NULL,
-    "saldo_posterior"     INTEGER NOT NULL,
-    "retenidos_anterior"  INTEGER NOT NULL,
-    "retenidos_posterior" INTEGER NOT NULL,
+    "cantidad"            NUMERIC(12,2) NOT NULL,
+    "saldo_anterior"      NUMERIC(12,2) NOT NULL,
+    "saldo_posterior"     NUMERIC(12,2) NOT NULL,
+    "retenidos_anterior"  NUMERIC(12,2) NOT NULL,
+    "retenidos_posterior" NUMERIC(12,2) NOT NULL,
     "created_at"          TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "descripcion"         VARCHAR,
     CONSTRAINT "MOVIMIENTOS_CREDITO_pkey" PRIMARY KEY ("id_movimiento")
@@ -255,7 +257,10 @@ ALTER TABLE "AUDITORIA" ADD CONSTRAINT "AUDITORIA_id_usuario_fkey"
 -- ============================================================
 ALTER TABLE "USUARIOS"
   ADD CONSTRAINT "USUARIOS_creditos_validos"
-    CHECK (saldo >= 0 AND creditos_retenidos >= 0 AND creditos_retenidos <= saldo),
+    CHECK (
+      saldo >= 0 AND creditos_retenidos >= 0 AND creditos_retenidos <= saldo AND
+      saldo = trunc(saldo, 1) AND creditos_retenidos = trunc(creditos_retenidos, 1)
+    ),
   ADD CONSTRAINT "USUARIOS_semestre_valido"
     CHECK (semestre IS NULL OR semestre BETWEEN 1 AND 12);
 
@@ -267,7 +272,7 @@ ALTER TABLE "SOLICITUDES_INTERCAMBIO"
   ADD CONSTRAINT "SOLICITUDES_intervalo_valido"
     CHECK (fecha_fin_propuesta > fecha_inicio_propuesta),
   ADD CONSTRAINT "SOLICITUDES_creditos_positivos"
-    CHECK (creditos_requeridos > 0),
+    CHECK (creditos_requeridos > 0 AND creditos_requeridos = trunc(creditos_requeridos, 1)),
   ADD CONSTRAINT "SOLICITUDES_participantes_distintos"
     CHECK (id_solicitante <> id_ofertante);
 
@@ -275,7 +280,7 @@ ALTER TABLE "RESERVAS"
   ADD CONSTRAINT "RESERVAS_intervalo_valido"
     CHECK (fecha_fin > fecha_inicio),
   ADD CONSTRAINT "RESERVAS_creditos_positivos"
-    CHECK (creditos > 0),
+    CHECK (creditos > 0 AND creditos = trunc(creditos, 1)),
   ADD CONSTRAINT "RESERVAS_participantes_distintos"
     CHECK (id_solicitante <> id_ofertante);
 
@@ -290,7 +295,12 @@ ALTER TABLE "MOVIMIENTOS_CREDITO"
     CHECK (
       saldo_anterior >= 0 AND saldo_posterior >= 0 AND
       retenidos_anterior >= 0 AND retenidos_posterior >= 0 AND
-      retenidos_anterior <= saldo_anterior AND retenidos_posterior <= saldo_posterior
+      retenidos_anterior <= saldo_anterior AND retenidos_posterior <= saldo_posterior AND
+      cantidad = trunc(cantidad, 1) AND
+      saldo_anterior = trunc(saldo_anterior, 1) AND
+      saldo_posterior = trunc(saldo_posterior, 1) AND
+      retenidos_anterior = trunc(retenidos_anterior, 1) AND
+      retenidos_posterior = trunc(retenidos_posterior, 1)
     );
 
 -- ============================================================
@@ -403,7 +413,7 @@ RETURNS TABLE (
   id_solicitud uuid, id_solicitante uuid,
   nombre_solicitante text, apellido_solicitante text, id_ofertante uuid,
   nombre_habilidad text, fecha_inicio_propuesta timestamptz,
-  fecha_fin_propuesta timestamptz, creditos_requeridos int,
+  fecha_fin_propuesta timestamptz, creditos_requeridos numeric(12,2),
   estado varchar, created_at timestamptz
 )
 LANGUAGE sql STABLE SECURITY DEFINER
@@ -425,7 +435,7 @@ RETURNS TABLE (
   id_solicitud uuid, id_solicitante uuid, id_ofertante uuid,
   nombre_ofertante text, apellido_ofertante text, nombre_habilidad text,
   fecha_inicio_propuesta timestamptz, fecha_fin_propuesta timestamptz,
-  creditos_requeridos int, estado varchar, created_at timestamptz,
+  creditos_requeridos numeric(12,2), estado varchar, created_at timestamptz,
   respondida_at timestamptz
 )
 LANGUAGE sql STABLE SECURITY DEFINER
@@ -471,7 +481,7 @@ RETURNS TABLE (
   id_solicitante uuid, nombre_solicitante text,
   id_ofertante uuid, nombre_ofertante text,
   nombre_habilidad text, fecha_inicio timestamptz, fecha_fin timestamptz,
-  creditos int, modalidad varchar, lugar varchar,
+  creditos numeric(12,2), modalidad varchar, lugar varchar,
   estado varchar, created_at timestamptz, completed_at timestamptz, cancelled_at timestamptz
 )
 LANGUAGE sql STABLE SECURITY DEFINER

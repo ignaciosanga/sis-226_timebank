@@ -15,11 +15,11 @@
 --
 -- El precio acordado del tutor es la fuente de verdad; no recalcularlo al
 -- aceptar ni al pagar. Cambios posteriores de la oferta no alteran la solicitud
--- ni la reserva. Todos los importes son INTEGER en decimas: 37 = 3.7 creditos.
+-- ni la reserva. Todos los importes son NUMERIC en créditos reales: 3.7 se almacena como 3.70.
 -- Requiere: 01, 04, 07, 10 y 11.
+-- Se incluye en 00_bootstrap.sql, que controla la transaccion global.
 -- =====================================================================
 
-BEGIN;
 
 -- Evita que una misma reserva tenga dos movimientos de la misma etapa
 -- para el mismo usuario. El pago y el ingreso tienen usuarios diferentes.
@@ -44,7 +44,7 @@ DECLARE
     v_solicitante uuid;
     v_ofertante uuid;
     v_habilidad uuid;
-    v_creditos integer;
+    v_creditos numeric(12,2);
     v_estado varchar;
 BEGIN
     IF NEW."id_solicitud" IS NULL OR NEW."estado" <> 'Confirmada' THEN
@@ -135,10 +135,10 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
 DECLARE
-    v_saldo integer;
-    v_retenidos integer;
-    v_disponibles integer;
-    v_retenidos_nuevos integer;
+    v_saldo numeric(12,2);
+    v_retenidos numeric(12,2);
+    v_disponibles numeric(12,2);
+    v_retenidos_nuevos numeric(12,2);
 BEGIN
     IF NEW."estado" <> 'Confirmada' THEN
         RETURN NEW;
@@ -176,7 +176,7 @@ BEGIN
     v_disponibles := v_saldo - v_retenidos;
     IF v_disponibles < NEW."creditos" THEN
         RAISE EXCEPTION
-          'Saldo disponible insuficiente. Disponible: % decimas; requerido: % decimas.',
+          'Saldo disponible insuficiente. Disponible: % créditos; requerido: % créditos.',
           v_disponibles, NEW."creditos"
           USING ERRCODE = '23514';
     END IF;
@@ -196,8 +196,7 @@ BEGIN
     ) VALUES (
         NEW."id_solicitante", NEW."id_reserva", 'retencion_reserva', 0,
         v_saldo, v_saldo, v_retenidos, v_retenidos_nuevos,
-        format('Retencion de %s decimas (%s creditos) al aceptar la solicitud.',
-               NEW."creditos", NEW."creditos" / 10.0)
+        format('Retención de %s créditos al aceptar la solicitud.', NEW."creditos")
     );
 
     RETURN NEW;
@@ -219,13 +218,13 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
 DECLARE
-    v_saldo_estudiante integer;
-    v_retenidos_estudiante integer;
-    v_saldo_tutor integer;
-    v_retenidos_tutor integer;
-    v_saldo_estudiante_nuevo integer;
-    v_retenidos_estudiante_nuevos integer;
-    v_saldo_tutor_nuevo integer;
+    v_saldo_estudiante numeric(12,2);
+    v_retenidos_estudiante numeric(12,2);
+    v_saldo_tutor numeric(12,2);
+    v_retenidos_tutor numeric(12,2);
+    v_saldo_estudiante_nuevo numeric(12,2);
+    v_retenidos_estudiante_nuevos numeric(12,2);
+    v_saldo_tutor_nuevo numeric(12,2);
     v_pago_count integer;
     v_ingreso_count integer;
 BEGIN
@@ -288,8 +287,8 @@ BEGIN
           USING ERRCODE = '23514';
     END IF;
 
-    IF v_saldo_tutor > 2147483647 - NEW."creditos" THEN
-        RAISE EXCEPTION 'El saldo del tutor excederia el rango INTEGER.'
+    IF v_saldo_tutor > 9999999999.99 - NEW."creditos" THEN
+        RAISE EXCEPTION 'El saldo del tutor excederia NUMERIC(12,2).'
           USING ERRCODE = '22003';
     END IF;
 
@@ -298,8 +297,8 @@ BEGIN
     v_saldo_tutor_nuevo := v_saldo_tutor + NEW."creditos";
 
     -- Debito del estudiante: el disponible permanece igual:
-    -- antes: saldo 100 - retenidos 37 = 63;
-    -- despues: saldo 63 - retenidos 0 = 63.
+    -- antes: saldo 10.0 - retenidos 3.7 = 6.3;
+    -- después: saldo 6.3 - retenidos 0.0 = 6.3.
     UPDATE public."USUARIOS"
     SET "saldo" = v_saldo_estudiante_nuevo,
         "creditos_retenidos" = v_retenidos_estudiante_nuevos
@@ -313,8 +312,7 @@ BEGIN
         NEW."id_solicitante", NEW."id_reserva", 'pago_tutoria', -NEW."creditos",
         v_saldo_estudiante, v_saldo_estudiante_nuevo,
         v_retenidos_estudiante, v_retenidos_estudiante_nuevos,
-        format('Pago de tutoria: %s decimas (%s creditos), debitado al recibirse ambas confirmaciones.',
-               NEW."creditos", NEW."creditos" / 10.0)
+        format('Pago de tutoría: %s créditos, debitado al recibirse ambas confirmaciones.', NEW."creditos")
     );
 
     -- El ingreso se registra antes del UPDATE para que, si el tutor tiene
@@ -328,8 +326,7 @@ BEGIN
         NEW."id_ofertante", NEW."id_reserva", 'ingreso_tutoria', NEW."creditos",
         v_saldo_tutor, v_saldo_tutor_nuevo,
         v_retenidos_tutor, v_retenidos_tutor,
-        format('Ingreso por tutoria: %s decimas (%s creditos), acreditado al recibirse ambas confirmaciones.',
-               NEW."creditos", NEW."creditos" / 10.0)
+        format('Ingreso por tutoría: %s créditos, acreditado al recibirse ambas confirmaciones.', NEW."creditos")
     );
 
     UPDATE public."USUARIOS"
@@ -357,7 +354,7 @@ EXECUTE FUNCTION public.fn_transferir_creditos_reserva();
 
 -- 3) Liberar la retencion si se cancela antes de ambas confirmaciones.
 --    El tutor no recibe nada. El trigger de penalizacion existente decide
---    aparte si corresponde cobrar -5 decimas por cancelar con menos de 5 h.
+--    aparte si corresponde cobrar 0.5 créditos por cancelar con menos de 5 h.
 CREATE OR REPLACE FUNCTION public.fn_liberar_retencion_reserva()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -365,9 +362,9 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
 DECLARE
-    v_saldo integer;
-    v_retenidos integer;
-    v_retenidos_nuevos integer;
+    v_saldo numeric(12,2);
+    v_retenidos numeric(12,2);
+    v_retenidos_nuevos numeric(12,2);
 BEGIN
     IF NEW."estado" <> 'Cancelada' THEN
         RETURN NEW;
@@ -430,8 +427,7 @@ BEGIN
     ) VALUES (
         NEW."id_solicitante", NEW."id_reserva", 'liberacion_retencion', 0,
         v_saldo, v_saldo, v_retenidos, v_retenidos_nuevos,
-        format('Liberacion de retencion de %s decimas (%s creditos) por cancelacion antes del pago.',
-               NEW."creditos", NEW."creditos" / 10.0)
+        format('Liberación de retención de %s créditos por cancelación antes del pago.', NEW."creditos")
     );
 
     RETURN NEW;
@@ -529,4 +525,3 @@ REVOKE ALL ON FUNCTION public.fn_transferir_creditos_reserva() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.fn_liberar_retencion_reserva() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.fn_confirmar_reserva(uuid) FROM PUBLIC;
 
-COMMIT;

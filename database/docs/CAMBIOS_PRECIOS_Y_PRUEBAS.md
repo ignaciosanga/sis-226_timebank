@@ -1,32 +1,25 @@
-# Cambios aplicados: precio de tutor y pruebas HU-04/HU-06/HU-10
+# Actualización de créditos — SkillSwap V4
 
-## Decisión de integración
+- Los valores de créditos se almacenan directamente como `NUMERIC(12,2)` en créditos reales.
+- La regla del negocio admite una sola cifra decimal (3.7 sí; 3.75 no).
+- Se eliminó la conversión `INTEGER × 10` y la división `/10`.
+- El precio publicado por el tutor prevalece sobre la sugerencia dinámica y se conserva como snapshot en solicitud/reserva.
+- El ciclo de pago retiene el precio al confirmar la reserva, registra la primera confirmación sin transferir y paga solo al recibirse la segunda confirmación.
+- El pago es idempotente; la cancelación anterior al pago libera la retención.
+- Penalización: 0.5 créditos si la cancelación ocurre con menos de cinco horas; si no hay saldo libre suficiente, queda pendiente.
+- Se actualizaron los datos de demostración y las pruebas HU-04, HU-06, HU-07 y HU-10 para usar decimales reales.
 
-El precio elegido por el tutor es la fuente de verdad del cobro. La fórmula dinámica de Base de Datos se expone como `fn_sugerir_precio_clase` y es solo una recomendación. El importe queda congelado en `SOLICITUDES_INTERCAMBIO.creditos_requeridos` y se valida al crear `RESERVAS.creditos`.
+Esta versión está pensada para inicializar un entorno de pruebas limpio. No aplicar scripts antiguos de conversión a décimas.
 
-## Archivos modificados
+- Se corrigió HU-06 para usar 3.7 créditos reales en la reserva de prueba; se eliminó un valor residual `37` de la escala anterior.
 
-- `initdb/sql/07_economia_dinamica.sql`: documenta la función legada como sugerencia y agrega `fn_sugerir_precio_clase`.
-- `initdb/sql/05_seguridad_roles.sql.tpl`: concede al rol de aplicación la función sugerida y retira acceso a la función legada ambigua.
-- `initdb/sql/11_ofertas_tutoria_hu04.sql`: documenta que `costo_decimas` es el precio elegido por el tutor.
-- `initdb/sql/12_ciclo_pago_reservas_hu10.sql`: documenta el snapshot y el ciclo de retención/pago.
-- `tests/12_pruebas_economia_match.sql`: utiliza la función de sugerencia.
-- `tests/16_pruebas_auditoria_hu06.sql`: prueba autocontenida de los tres criterios HU-06.
-- `tests/17_pruebas_ofertas_hu04.sql`: prueba el precio manual frente a una sugerencia dinámica distinta.
-- `tests/18_pruebas_pago_clases_hu10.sql`: prueba snapshot, retención, doble confirmación, idempotencia y liberación.
-- `migrations/03_politica_precio_tutor_autoritativo.sql`: parche para una V4 ya inicializada.
+## V6: integración con el hardening solo-BD
 
-## Pruebas
+- Base: V4 (créditos decimales `NUMERIC(12,2)`). No se incluyen las migraciones de décimas (`INTEGER × 10`) de la V5 porque contradicen este contrato.
+- `initdb/sql/13_hardening_search_path.sql` (nuevo) y `00_bootstrap.sql` (lo incluye al final): versión de `skillswap_v4_sql_injection_solo_bd_sin_coordinacion.sql` sin `BEGIN/COMMIT`, con la lista ampliada de 18 a 23 funciones `SECURITY DEFINER` (se agregan `fn_sugerir_precio_clase` y las 4 funciones del ciclo de pago HU-10).
+- `migrations/01_hardening_search_path_solo_bd.sql` (nuevo): la misma migración para una base ya inicializada, con informe de solo lectura.
+- `tests/19_pruebas_hardening.sql` (nuevo).
+- `tests/12_pruebas_economia_match.sql`: corregido. Tomaba "el último movimiento de la reserva", pero desde HU-10 toda reserva confirmada genera antes un movimiento `retencion_reserva` y el test fallaba también en la V4 original. Ahora filtra los movimientos de tipo `penalizacion`.
+- No incluido de la V5: el hardening amplio (`13_hardening_sql_injection.sql`), que sí revoca/otorga permisos y crea `fn_buscar_habilidades_seguro`, ni sus migraciones.
 
-Ejecutar en una base V4 con los módulos 07, 10, 11, 12 y roles instalados. Todos los scripts de prueba terminan con ROLLBACK.
-
-La validación en este paquete es estática; falta ejecutar contra PostgreSQL real. No se incluye `.env`.
-
-## Version 5: hardening e integracion
-
-- `initdb/sql/13_hardening_sql_injection.sql`: endurecimiento contra inyeccion SQL y escalada de privilegios (sin CREATE en public, sin EXECUTE publico, search_path fijo en funciones SECURITY DEFINER, helpers de claves y ETL fuera del alcance de los roles de aplicacion) y la funcion `fn_buscar_habilidades_seguro`. Se ejecuta al final del bootstrap, despues de los roles.
-- `migrations/04_hardening_sql_injection.sql`: el mismo parche con BEGIN/COMMIT, para una base V4 ya inicializada.
-- `tests/19_pruebas_hardening.sql`: verifica permisos, la politica de precio (la app solo recibe `fn_sugerir_precio_clase`), el comodin % literal, una entrada hostil y que `rol_app` no puede crear objetos.
-- `initdb/sql/00_bootstrap.sql`: incluye el script 13 al final.
-
-El hardening NO corrige consultas concatenadas del backend (usar parametros del driver) ni cierra el DML amplio de `rol_app`: eso es la fase 2 descrita al final del script.
+Validado en PostgreSQL 16.15: bootstrap completo desde cero, datos demo, tests 12, 13, 14, 16, 17, 18 y 19; la migración 01 sobre una base V4 ya inicializada (dos ejecuciones, la segunda sin cambios); y el test 19 falla correctamente en una V4 sin el hardening.

@@ -1,51 +1,54 @@
 -- =====================================================================
 -- SkillSwap / Base prioritaria: economia dinamica y penalizacion.
--- Los campos de credito siguen siendo INTEGER, pero se almacenan en
--- DECIMAS DE CREDITO: 1.0 credito = 10; 1.5 = 15; 0.5 = 5.
--- La aplicacion divide los valores almacenados entre 10 para mostrarlos.
--- Umbral de cancelacion: menos de 5 horas. Penalizacion: 0.5 credito = 5.
+-- Los importes se almacenan como NUMERIC(12,2) en créditos reales.
+-- La regla funcional admite una sola cifra decimal: 3.7, 1.5, 1.3, 0.5.
+-- Umbral de cancelación: menos de 5 horas. Penalización: 0.5 créditos.
 -- =====================================================================
 
 CREATE TABLE IF NOT EXISTS public.config_economia (
     clave          text PRIMARY KEY,
-    valor          integer NOT NULL,
+    valor          numeric(12,2) NOT NULL,
     descripcion    text NOT NULL,
     actualizado_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT config_economia_valor_no_negativo CHECK (valor >= 0)
+    CONSTRAINT config_economia_valor_no_negativo CHECK (valor >= 0),
+    CONSTRAINT config_economia_una_decimal CHECK (valor = trunc(valor, 1)),
+    CONSTRAINT config_economia_umbrales_enteros CHECK (
+      clave NOT IN ('umbral_tutores_escasez', 'horas_minimas_cancelacion')
+      OR valor = trunc(valor)
+    )
 );
 
--- Los importes de credito se configuran en decimas. Los umbrales de tutores
--- y horas se mantienen en sus unidades naturales (tutores y horas).
+-- Los importes se configuran directamente en créditos reales. Los umbrales de
+-- tutores y horas se mantienen en unidades enteras (tutores y horas).
 INSERT INTO public.config_economia (clave, valor, descripcion) VALUES
-    ('costo_base',                    10, 'Costo base: 1.0 credito, almacenado como 10 decimas.'),
-    ('mult_escasez',                  15, 'Bonificacion por escasez: 1.5 creditos, almacenada como 15 decimas.'),
-    ('mult_demanda',                  13, 'Bonificacion por alta demanda: 1.3 creditos, almacenada como 13 decimas.'),
-    ('mult_impacto',                  12, 'Bonificacion por alto impacto: 1.2 creditos, almacenada como 12 decimas.'),
-    ('umbral_tutores_escasez',         3, 'Hay escasez cuando existen menos de 3 tutores activos.'),
-    ('horas_minimas_cancelacion',      5, 'Se penaliza una cancelacion realizada con menos de 5 horas de anticipacion.'),
-    ('penalizacion_creditos',          5, 'Penalizacion de 0.5 creditos, almacenada como 5 decimas.')
+    ('costo_base',                   1.0, 'Costo base sugerido: 1.0 credito.'),
+    ('mult_escasez',                  1.5, 'Componente sugerido por escasez: 1.5 creditos.'),
+    ('mult_demanda',                  1.3, 'Componente sugerido por demanda: 1.3 creditos.'),
+    ('mult_impacto',                  1.2, 'Componente sugerido por impacto: 1.2 creditos.'),
+    ('umbral_tutores_escasez',       3.0, 'Hay escasez cuando existen menos de 3 tutores activos.'),
+    ('horas_minimas_cancelacion',    5.0, 'Se penaliza una cancelacion realizada con menos de 5 horas de anticipacion.'),
+    ('penalizacion_creditos',        0.5, 'Penalizacion de 0.5 creditos.')
 ON CONFLICT (clave) DO NOTHING;
 
 COMMENT ON TABLE public.config_economia IS
-  'Parametros economicos. Los importes de credito se guardan en decimas (1 credito = 10 unidades enteras); umbrales de tutores y horas usan unidades naturales.';
+  'Parámetros económicos expresados en créditos reales; se admite una cifra decimal. Los umbrales de tutores y horas son enteros.';
 
--- Suma los importes escalados. Ejemplo: 10 + 15 = 25 unidades internas,
--- que la app presenta como 2.5 creditos (25 / 10). No redondear el total.
+-- Suma los componentes como créditos reales. Ejemplo: 1.0 + 1.5 = 2.5 créditos.
 CREATE OR REPLACE FUNCTION public.fn_calcular_costo_clase(
     p_id_habilidad uuid,
     p_id_ofertante uuid,
     p_fecha_inicio timestamptz
-) RETURNS integer
+) RETURNS numeric(12,2)
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
 DECLARE
-    v_costo integer;
+    v_costo numeric(12,2);
     v_tutores_activos integer;
     v_promedio_tutor numeric;
-    v_factor integer;
+    v_factor numeric(12,2);
     v_umbral integer;
 BEGIN
     IF p_id_habilidad IS NULL OR p_id_ofertante IS NULL OR p_fecha_inicio IS NULL THEN
@@ -79,7 +82,7 @@ BEGIN
     SELECT c.valor INTO v_costo
     FROM public.config_economia c
     WHERE c.clave = 'costo_base';
-    v_costo := COALESCE(v_costo, 10);
+    v_costo := COALESCE(v_costo, 1.0);
 
     SELECT COUNT(DISTINCT uh."id_usuario")
       INTO v_tutores_activos
@@ -89,7 +92,7 @@ BEGIN
       AND u."estado" = 'Activo'
       AND u."rol" = 'Estudiante';
 
-    SELECT c.valor INTO v_umbral
+    SELECT c.valor::integer INTO v_umbral
     FROM public.config_economia c
     WHERE c.clave = 'umbral_tutores_escasez';
     v_umbral := COALESCE(v_umbral, 3);
@@ -122,9 +125,9 @@ BEGIN
         v_costo := v_costo + COALESCE(v_factor, 0);
     END IF;
 
-    -- Se devuelve el entero en decimas. Nunca convertirlo a credito entero
-    -- ni redondearlo: 25 significa 2.5 creditos y 50 significa 5.0.
-    RETURN GREATEST(1, v_costo);
+    -- Se devuelve el precio sugerido en créditos reales. No se utiliza como
+    -- precio de cobro; el precio definitivo es el publicado por el tutor.
+    RETURN GREATEST(0.1::numeric, v_costo);
 END;
 $$;
 
@@ -132,12 +135,12 @@ COMMENT ON FUNCTION public.fn_calcular_costo_clase(uuid, uuid, timestamptz) IS
   'DEPRECADA COMO PRECIO DE COBRO. Devuelve una referencia calculada por reglas dinamicas; nunca reemplaza el precio elegido por el tutor ni la cotizacion guardada en SOLICITUDES_INTERCAMBIO.';
 
 -- Nombre explicito para el uso permitido desde la aplicacion: mostrar una
--- sugerencia al tutor. El precio definitivo sigue siendo OFERTAS_TUTORIA.costo_decimas.
+-- sugerencia al tutor. El precio definitivo sigue siendo OFERTAS_TUTORIA.costo_creditos.
 CREATE OR REPLACE FUNCTION public.fn_sugerir_precio_clase(
     p_id_habilidad uuid,
     p_id_ofertante uuid,
     p_fecha_inicio timestamptz
-) RETURNS integer
+) RETURNS numeric(12,2)
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
@@ -149,7 +152,7 @@ AS $$
 $$;
 
 COMMENT ON FUNCTION public.fn_sugerir_precio_clase(uuid, uuid, timestamptz) IS
-  'Devuelve un precio sugerido en decimas segun oferta/demanda/impacto. Es orientativo: no modifica ofertas, solicitudes ni reservas.';
+  'Devuelve un precio sugerido en créditos reales según oferta/demanda/impacto. Es orientativo: no modifica ofertas, solicitudes ni reservas.';
 
 REVOKE ALL ON FUNCTION public.fn_sugerir_precio_clase(uuid, uuid, timestamptz) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.fn_calcular_costo_clase(uuid, uuid, timestamptz) FROM PUBLIC;
@@ -186,7 +189,7 @@ BEFORE INSERT OR UPDATE OF "estado" ON public."RESERVAS"
 FOR EACH ROW
 EXECUTE FUNCTION public.fn_preparar_cancelacion_reserva();
 
--- Penaliza con 0.5 credito (= 5 decimas internas) cuando la cancelacion
+-- Penaliza con 0.5 créditos cuando la cancelación
 -- ocurre a menos de 5 horas del inicio. No cobra dos veces ni deja el saldo
 -- por debajo de los creditos retenidos. Si no alcanza el disponible completo,
 -- deja un movimiento informativo sin aplicar un descuento parcial.
@@ -198,11 +201,11 @@ SET search_path = pg_catalog, public
 AS $$
 DECLARE
     v_horas_minimas integer;
-    v_penalizacion integer;
-    v_saldo_anterior integer;
-    v_saldo_posterior integer;
-    v_retenidos integer;
-    v_disponibles integer;
+    v_penalizacion numeric(12,2);
+    v_saldo_anterior numeric(12,2);
+    v_saldo_posterior numeric(12,2);
+    v_retenidos numeric(12,2);
+    v_disponibles numeric(12,2);
 BEGIN
     IF NEW."estado" <> 'Cancelada' THEN
         RETURN NEW;
@@ -221,7 +224,7 @@ BEGIN
         RETURN NEW;
     END IF;
 
-    SELECT c.valor INTO v_horas_minimas
+    SELECT c.valor::integer INTO v_horas_minimas
     FROM public.config_economia c
     WHERE c.clave = 'horas_minimas_cancelacion';
     v_horas_minimas := COALESCE(v_horas_minimas, 5);
@@ -234,7 +237,7 @@ BEGIN
     SELECT c.valor INTO v_penalizacion
     FROM public.config_economia c
     WHERE c.clave = 'penalizacion_creditos';
-    v_penalizacion := GREATEST(0, COALESCE(v_penalizacion, 5));
+    v_penalizacion := GREATEST(0, COALESCE(v_penalizacion, 0.5));
 
     IF v_penalizacion = 0 THEN
         RETURN NEW;
@@ -267,8 +270,8 @@ BEGIN
             NEW."cancelado_por", NEW."id_reserva", 'penalizacion', -v_penalizacion,
             v_saldo_anterior, v_saldo_posterior,
             v_retenidos, v_retenidos,
-            format('Penalizacion de %s decimas ( %s credito(s) ) por cancelar con menos de %s horas de anticipacion.',
-                   v_penalizacion, v_penalizacion / 10.0, v_horas_minimas)
+            format('Penalización de %s créditos por cancelar con menos de %s horas de anticipación.',
+                   v_penalizacion, v_horas_minimas)
         );
     ELSE
         INSERT INTO public."MOVIMIENTOS_CREDITO" (
@@ -279,7 +282,7 @@ BEGIN
             NEW."cancelado_por", NEW."id_reserva", 'penalizacion_sin_saldo', 0,
             v_saldo_anterior, v_saldo_anterior,
             v_retenidos, v_retenidos,
-            format('Penalizacion de %s decimas no cobrada: saldo disponible insuficiente. Cancelacion con menos de %s horas.',
+            format('Penalización de %s créditos no cobrada: saldo disponible insuficiente. Cancelación con menos de %s horas.',
                    v_penalizacion, v_horas_minimas)
         );
     END IF;

@@ -77,7 +77,6 @@ GRANT EXECUTE ON FUNCTION public.fn_reservas_usuario(uuid) TO rol_app;
 GRANT EXECUTE ON FUNCTION public.fn_calificaciones_recibidas(uuid) TO rol_app;
 REVOKE EXECUTE ON FUNCTION public.fn_calcular_costo_clase(uuid, uuid, timestamptz) FROM rol_app;
 GRANT EXECUTE ON FUNCTION public.fn_sugerir_precio_clase(uuid, uuid, timestamptz) TO rol_app;
-GRANT EXECUTE ON FUNCTION public.fn_creditos_a_decimas(numeric) TO rol_app;
 GRANT EXECUTE ON FUNCTION public.fn_confirmar_reserva(uuid) TO rol_app;
 GRANT EXECUTE ON FUNCTION public.fn_cobrar_penalizaciones_pendientes(uuid) TO rol_app;
 GRANT EXECUTE ON FUNCTION public.fn_obtener_top_tutores(uuid, timestamptz, timestamptz, text) TO rol_app;
@@ -111,3 +110,5 @@ TO rol_lectura;
 
 -- No otorgar a rol_lectura EXECUTE sobre las funciones privadas de cifrado,
 -- descifrado, hash, autenticación ni funciones de consulta por usuario.
+
+GRANT EXECUTE ON FUNCTION public.fn_validar_precio_creditos(numeric) TO rol_app;

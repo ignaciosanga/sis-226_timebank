@@ -1,0 +1,19 @@
+// Reemplazos en los modelos de schema.prisma (Prisma 7).
+// Mantener los nombres @map/@@map actuales y las demás relaciones.
+// Usuario:
+saldo              Decimal @default(0) @db.Decimal(12, 2)
+creditos_retenidos Decimal @default(0) @db.Decimal(12, 2)
+// SolicitudIntercambio:
+creditos_requeridos Decimal @db.Decimal(12, 2)
+// Reserva:
+creditos Decimal @db.Decimal(12, 2)
+// MovimientoCredito:
+cantidad            Decimal @db.Decimal(12, 2)
+saldo_anterior      Decimal @db.Decimal(12, 2)
+saldo_posterior     Decimal @db.Decimal(12, 2)
+retenidos_anterior  Decimal @db.Decimal(12, 2)
+retenidos_posterior Decimal @db.Decimal(12, 2)
+// OfertaTutoria (modelo adicional que debe acordarse en contrato):
+costo_creditos Decimal @db.Decimal(12, 2)
+// PenalizacionPendiente (modelo técnico adicional):
+monto Decimal @db.Decimal(12, 2)

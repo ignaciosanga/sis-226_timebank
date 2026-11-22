@@ -18,4 +18,4 @@ SET TIME ZONE 'America/La_Paz';
 \i /docker-entrypoint-initdb.d/sql/11_ofertas_tutoria_hu04.sql
 \i /docker-entrypoint-initdb.d/sql/12_ciclo_pago_reservas_hu10.sql
 \i /docker-entrypoint-initdb.d/sql/05_seguridad_roles.sql.tpl
-\i /docker-entrypoint-initdb.d/sql/13_hardening_sql_injection.sql
+\i /docker-entrypoint-initdb.d/sql/13_hardening_search_path.sql

@@ -230,63 +230,47 @@ FROM brechas b;
 COMMENT ON VIEW public.v_knowledge_gap_index IS
   'Indicador de brecha entre solicitudes pendientes de una habilidad y tutores activos que la ofrecen.';
 
--- Vistas de conveniencia para el equipo de aplicacion.
--- Se conservan tambien las columnas *_decimas para operaciones/depuracion;
--- las columnas *_creditos son NUMERIC y ya vienen divididas entre 10.
+-- Vistas de conveniencia para aplicación y BI. Los créditos ya son valores reales.
 CREATE OR REPLACE VIEW public.v_cuentas_credito_app AS
 SELECT
     u."id_usuario",
-    u."saldo" AS saldo_decimas,
-    (u."saldo"::numeric / 10) AS saldo_creditos,
-    u."creditos_retenidos" AS retenidos_decimas,
-    (u."creditos_retenidos"::numeric / 10) AS retenidos_creditos,
-    (u."saldo" - u."creditos_retenidos") AS disponibles_decimas,
-    ((u."saldo" - u."creditos_retenidos")::numeric / 10) AS disponibles_creditos
+    u."saldo" AS saldo_creditos,
+    u."creditos_retenidos" AS retenidos_creditos,
+    (u."saldo" - u."creditos_retenidos") AS disponibles_creditos
 FROM public."USUARIOS" u;
 
 COMMENT ON VIEW public.v_cuentas_credito_app IS
-  'Saldos para la app: columnas *_decimas son INTEGER internos y columnas *_creditos son valores visibles divididos entre 10.';
+  'Saldos expresados directamente en créditos reales (NUMERIC), sin conversiones de escala.';
 
 CREATE OR REPLACE VIEW public.v_movimientos_credito_app AS
 SELECT
-    m."id_movimiento",
-    m."id_usuario",
-    m."id_reserva",
-    m."tipo",
-    m."cantidad" AS cantidad_decimas,
-    (m."cantidad"::numeric / 10) AS cantidad_creditos,
-    m."saldo_anterior" AS saldo_anterior_decimas,
-    (m."saldo_anterior"::numeric / 10) AS saldo_anterior_creditos,
-    m."saldo_posterior" AS saldo_posterior_decimas,
-    (m."saldo_posterior"::numeric / 10) AS saldo_posterior_creditos,
-    m."descripcion",
-    m."created_at"
+    m."id_movimiento", m."id_usuario", m."id_reserva", m."tipo",
+    m."cantidad" AS cantidad_creditos,
+    m."saldo_anterior" AS saldo_anterior_creditos,
+    m."saldo_posterior" AS saldo_posterior_creditos,
+    m."retenidos_anterior" AS retenidos_anterior_creditos,
+    m."retenidos_posterior" AS retenidos_posterior_creditos,
+    m."descripcion", m."created_at"
 FROM public."MOVIMIENTOS_CREDITO" m;
 
 COMMENT ON VIEW public.v_movimientos_credito_app IS
-  'Movimientos contables en decimas y su equivalente visible en creditos (division entre 10).';
+  'Movimientos contables expresados directamente en créditos reales (NUMERIC).';
 
--- Vista agregada para Command Center / BI, sin nombres ni identificadores personales.
 CREATE OR REPLACE VIEW public.v_command_center_resumen AS
 WITH saldo_global AS (
-    SELECT COALESCE(SUM(u."saldo"), 0)::bigint AS total_decimas
+    SELECT COALESCE(SUM(u."saldo"), 0)::numeric(14,2) AS total_creditos
     FROM public."USUARIOS" u
     WHERE u."estado" = 'Activo'
 )
 SELECT
     (SELECT COUNT(*) FROM public."USUARIOS" u
       WHERE u."estado" = 'Activo' AND u."rol" = 'Estudiante') AS estudiantes_activos,
-    (SELECT COUNT(*) FROM public."RESERVAS" r
-      WHERE r."estado" = 'Completada') AS clases_completadas,
-    (SELECT COUNT(*) FROM public."RESERVAS" r
-      WHERE r."estado" = 'Cancelada') AS clases_canceladas,
-    (SELECT COUNT(*) FROM public."SOLICITUDES_INTERCAMBIO" s
-      WHERE s."estado" = 'Solicitada') AS solicitudes_pendientes,
-    (SELECT COUNT(*) FROM public."HABILIDADES" h
-      WHERE h."estado" = 'activo') AS habilidades_activas,
-    sg.total_decimas AS creditos_en_cuentas_decimas,
-    (sg.total_decimas::numeric / 10) AS creditos_en_cuentas
+    (SELECT COUNT(*) FROM public."RESERVAS" r WHERE r."estado" = 'Completada') AS clases_completadas,
+    (SELECT COUNT(*) FROM public."RESERVAS" r WHERE r."estado" = 'Cancelada') AS clases_canceladas,
+    (SELECT COUNT(*) FROM public."SOLICITUDES_INTERCAMBIO" s WHERE s."estado" = 'Solicitada') AS solicitudes_pendientes,
+    (SELECT COUNT(*) FROM public."HABILIDADES" h WHERE h."estado" = 'activo') AS habilidades_activas,
+    sg.total_creditos AS creditos_en_cuentas
 FROM saldo_global sg;
 
 COMMENT ON VIEW public.v_command_center_resumen IS
-  'Indicadores agregados para Command Center. creditos_en_cuentas_decimas es el entero interno; creditos_en_cuentas es el importe visible dividido entre 10.';
+  'Indicadores agregados del Command Center; créditos en escala real NUMERIC.';

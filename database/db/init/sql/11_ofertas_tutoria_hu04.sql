@@ -1,48 +1,35 @@
 -- =====================================================================
 -- HU-04: Ofertas de tutoria persistentes.
--- Precio: lo define el tutor; una sola cifra decimal, guardado como INTEGER en decimas.
+-- Precio: lo define el tutor y se guarda directamente como NUMERIC(12,2).
+-- Se admite una sola cifra decimal; 3.7 se almacena como 3.70 y 3.75 se rechaza.
 -- La sugerencia dinamica de BD nunca sustituye este precio publicado.
--- 1.0 credito = 10; 3.7 creditos = 37; 3.75 se rechaza.
 -- Requiere: 01_base_a_schema.sql y 04_auditoria_automatica.sql.
+-- Se incluye en 00_bootstrap.sql, que controla la transaccion global.
 -- =====================================================================
 
-BEGIN;
 
-CREATE OR REPLACE FUNCTION public.fn_creditos_a_decimas(p_creditos numeric)
-RETURNS integer
+-- Valida el precio recibido sin cambiar su escala. El parámetro numeric
+-- sin typmod permite rechazar 3.75 antes de asignarlo a la columna NUMERIC(12,2).
+CREATE OR REPLACE FUNCTION public.fn_validar_precio_creditos(p_creditos numeric)
+RETURNS numeric(12,2)
 LANGUAGE plpgsql
 IMMUTABLE
 SET search_path = pg_catalog, public
 AS $$
-DECLARE
-    v_decimas numeric;
 BEGIN
     IF p_creditos IS NULL OR p_creditos <= 0 THEN
-        RAISE EXCEPTION 'El precio debe ser mayor que cero.'
+        RAISE EXCEPTION 'El precio debe ser mayor que cero.' USING ERRCODE = '22023';
+    END IF;
+    IF p_creditos <> trunc(p_creditos, 1) THEN
+        RAISE EXCEPTION 'El precio admite una sola cifra decimal. Valor recibido: %.', p_creditos
           USING ERRCODE = '22023';
     END IF;
-
-    v_decimas := p_creditos * 10;
-
-    -- El modelo de negocio admite exactamente una cifra decimal.
-    IF v_decimas <> trunc(v_decimas) THEN
-        RAISE EXCEPTION
-          'El precio admite una sola cifra decimal. Valor recibido: %.',
-          p_creditos
-          USING ERRCODE = '22023';
-    END IF;
-
-    IF v_decimas > 2147483647 THEN
-        RAISE EXCEPTION 'El precio excede el rango INTEGER.'
-          USING ERRCODE = '22003';
-    END IF;
-
-    RETURN v_decimas::integer;
+    RETURN p_creditos::numeric(12,2);
 END;
 $$;
 
-COMMENT ON FUNCTION public.fn_creditos_a_decimas(numeric) IS
-  'Convierte creditos visibles a decimas INTEGER. Acepta una sola cifra decimal: 3.7 -> 37; rechaza 3.75.';
+COMMENT ON FUNCTION public.fn_validar_precio_creditos(numeric) IS
+  'Valida y devuelve el precio en créditos reales; admite una cifra decimal, por ejemplo 3.7, y rechaza 3.75.';
 
 CREATE TABLE IF NOT EXISTS public."OFERTAS_TUTORIA" (
     "id_oferta"      uuid        NOT NULL DEFAULT gen_random_uuid(),
@@ -52,7 +39,7 @@ CREATE TABLE IF NOT EXISTS public."OFERTAS_TUTORIA" (
     "descripcion"    text,
     "fecha_inicio"   timestamptz NOT NULL,
     "fecha_fin"      timestamptz NOT NULL,
-    "costo_decimas"  integer     NOT NULL,
+    "costo_creditos" numeric(12,2) NOT NULL,
     "estado"         varchar     NOT NULL DEFAULT 'Activa',
     "created_at"     timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at"     timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -63,7 +50,7 @@ CREATE TABLE IF NOT EXISTS public."OFERTAS_TUTORIA" (
     CONSTRAINT "OFERTAS_TUTORIA_intervalo_valido"
         CHECK ("fecha_fin" > "fecha_inicio"),
     CONSTRAINT "OFERTAS_TUTORIA_costo_positivo"
-        CHECK ("costo_decimas" > 0),
+        CHECK ("costo_creditos" > 0 AND "costo_creditos" = trunc("costo_creditos", 1)),
     CONSTRAINT "OFERTAS_TUTORIA_estado_valido"
         CHECK ("estado" IN ('Activa', 'Pausada', 'Cerrada')),
     CONSTRAINT "OFERTAS_TUTORIA_usuario_habilidad_fkey"
@@ -79,8 +66,8 @@ CREATE INDEX IF NOT EXISTS "OFERTAS_TUTORIA_habilidad_estado_fecha_idx"
 
 COMMENT ON TABLE public."OFERTAS_TUTORIA" IS
   'Ofertas de tutoria publicadas por un usuario para una habilidad, con titulo, horario y precio persistente definido por el tutor. Este precio es la fuente de verdad para la solicitud.';
-COMMENT ON COLUMN public."OFERTAS_TUTORIA"."costo_decimas" IS
-  'Precio definitivo elegido por el tutor. INTEGER en decimas: 37 = 3.7 creditos. La funcion de sugerencia dinamica no lo sobreescribe.';
+COMMENT ON COLUMN public."OFERTAS_TUTORIA"."costo_creditos" IS
+  'Precio definitivo elegido por el tutor, almacenado directamente en créditos reales NUMERIC. La sugerencia dinámica no lo sobreescribe.';
 
 CREATE OR REPLACE FUNCTION public.fn_validar_oferta_tutoria()
 RETURNS trigger
@@ -98,10 +85,7 @@ BEGIN
           USING ERRCODE = '23514';
     END IF;
 
-    IF NEW."costo_decimas" <= 0 THEN
-        RAISE EXCEPTION 'El costo de la oferta debe ser mayor que cero.'
-          USING ERRCODE = '23514';
-    END IF;
+    NEW."costo_creditos" := public.fn_validar_precio_creditos(NEW."costo_creditos");
 
     IF NOT EXISTS (
         SELECT 1
@@ -143,7 +127,7 @@ AFTER INSERT OR UPDATE OR DELETE ON public."OFERTAS_TUTORIA"
 FOR EACH ROW
 EXECUTE FUNCTION public.fn_auditar('id_oferta');
 
--- Vista de consumo de la aplicacion. El precio visible se divide entre 10.
+-- Vista de consumo de la aplicacion. El precio se consulta directamente en créditos reales.
 CREATE OR REPLACE VIEW public.v_ofertas_tutoria_app AS
 SELECT
     o."id_oferta",
@@ -154,8 +138,7 @@ SELECT
     o."descripcion",
     o."fecha_inicio",
     o."fecha_fin",
-    o."costo_decimas",
-    (o."costo_decimas" / 10.0)::numeric(12,1) AS "costo_creditos",
+    o."costo_creditos",
     o."estado",
     o."created_at",
     o."updated_at"
@@ -163,4 +146,3 @@ FROM public."OFERTAS_TUTORIA" o
 JOIN public."HABILIDADES" h
   ON h."id_habilidad" = o."id_habilidad";
 
-COMMIT;

@@ -1,9 +1,8 @@
 \set ON_ERROR_STOP on
 SET client_min_messages = warning;
 
--- HU-04: prueba de ofertas de tutoria y precio elegido por el tutor.
--- Ejecutar como administrador en la base V4 inicializada.
--- Las filas de prueba, incluidos sus eventos de auditoria, se revierten.
+-- HU-04: ofertas persistentes y precio definido por el tutor.
+-- Ejecutar como administrador en la base V4 de pruebas. Todo se revierte.
 BEGIN;
 SET LOCAL TIME ZONE 'America/La_Paz';
 SELECT set_config('app.encryption_key',
@@ -20,175 +19,153 @@ DECLARE
     v_tutor uuid := gen_random_uuid();
     v_estudiante uuid := gen_random_uuid();
     v_oferta uuid := gen_random_uuid();
+    v_oferta_45 uuid := gen_random_uuid();
     v_solicitud uuid := gen_random_uuid();
     v_fecha_inicio timestamptz := ((CURRENT_DATE + 2) + TIME '10:00') AT TIME ZONE 'America/La_Paz';
-    v_fecha_fin timestamptz := (((CURRENT_DATE + 2) + TIME '10:00') AT TIME ZONE 'America/La_Paz') + interval '1 hour';
-    v_precio integer;
-    v_precio_sugerido integer;
-    v_vista_precio numeric;
-    v_snapshot integer;
+    v_fecha_fin timestamptz;
+    v_precio numeric(12,2);
+    v_sugerencia numeric(12,2);
+    v_precio_vista numeric(12,2);
+    v_snapshot numeric(12,2);
     v_count integer;
     v_rechazado boolean := false;
 BEGIN
     SELECT c."id_carrera" INTO v_carrera
-    FROM public."CARRERAS" c
-    ORDER BY c."nombre"
-    LIMIT 1;
-
+    FROM public."CARRERAS" c ORDER BY c."nombre" LIMIT 1;
     IF v_carrera IS NULL THEN
-        RAISE EXCEPTION 'HU04: no existe una carrera para crear usuarios de prueba.';
+        RAISE EXCEPTION 'HU04: no existe una carrera semilla.';
     END IF;
 
     IF to_regclass('public."OFERTAS_TUTORIA"') IS NULL
        OR to_regclass('public.v_ofertas_tutoria_app') IS NULL THEN
-        RAISE EXCEPTION 'HU04 pendiente: falta instalar OFERTAS_TUTORIA y v_ofertas_tutoria_app.';
+        RAISE EXCEPTION 'HU04 pendiente: falta OFERTAS_TUTORIA o su vista de aplicación.';
     END IF;
 
     INSERT INTO public."CATEGORIAS" ("id_categoria", "nombre", "estado")
-    VALUES (v_categoria, 'ZZ_HU04_CAT_' || left(v_categoria::text, 8), 'activo');
-
+    VALUES (v_categoria, 'ZZ_HU04_CAT_' || left(v_categoria::text,8), 'activo');
     INSERT INTO public."HABILIDADES" ("id_habilidad", "nombre", "id_categoria", "estado")
-    VALUES (v_habilidad, 'ZZ_HU04_HAB_' || left(v_habilidad::text, 8), v_categoria, 'activo');
-
+    VALUES (v_habilidad, 'ZZ_HU04_HAB_' || left(v_habilidad::text,8), v_categoria, 'activo');
     INSERT INTO public."USUARIOS" (
         "id_usuario", "nombre", "apellido", "correo", "password_hash", "rol",
         "id_carrera", "semestre", "saldo", "creditos_retenidos", "estado"
     ) VALUES
       (v_tutor, 'Tutor HU04', 'Prueba', 'hu04-tutor-' || v_tutor::text || '@test.invalid',
-       'hash-no-login', 'Estudiante', v_carrera, 4, 0, 0, 'Activo'),
-      (v_estudiante, 'Estudiante HU04', 'Prueba',
-       'hu04-estudiante-' || v_estudiante::text || '@test.invalid',
-       'hash-no-login', 'Estudiante', v_carrera, 4, 100, 0, 'Activo');
-
+       'hash-no-login', 'Estudiante', v_carrera, 4, 0.0, 0.0, 'Activo'),
+      (v_estudiante, 'Estudiante HU04', 'Prueba', 'hu04-estudiante-' || v_estudiante::text || '@test.invalid',
+       'hash-no-login', 'Estudiante', v_carrera, 4, 10.0, 0.0, 'Activo');
     INSERT INTO public."USUARIO_HABILIDADES" ("id_usuario", "id_habilidad", "nivel")
     VALUES (v_tutor, v_habilidad, 'avanzado');
 
-    -- La oferta almacena su propia franja horaria.
-    INSERT INTO public."DISPONIBILIDADES" (
-        "id_disponibilidad", "id_usuario", "fecha_inicio", "fecha_fin", "estado"
-    ) VALUES (
-        gen_random_uuid(), v_tutor, v_fecha_inicio - interval '1 hour',
-        v_fecha_fin + interval '1 hour', 'disponible'
-    );
-
-    -- Precios con una cifra decimal: 3.0, 3.5 y 3.7 se aceptan.
-    IF public.fn_creditos_a_decimas(3.0::numeric) <> 30
-       OR public.fn_creditos_a_decimas(3.5::numeric) <> 35
-       OR public.fn_creditos_a_decimas(3.7::numeric) <> 37 THEN
-        RAISE EXCEPTION 'HU04: la conversion a decimas no produjo 30, 35 y 37.';
+    -- Validador: acepta una cifra decimal real y rechaza 3.75.
+    IF public.fn_validar_precio_creditos(3.0::numeric) <> 3.0
+       OR public.fn_validar_precio_creditos(3.5::numeric) <> 3.5
+       OR public.fn_validar_precio_creditos(3.7::numeric) <> 3.7 THEN
+        RAISE EXCEPTION 'HU04: el validador no conserva los importes decimales reales.';
     END IF;
-
-    -- Precio con dos decimales: 3.75 debe ser rechazado.
     BEGIN
-        PERFORM public.fn_creditos_a_decimas(3.75::numeric);
-        RAISE EXCEPTION 'HU04 FALLA: 3.75 fue aceptado, pero solo se admite una cifra decimal.';
-    EXCEPTION
-        WHEN SQLSTATE '22023' THEN
-            v_rechazado := true;
+        PERFORM public.fn_validar_precio_creditos(3.75::numeric);
+        RAISE EXCEPTION 'HU04 FALLA: se aceptó 3.75; solo se admite una cifra decimal.';
+    EXCEPTION WHEN SQLSTATE '22023' THEN
+        v_rechazado := true;
     END;
     IF NOT v_rechazado THEN
-        RAISE EXCEPTION 'HU04 FALLA: no se rechazo 3.75.';
+        RAISE EXCEPTION 'HU04 FALLA: no se rechazó 3.75.';
     END IF;
 
-    v_precio := public.fn_creditos_a_decimas(3.7::numeric);
-
-    -- El motor dinamico puede sugerir otro importe (aqui 2.5 por escasez),
-    -- pero no reemplaza el precio elegido por el tutor (3.7 = 37 decimas).
-    v_precio_sugerido := public.fn_sugerir_precio_clase(
-        v_habilidad, v_tutor, v_fecha_inicio
-    );
-    IF v_precio_sugerido IS NULL OR v_precio_sugerido = v_precio THEN
-        RAISE EXCEPTION
-          'HU04: la prueba necesita una sugerencia dinamica distinta al precio del tutor. Sugerido %, tutor %.',
-          v_precio_sugerido, v_precio;
-    END IF;
-
-    -- Ideal: publicar una oferta con titulo, materia, horario y costo.
+    -- Una oferta de 60 minutos y otra de 45 minutos conservan el precio total publicado.
+    v_fecha_fin := v_fecha_inicio + interval '1 hour';
     INSERT INTO public."OFERTAS_TUTORIA" (
         "id_oferta", "id_usuario", "id_habilidad", "titulo", "descripcion",
-        "fecha_inicio", "fecha_fin", "costo_decimas", "estado"
+        "fecha_inicio", "fecha_fin", "costo_creditos", "estado"
     ) VALUES (
-        v_oferta, v_tutor, v_habilidad, 'Tutoria de prueba HU04',
-        'Oferta creada por una prueba automatizada.',
-        v_fecha_inicio, v_fecha_fin, v_precio, 'Activa'
+        v_oferta, v_tutor, v_habilidad, 'Tutoría HU04 60 minutos',
+        'Precio publicado por el tutor.', v_fecha_inicio, v_fecha_fin, 3.7, 'Activa'
     );
 
-    -- Simula que Frontend vuelve a consultar despues de recargar.
-    SELECT o."costo_creditos" INTO v_vista_precio
-    FROM public.v_ofertas_tutoria_app o
-    WHERE o."id_oferta" = v_oferta;
+    INSERT INTO public."OFERTAS_TUTORIA" (
+        "id_oferta", "id_usuario", "id_habilidad", "titulo", "descripcion",
+        "fecha_inicio", "fecha_fin", "costo_creditos", "estado"
+    ) VALUES (
+        v_oferta_45, v_tutor, v_habilidad, 'Tutoría HU04 45 minutos',
+        'El precio es el total de la sesión, no una tarifa prorrateada.',
+        v_fecha_inicio + interval '2 hours',
+        v_fecha_inicio + interval '2 hours 45 minutes', 3.7, 'Activa'
+    );
 
-    IF NOT FOUND OR v_vista_precio IS DISTINCT FROM 3.7::numeric THEN
-        RAISE EXCEPTION 'HU04 FALLA: la oferta no persistio o el precio visible no es 3.7 (obtenido %).',
-            v_vista_precio;
+    SELECT o."costo_creditos" INTO v_precio_vista
+    FROM public.v_ofertas_tutoria_app o WHERE o."id_oferta" = v_oferta;
+    IF v_precio_vista IS DISTINCT FROM 3.70::numeric THEN
+        RAISE EXCEPTION 'HU04 FALLA: la vista no devuelve 3.7; obtuvo %.', v_precio_vista;
     END IF;
-    IF (SELECT o."costo_decimas" FROM public."OFERTAS_TUTORIA" o
-        WHERE o."id_oferta" = v_oferta) <> 37 THEN
-        RAISE EXCEPTION 'HU04 FALLA: la sugerencia dinamica sustituyo el precio publicado por el tutor.';
+    IF NOT EXISTS (
+        SELECT 1 FROM public."OFERTAS_TUTORIA" o
+        WHERE o."id_oferta" = v_oferta_45
+          AND o."fecha_fin" - o."fecha_inicio" = interval '45 minutes'
+          AND o."costo_creditos" = 3.7
+    ) THEN
+        RAISE EXCEPTION 'HU04 FALLA: no se persistió la oferta de 45 minutos a 3.7 créditos.';
     END IF;
 
-    -- Alternativo: guardar la cotizacion en la solicitud. Si luego cambia
-    -- el precio de la oferta, la solicitud conserva la cotizacion original.
+    -- La sugerencia económica es orientativa y no reemplaza el precio del tutor.
+    v_sugerencia := public.fn_sugerir_precio_clase(v_habilidad, v_tutor, v_fecha_inicio);
+    IF v_sugerencia IS NULL OR v_sugerencia = 3.7 THEN
+        RAISE EXCEPTION 'HU04: se esperaba una sugerencia dinámica distinta de 3.7; se obtuvo %.', v_sugerencia;
+    END IF;
+
+    -- La solicitud conserva el precio snapshot aunque el tutor edite su oferta.
     INSERT INTO public."SOLICITUDES_INTERCAMBIO" (
         "id_solicitud", "id_solicitante", "id_ofertante", "id_habilidad",
-        "fecha_inicio_propuesta", "fecha_fin_propuesta",
-        "creditos_requeridos", "estado"
+        "fecha_inicio_propuesta", "fecha_fin_propuesta", "creditos_requeridos", "estado"
     ) VALUES (
         v_solicitud, v_estudiante, v_tutor, v_habilidad,
-        v_fecha_inicio, v_fecha_fin, v_precio, 'Solicitada'
+        v_fecha_inicio, v_fecha_fin, 3.7, 'Solicitada'
     );
-
     UPDATE public."OFERTAS_TUTORIA"
-    SET "costo_decimas" = public.fn_creditos_a_decimas(4.2::numeric)
+    SET "costo_creditos" = public.fn_validar_precio_creditos(4.2::numeric)
     WHERE "id_oferta" = v_oferta;
-
     SELECT s."creditos_requeridos" INTO v_snapshot
-    FROM public."SOLICITUDES_INTERCAMBIO" s
-    WHERE s."id_solicitud" = v_solicitud;
-
-    IF v_snapshot IS DISTINCT FROM 37 THEN
-        RAISE EXCEPTION 'HU04 FALLA: la solicitud no conservo la cotizacion original de 37 decimas.';
+    FROM public."SOLICITUDES_INTERCAMBIO" s WHERE s."id_solicitud" = v_solicitud;
+    IF v_snapshot IS DISTINCT FROM 3.7::numeric THEN
+        RAISE EXCEPTION 'HU04 FALLA: el cambio de oferta alteró el precio snapshot: %.', v_snapshot;
     END IF;
 
-    -- Error: costo cero debe ser rechazado.
+    -- Error: un precio no positivo debe rechazarse.
     v_rechazado := false;
     BEGIN
         INSERT INTO public."OFERTAS_TUTORIA" (
-            "id_usuario", "id_habilidad", "titulo", "fecha_inicio",
-            "fecha_fin", "costo_decimas", "estado"
-        ) VALUES (
-            v_tutor, v_habilidad, 'Oferta con costo cero',
-            v_fecha_inicio, v_fecha_fin, 0, 'Activa'
-        );
-        RAISE EXCEPTION 'HU04 FALLA: se permitio una oferta con costo cero.';
-    EXCEPTION
-        WHEN check_violation THEN
-            v_rechazado := true;
+            "id_usuario", "id_habilidad", "titulo", "fecha_inicio", "fecha_fin", "costo_creditos", "estado"
+        ) VALUES (v_tutor, v_habilidad, 'Oferta cero', v_fecha_inicio, v_fecha_fin, 0, 'Activa');
+        RAISE EXCEPTION 'HU04 FALLA: se aceptó una oferta con precio cero.';
+    EXCEPTION WHEN check_violation OR SQLSTATE '22023' THEN
+        v_rechazado := true;
     END;
-    IF NOT v_rechazado THEN
-        RAISE EXCEPTION 'HU04 FALLA: no se rechazo el costo cero.';
-    END IF;
+    IF NOT v_rechazado THEN RAISE EXCEPTION 'HU04: no se rechazó el precio cero.'; END IF;
 
-    -- Error: intervalo invertido debe ser rechazado.
+    -- Error: se intenta insertar 3.75 directamente en la tabla.
     v_rechazado := false;
     BEGIN
         INSERT INTO public."OFERTAS_TUTORIA" (
-            "id_usuario", "id_habilidad", "titulo", "fecha_inicio",
-            "fecha_fin", "costo_decimas", "estado"
-        ) VALUES (
-            v_tutor, v_habilidad, 'Oferta con horario invalido',
-            v_fecha_fin, v_fecha_inicio, 37, 'Activa'
-        );
-        RAISE EXCEPTION 'HU04 FALLA: se permitio fecha_fin anterior a fecha_inicio.';
-    EXCEPTION
-        WHEN check_violation THEN
-            v_rechazado := true;
+            "id_usuario", "id_habilidad", "titulo", "fecha_inicio", "fecha_fin", "costo_creditos", "estado"
+        ) VALUES (v_tutor, v_habilidad, 'Oferta con 3.75', v_fecha_inicio, v_fecha_fin, 3.75, 'Activa');
+        RAISE EXCEPTION 'HU04 FALLA: la tabla aceptó 3.75.';
+    EXCEPTION WHEN check_violation OR SQLSTATE '22023' THEN
+        v_rechazado := true;
     END;
-    IF NOT v_rechazado THEN
-        RAISE EXCEPTION 'HU04 FALLA: no se rechazo el intervalo invalido.';
-    END IF;
+    IF NOT v_rechazado THEN RAISE EXCEPTION 'HU04: no se rechazó 3.75 al insertar.'; END IF;
 
-    -- La oferta tambien debe quedar registrada en auditoria.
+    -- Error: intervalo horario invertido.
+    v_rechazado := false;
+    BEGIN
+        INSERT INTO public."OFERTAS_TUTORIA" (
+            "id_usuario", "id_habilidad", "titulo", "fecha_inicio", "fecha_fin", "costo_creditos", "estado"
+        ) VALUES (v_tutor, v_habilidad, 'Oferta con horario inválido', v_fecha_fin, v_fecha_inicio, 3.7, 'Activa');
+        RAISE EXCEPTION 'HU04 FALLA: se aceptó un intervalo horario invertido.';
+    EXCEPTION WHEN check_violation THEN
+        v_rechazado := true;
+    END;
+    IF NOT v_rechazado THEN RAISE EXCEPTION 'HU04: no se rechazó el intervalo invertido.'; END IF;
+
+    -- La creación de oferta debe quedar auditada y cifrada.
     SELECT COUNT(*) INTO v_count
     FROM public."AUDITORIA" a
     WHERE a."entidad" = 'OFERTAS_TUTORIA'
@@ -196,18 +173,18 @@ BEGIN
       AND a."accion" = 'INSERT'
       AND a."datos_nuevos_enc" IS NOT NULL
       AND a."datos_nuevos" IS NULL;
-
     IF v_count <> 1 THEN
-        RAISE EXCEPTION 'HU04: la creacion de la oferta no genero el evento de auditoria cifrado.';
+        RAISE EXCEPTION 'HU04: la oferta no generó exactamente un evento de auditoría cifrado.';
     END IF;
 
-    RAISE NOTICE 'OK HU04-01: oferta guardada y recuperable desde v_ofertas_tutoria_app.';
-    RAISE NOTICE 'OK HU04-PRECIO: la sugerencia dinamica (%) no reemplazo el precio elegido por el tutor (37 decimas).', v_precio_sugerido;
-    RAISE NOTICE 'OK HU04-02: precio de 3.7 guardado como 37; la solicitud conserva la cotizacion aunque cambie la oferta.';
-    RAISE NOTICE 'OK HU04-03: 3.75, costo cero e intervalo invalido fueron rechazados.';
-    RAISE NOTICE 'OK HU04-AUDIT: el alta de la oferta quedo auditada y cifrada.';
+    RAISE NOTICE 'OK HU04-01: oferta guardada y recuperable después de consultar la vista.';
+    RAISE NOTICE 'OK HU04-02: 3.7 créditos conservados como 3.70, incluida una sesión de 45 minutos.';
+    RAISE NOTICE 'OK HU04-PRECIO: sugerencia dinámica % no sustituyó el precio del tutor.', v_sugerencia;
+    RAISE NOTICE 'OK HU04-03: precio cero, 3.75 e intervalo inválido rechazados.';
+    RAISE NOTICE 'OK HU04-SNAPSHOT: la solicitud conservó 3.7 aunque la oferta cambió a 4.2.';
+    RAISE NOTICE 'OK HU04-AUDITORIA: alta de oferta auditada y cifrada.';
 END;
 $hu04$;
 
 ROLLBACK;
-\echo 'HU-04: pruebas finalizadas. Todas las filas de prueba fueron revertidas.'
+\echo 'HU-04: pruebas finalizadas; todas las filas de prueba fueron revertidas.'
