@@ -130,6 +130,19 @@ Acceso: **Público** · **JWT** (cualquier cuenta activa) · **EST** (rol ESTUDI
 - `tipo` de movimiento: `BonoInicial | Recompensa | Penalizacion | Transferencia | Ajuste | Retencion | Liberacion | Consumo`.
 - `POST /credits/grants` solo funciona en desarrollo y pruebas: con `NODE_ENV=production` responde 403. Con la base en esquema entero solo admite importes enteros (400 si trae décimas). La colección Postman de RF-25 depende de esto para cargar créditos al estudiante B.
 
+### 3.6 Notificaciones
+
+| Método y ruta | Acceso | Cuerpo / query → respuesta |
+|---|---|---|
+| `GET /notifications/me?page=1&limit=20` | JWT | `page, limit` → 200 `NotificationsPage` |
+| `PATCH /notifications/{id}/read` | JWT (solo el dueño) | → 200 `NotificationResponse` con `leida: true` |
+| `POST /notifications/read-all` | JWT | → 200 `{ actualizadas }` (cantidad de notificaciones marcadas como leídas) |
+
+- `NotificationResponse`: `{ id_notificacion, tipo, titulo, mensaje, leida, created_at }`.
+- `NotificationsPage`: `{ data: [NotificationResponse], meta: { page, limit, total, totalPages, noLeidas } }`. Es la paginación de la sección 2 más `noLeidas`.
+- `tipo`: `SolicitudRecibida | SolicitudAceptada | SolicitudRechazada | ReservaCancelada | ClasePorConfirmar | OpinionRecibida`.
+- Ejemplo de `POST /notifications/read-all`: `{ "actualizadas": 3 }`.
+
 ## 4. Estados
 
 | Entidad | Valores y transiciones |
