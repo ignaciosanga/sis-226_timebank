@@ -30,6 +30,7 @@
 .vd-badge-gold { display: inline-flex; align-items: center; gap: 5px; background: #fef5d6; color: #7c5600; border: 1px solid #f0d060; }
 .vd-badge-muted { background: var(--canvas); color: var(--muted); border: 1px solid var(--line); }
 .vd-row-highlight { background: #fffdf5; }
+.vd-row-critical { background: #fff7f6; }
 .vd-subcell { display: block; color: var(--muted); font-size: .76rem; }
 .vd-score-num { color: var(--ucb-blue-dark); font-family: "Sora", sans-serif; font-size: .95rem; }
 .vd-notice-info { padding: 12px 16px; border: 1px solid #c4d7e4; border-left: 4px solid var(--ucb-blue); border-radius: 10px; background: #edf4f8; color: var(--ink); font-size: .86rem; }

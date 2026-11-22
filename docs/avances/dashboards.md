@@ -136,3 +136,33 @@ Se implementó la vista de **Reputación y reconocimiento de tutores** dentro de
 
 - **Issue #50 (Frontend / APIs):** aprobación de ubicación en `frontend/src/features/metrics/vue-dashboards/` e integración en `ReportPanel.vue`.
 - **Issue #51 (Backend):** publicar `knowledge_score` calculado en `GET /analytics/reputation` dentro de `apis/integracion-parcial3`.
+
+---
+
+## Parcial 3 — Command Center y *Knowledge Gap Index* (Demanda vs. Tutores por materia)
+
+- **Fecha:** 2026-11-22
+- **Estado:** En progreso (implementado en `equipo/dashboards-parcial3-vue` consumiendo `GET /analytics/academic`, con respaldo de demostración y aviso `.vd-demo-notice` mientras Neon recibe datos reales)
+- **Responsables:** Equipo Dashboards (Gustavo Walter Quisbert Chana, Pablo Soto, Mayte)
+
+### Descripción
+
+Atendiendo la observación de incluir explícitamente el **Knowledge Gap Index** en BI, se implementó el panel **Command Center · Knowledge Gap Index** dentro del dashboard de administración en Vue 3, comparando demanda estudiantil (`solicitudes`) frente a `tutores_activos` en las **49 materias** del pensum de Ingeniería de Sistemas y alineando la fórmula y niveles de alerta con la vista `v_knowledge_gap_index` de Base de Datos V6.
+
+### Funcionalidades
+
+- **Cálculo y normalización (`knowledge-gap.js`):** cálculo de `nivel_brecha = (demanda / tutores_activos) × 100` (y `100%` cuando hay demanda sin tutores), clasificación en alertas (`Sin tutores`, `Crítica`, `Alta`, `Media`, `Baja`, `Sin demanda pendiente`), filtros por área y semestre, y resumen global.
+- **Vista (`CommandCenterPanel.vue`):**
+  - Tarjetas KPI con el título exacto **«Knowledge Gap Index»**, materias críticas/sin tutores, demanda vs. tutores activos y cobertura académica.
+  - Gráfico comparativo **«Knowledge Gap Index — Demanda vs. Tutores por materia»** (Top 10 materias con mayor brecha).
+  - Tabla detallada de las 49 materias con demanda, demanda proyectada estimada, tutores activos, cobertura y nivel de alerta.
+- **Consumo de API (`analytics.js`):** agregada la función `getAcademic()` sobre `GET /analytics/academic` (validada por `openapi-contract.test.js`). Si en el despliegue aún no hay actividad cargada en Neon, muestra la muestra de demostración manteniendo visible el aviso `.vd-demo-notice`.
+
+### Evidencias y pruebas
+
+- `node --test src/features/metrics/vue-dashboards/knowledge-gap.test.js`: pruebas unitarias aprobadas.
+- `npm test` y `npm run build` en `frontend/` aprobados (incluida validación de `docs/openapi.json`).
+
+### Dependencias
+
+- Carga de vistas y datos reales de BD V6 en Neon para activar el flujo 100% real en producción sin aviso demo.

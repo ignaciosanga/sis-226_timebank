@@ -1,25 +1,32 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useAppStore } from '../../../stores/app'
-import { getReputation } from '../../../services/analytics'
+import { getAcademic, getReputation } from '../../../services/analytics'
 import { demoEnabled } from '../../demo/mode.js'
 import DonutChart from './charts/DonutChart.vue'
 import LineChart from './charts/LineChart.vue'
 import BarChart from './charts/BarChart.vue'
 import HeatmapChart from './charts/HeatmapChart.vue'
 import KnowledgeScorePanel from './KnowledgeScorePanel.vue'
+import CommandCenterPanel from './CommandCenterPanel.vue'
 import { buildAdminSprint0Data } from './sprint0-data.js'
 import { buildSyntheticReputationPayload } from './knowledge-score.js'
+import { buildSyntheticAcademicPayload } from './knowledge-gap.js'
 import './vue-dashboards.css'
 
 const store = useAppStore()
 const data = computed(() => buildAdminSprint0Data())
-const activeTab = ref('reputation')
+const activeTab = ref('command')
 const periodGranularity = ref('week')
 
 const reputationData = ref(null)
 const reputationLoading = ref(false)
 const reputationError = ref('')
+
+const academicData = ref(null)
+const academicLoading = ref(false)
+const academicError = ref('')
+const usingAcademicDemo = ref(demoEnabled)
 
 async function loadReputation() {
   if (demoEnabled) {
@@ -40,9 +47,50 @@ async function loadReputation() {
   }
 }
 
-onMounted(loadReputation)
+async function loadAcademic() {
+  if (demoEnabled) {
+    academicData.value = buildSyntheticAcademicPayload()
+    academicError.value = ''
+    academicLoading.value = false
+    usingAcademicDemo.value = true
+    return
+  }
+  academicLoading.value = true
+  academicError.value = ''
+  try {
+    const res = await getAcademic()
+    const hasActivity = Array.isArray(res?.data) && res.data.some((r) => r.solicitudes > 0 || r.tutores_activos > 0)
+    if (hasActivity) {
+      academicData.value = res
+      usingAcademicDemo.value = false
+    } else {
+      // Para el deploy previo a cargar datos en Neon, respaldamos con muestra sintética y mostramos el aviso demo.
+      academicData.value = buildSyntheticAcademicPayload()
+      usingAcademicDemo.value = true
+    }
+  } catch (failure) {
+    academicData.value = null
+    academicError.value = failure?.message || 'No se pudo cargar el Command Center.'
+    usingAcademicDemo.value = false
+  } finally {
+    academicLoading.value = false
+  }
+}
+
+onMounted(() => {
+  loadAcademic()
+  loadReputation()
+})
+
+const showDemoNotice = computed(() => {
+  if (demoEnabled) return true
+  if (activeTab.value === 'command') return usingAcademicDemo.value
+  if (activeTab.value === 'reputation') return false
+  return true
+})
 
 const tabs = [
+  { id: 'command', label: 'Command Center' },
   { id: 'reputation', label: 'Reputación y tutores' },
   { id: 'all', label: 'Vista completa' },
   { id: 'hu04', label: 'Resumen general' },
@@ -59,7 +107,7 @@ const activitySeries = computed(() =>
 
 <template>
   <div class="vd-shell">
-    <p v-if="demoEnabled || activeTab !== 'reputation'" class="vd-demo-notice" role="note"><strong>Datos de demostración.</strong> Estos gráficos usan 100 registros sintéticos para mostrar cómo funcionará el panel; no reflejan la actividad real de Nexo U.</p>
+    <p v-if="showDemoNotice" class="vd-demo-notice" role="note"><strong>Datos de demostración.</strong> Estos gráficos usan 100 registros sintéticos para mostrar cómo funcionará el panel; no reflejan la actividad real de Nexo U.</p>
     <div class="vd-tabs" role="tablist" aria-label="Secciones del informe administrador">
       <button
         v-for="tab in tabs"
@@ -74,6 +122,15 @@ const activitySeries = computed(() =>
         {{ tab.label }}
       </button>
     </div>
+
+    <!-- Command Center · Knowledge Gap Index -->
+    <CommandCenterPanel
+      v-if="show('command')"
+      :academic="academicData"
+      :loading="academicLoading"
+      :error="academicError"
+      @retry="loadAcademic"
+    />
 
     <!-- Reputación y reconocimiento de tutores (Knowledge Score) -->
     <KnowledgeScorePanel
