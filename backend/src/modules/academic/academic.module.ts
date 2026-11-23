@@ -7,6 +7,7 @@ import {
   AcademicController,
 } from './academic.controller';
 import { AcademicRepository } from './academic.repository';
+import { MatchingController, MatchingService } from './matching.controller';
 import { ReviewsController } from './reviews.controller';
 import { ReviewsService } from './reviews.service';
 
@@ -16,7 +17,8 @@ import { ReviewsService } from './reviews.service';
     AcademicController,
     AcademicAnalyticsController,
     ReviewsController,
+    MatchingController,
   ],
-  providers: [AcademicRepository, ReviewsService],
+  providers: [AcademicRepository, ReviewsService, MatchingService],
 })
 export class AcademicModule {}

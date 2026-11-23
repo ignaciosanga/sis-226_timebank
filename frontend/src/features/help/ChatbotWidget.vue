@@ -7,6 +7,7 @@ import { askAssistant, deleteAssistantKey, getAssistantProfile, saveAssistantAva
 import { canAsk, historyFor, MAX_QUESTION_LENGTH } from './chat-history'
 import { highlightTarget, quotaLabel, safeAction, waitForTarget } from './screen-guide'
 import AssistantAvatar from './AssistantAvatar.vue'
+import AssistantAnswer from './AssistantAnswer.vue'
 import { ACCESSORY_OPTIONS, avatarTone, COLOR_OPTIONS, DEFAULT_AVATAR, normalizeAvatar, STYLE_OPTIONS } from './avatar-options.js'
 import './chatbot.css'
 
@@ -66,7 +67,7 @@ async function scrollToEnd() {
 async function runAction(action) {
   if (!action) return
   if (route.path !== action.route) await router.push(action.route)
-  if (await waitForTarget(action.target)) highlightTarget(action.target)
+  if (await waitForTarget(action.target)) highlightTarget(action.target, document, 5200, action.label ? `Aquí: ${action.label}` : 'Aquí')
 }
 function openOffer(card) {
   open.value = false
@@ -194,7 +195,8 @@ onBeforeUnmount(() => { clearTimeout(talkTimer); clearTimeout(dozeTimer); clearT
             <div v-else class="nexo-chat-messages" role="log" aria-label="Conversación con el asistente" aria-live="polite" aria-relevant="additions">
               <article v-for="message in messages" :key="message.id" class="nexo-chat-message" :class="{ 'is-assistant': message.role === 'assistant', 'is-error': message.error }">
                 <span>{{ message.role === 'user' ? 'Tú' : avatar.nombre }}</span>
-                <p>{{ message.text }}</p>
+                <AssistantAnswer v-if="message.role === 'assistant' && !message.error" :text="message.text" />
+                <p v-else>{{ message.text }}</p>
                 <ul v-if="message.offers?.length" class="nexo-chat-offers" aria-label="Tutorías encontradas">
                   <li v-for="card in message.offers" :key="card.id_oferta"><button type="button" @click="openOffer(card)"><em class="nexo-offer-tag"><Sparkles :size="12" aria-hidden="true" />Sugerida por {{ avatar.nombre }}</em><strong>{{ card.titulo }}</strong><small>{{ card.materia }} · {{ card.tutor }}</small><span class="nexo-offer-foot"><b>{{ card.costo_creditos }} {{ Number(card.costo_creditos) === 1 ? 'crédito' : 'créditos' }}</b><i>Ver oferta<ArrowRight :size="14" aria-hidden="true" /></i></span></button></li>
                 </ul>

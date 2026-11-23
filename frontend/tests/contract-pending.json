@@ -1,8 +1,1 @@
-[
-  {
-    "method": "GET",
-    "path": "/tutoring/recommendations",
-    "reason": "Implementado en Backend 5719d55; falta incorporar el controlador a apis/integracion-parcial3 y regenerar OpenAPI. Adaptador real desactivado por defecto mediante VITE_RECOMMENDATIONS_API_ENABLED.",
-    "owner": "Backend y APIs; Frontend mantiene el consumidor"
-  }
-]
+[]

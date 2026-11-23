@@ -16,7 +16,7 @@ import { TutoringService } from '../tutoring/tutoring.service';
 import { UserSkillsService } from '../user-skills/user-skills.service';
 import { UsersService } from '../users/users.service';
 import { decryptSecret, encryptSecret, keyHint } from './assistant-crypto';
-import { assistantInstructions } from './assistant-knowledge';
+import { assistantInstructions, guardAnswer } from './assistant-knowledge';
 import {
   AssistantProfile,
   AssistantProfileStore,
@@ -144,6 +144,7 @@ export class AssistantService {
       throw new ServiceUnavailableException(
         'El servidor no tiene habilitadas las llaves personales',
       );
+    const model = this.config.get('ASSISTANT_MODEL', { infer: true });
     let response: Response;
     try {
       response = await fetcher(this.modelsUrl(), {
@@ -254,7 +255,7 @@ export class AssistantService {
       };
     }
     return {
-      answer: answer.slice(0, 2000),
+      answer: guardAnswer(answer).slice(0, 2000),
       actions: context.actions.slice(0, 1),
       offers: context.offers.slice(0, 3),
       quota: nextQuota,
@@ -287,6 +288,7 @@ export class AssistantService {
     ownKey: boolean,
     allowTools: boolean,
   ) {
+    const model = this.config.get('ASSISTANT_MODEL', { infer: true });
     let response: Response;
     try {
       response = await fetcher(
@@ -298,10 +300,13 @@ export class AssistantService {
             'content-type': 'application/json',
           },
           body: JSON.stringify({
-            model: this.config.get('ASSISTANT_MODEL', { infer: true }),
+            model,
             messages,
             temperature: 0.2,
-            max_tokens: 500,
+            max_tokens: 1200,
+            ...(model.startsWith('openai/gpt-oss')
+              ? { reasoning_effort: 'low' }
+              : {}),
             ...(allowTools
               ? { tools: ASSISTANT_TOOLS, tool_choice: 'auto' }
               : {}),
