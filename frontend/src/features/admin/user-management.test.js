@@ -51,11 +51,11 @@ test('required fields, email syntax and semester ranges are validated', () => {
   assert.ok(validateNewUser({ ...validInput(), apellido: 'a'.repeat(101) }, []).apellido)
 })
 
-test('administrative creation rejects noninstitutional emails without adding a user', () => {
+test('administrative creation rejects malformed emails without adding a user', () => {
   const users = seedAdminUsers()
   const original = structuredClone(users)
-  const result = addAdminUser(users, { ...validInput(), correo: 'lucia@gmail.com' }, options)
-  assert.ok(result.errors.correo.includes('@ucb.edu.bo'))
+  const result = addAdminUser(users, { ...validInput(), correo: 'lucia@@gmail.com' }, options)
+  assert.ok(result.errors.correo)
   assert.equal(result.users, undefined)
   assert.deepEqual(users, original)
 })

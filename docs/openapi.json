@@ -4021,7 +4021,7 @@
             "type": "string",
             "example": "ana@ucb.edu.bo",
             "format": "email",
-            "description": "Dominio exacto ucb.edu.bo; se normaliza antes de validar"
+            "description": "Cualquier correo valido; la cuenta queda pendiente hasta confirmar el enlace enviado a ese correo"
           },
           "password": {
             "type": "string",

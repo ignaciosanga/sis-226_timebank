@@ -22,7 +22,7 @@ export function assistantInstructions(
     '',
     'Cómo funciona Nexo U:',
     '- Los estudiantes intercambian tiempo enseñando lo que saben. La moneda son los créditos de tiempo.',
-    '- Para crear una cuenta se usa el correo institucional @ucb.edu.bo. Llega un enlace para verificar el correo y la cuenta queda pendiente hasta verificarlo. También se puede entrar con la cuenta institucional de Google.',
+    '- Para crear una cuenta se usa un correo electrónico; los estudiantes usan su correo @ucb.edu.bo y los invitados, como evaluadores externos, pueden usar otro correo. Llega un enlace para verificar el correo y la cuenta queda pendiente hasta verificarlo. También se puede entrar con la cuenta institucional de Google de la UCB.',
     `- Al verificar la cuenta institucional se recibe un bono de bienvenida de ${initialCredits} créditos.`,
     '- En Habilidades se buscan materias y ofertas de tutoría de otros estudiantes. Cada oferta muestra al tutor, la materia, el horario, el precio total en créditos y sus opiniones.',
     '- Para enseñar: 1) en **Perfil** se pulsa **Añadir habilidad**, se elige la materia del pensum y el nivel; 2) en **Habilidades** se pulsa **Ofertar una habilidad**, se completa título, descripción, portada, horario y precio total en créditos, y se pulsa **Publicar oferta**. El tutor decide el precio, que no depende de la duración.',

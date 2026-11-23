@@ -38,8 +38,6 @@ export class AuthService {
     }
     const repository = this.users.repository;
     const correo = input.correo.trim().toLowerCase();
-    if (!/^[^@\s]+@ucb\.edu\.bo$/.test(correo))
-      throw new ForbiddenException('Solo se permiten cuentas @ucb.edu.bo');
     if (await repository.findByEmail(correo))
       throw new ConflictException('Correo no disponible');
     const passwordHash = await this.passwords.hash(input.password);

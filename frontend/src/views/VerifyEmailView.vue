@@ -149,7 +149,7 @@ async function goToLogin() {
         <form class="flow-form" @submit.prevent="resendVerification">
           <div class="field">
             <label for="verification-email">
-              Correo institucional
+              Correo electrónico
             </label>
             <input
               id="verification-email"
@@ -157,7 +157,7 @@ async function goToLogin() {
               type="email"
               autocomplete="email"
               maxlength="254"
-              placeholder="nombre@ucb.edu.bo"
+              placeholder="tu@correo.com"
               required
             />
           </div>

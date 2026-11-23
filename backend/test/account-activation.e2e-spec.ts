@@ -192,7 +192,7 @@ describe('Cuenta institucional, activacion y bono (memoria; correo y Google simu
   it('rechaza invalido/vencido, rota en reenvio y conserva correos invalidos como negativos', async () => {
     await api()
       .post('/auth/register')
-      .send(body('ana@example.test'))
+      .send(body('ana@@example.test'))
       .expect(400);
     const input = body(),
       user = (await api().post('/auth/register').send(input).expect(201)).body;

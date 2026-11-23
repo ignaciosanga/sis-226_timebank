@@ -20,7 +20,6 @@ export class ResendVerificationDto {
     typeof value === 'string' ? value.trim().toLowerCase() : value,
   )
   @IsEmail()
-  @Matches(/^[^@\s]+@ucb\.edu\.bo$/)
   @MaxLength(254)
   correo!: string;
 }
