@@ -33,3 +33,15 @@ export function getAcademic({ from, to, codigo, area, semestre } = {}) {
   const qs = params.toString()
   return apiRequest(`/analytics/academic${qs ? `?${qs}` : ''}`)
 }
+
+// HU10 (Parcial 3): GET /analytics/economy (solo ADMIN).
+export function getEconomy({ from, to, codigo, area, semestre } = {}) {
+  const params = new URLSearchParams()
+  if (from) params.set('from', from)
+  if (to) params.set('to', to)
+  if (codigo) params.set('codigo', codigo)
+  if (area) params.set('area', area)
+  if (semestre) params.set('semestre', String(semestre))
+  const qs = params.toString()
+  return apiRequest(`/analytics/economy${qs ? `?${qs}` : ''}`)
+}

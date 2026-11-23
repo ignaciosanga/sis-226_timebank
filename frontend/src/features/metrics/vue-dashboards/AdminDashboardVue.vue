@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useAppStore } from '../../../stores/app'
-import { getAcademic, getReputation } from '../../../services/analytics'
+import { getAcademic, getEconomy, getReputation } from '../../../services/analytics'
 import { demoEnabled } from '../../demo/mode.js'
 import DonutChart from './charts/DonutChart.vue'
 import LineChart from './charts/LineChart.vue'
@@ -9,9 +9,11 @@ import BarChart from './charts/BarChart.vue'
 import HeatmapChart from './charts/HeatmapChart.vue'
 import KnowledgeScorePanel from './KnowledgeScorePanel.vue'
 import CommandCenterPanel from './CommandCenterPanel.vue'
+import EconomyPanel from './EconomyPanel.vue'
 import { buildAdminSprint0Data } from './sprint0-data.js'
 import { buildSyntheticReputationPayload } from './knowledge-score.js'
 import { buildSyntheticAcademicPayload } from './knowledge-gap.js'
+import { buildSyntheticEconomyPayload, economyHasActivity } from './economy.js'
 import './vue-dashboards.css'
 
 const store = useAppStore()
@@ -27,6 +29,11 @@ const academicData = ref(null)
 const academicLoading = ref(false)
 const academicError = ref('')
 const usingAcademicDemo = ref(demoEnabled)
+
+const economyData = ref(null)
+const economyLoading = ref(false)
+const economyError = ref('')
+const usingEconomyDemo = ref(demoEnabled)
 
 async function loadReputation() {
   if (demoEnabled) {
@@ -77,20 +84,52 @@ async function loadAcademic() {
   }
 }
 
+async function loadEconomy() {
+  if (demoEnabled) {
+    economyData.value = buildSyntheticEconomyPayload()
+    economyError.value = ''
+    economyLoading.value = false
+    usingEconomyDemo.value = true
+    return
+  }
+  economyLoading.value = true
+  economyError.value = ''
+  try {
+    const res = await getEconomy()
+    if (economyHasActivity(res)) {
+      economyData.value = res
+      usingEconomyDemo.value = false
+    } else {
+      // Respuesta vacía: misma muestra sintética y aviso de demo que el Command Center.
+      economyData.value = buildSyntheticEconomyPayload()
+      usingEconomyDemo.value = true
+    }
+  } catch (failure) {
+    economyData.value = null
+    economyError.value = failure?.message || 'No se pudo cargar el monitor de economía.'
+    usingEconomyDemo.value = false
+  } finally {
+    economyLoading.value = false
+  }
+}
+
 onMounted(() => {
   loadAcademic()
   loadReputation()
+  loadEconomy()
 })
 
 const showDemoNotice = computed(() => {
   if (demoEnabled) return true
   if (activeTab.value === 'command') return usingAcademicDemo.value
+  if (activeTab.value === 'economy') return usingEconomyDemo.value
   if (activeTab.value === 'reputation') return false
   return true
 })
 
 const tabs = [
   { id: 'command', label: 'Command Center' },
+  { id: 'economy', label: 'Economía dinámica' },
   { id: 'reputation', label: 'Reputación y tutores' },
   { id: 'all', label: 'Vista completa' },
   { id: 'hu04', label: 'Resumen general' },
@@ -130,6 +169,14 @@ const activitySeries = computed(() =>
       :loading="academicLoading"
       :error="academicError"
       @retry="loadAcademic"
+    />
+
+    <EconomyPanel
+      v-if="show('economy')"
+      :economy="economyData"
+      :loading="economyLoading"
+      :error="economyError"
+      @retry="loadEconomy"
     />
 
     <!-- Reputación y reconocimiento de tutores (Knowledge Score) -->

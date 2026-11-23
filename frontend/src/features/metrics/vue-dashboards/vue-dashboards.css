@@ -130,3 +130,70 @@
 }
 .vd-demo-notice { margin: 0 0 16px; padding: 12px 16px; border: 1px solid #f0d98a; border-radius: 10px; background: #fffaeb; color: #5e532c; font-size: .9rem; line-height: 1.5; }
 .vd-demo-notice strong { color: #3f3613; }
+
+.vd-eco-info {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: 6px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--canvas);
+  color: var(--muted);
+  vertical-align: middle;
+}
+.vd-eco-info:hover,
+.vd-eco-info:focus-visible { color: var(--ucb-blue); border-color: var(--ucb-blue); outline: none; }
+.vd-eco-tip {
+  position: absolute;
+  z-index: 4;
+  top: calc(100% + 8px);
+  left: 0;
+  width: min(280px, 70vw);
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: .75rem;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: left;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  pointer-events: none;
+}
+.vd-eco-info:focus-visible .vd-eco-tip { opacity: 1; }
+.vd-eco-scale { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: .76rem; font-weight: 600; }
+.vd-eco-scale-chip { width: 16px; height: 10px; border-radius: 3px; border: 1px solid rgba(0, 0, 0, .06); }
+.vd-eco-heat-split { display: none; }
+.vd-eco-heat-table { display: grid; gap: 3px; align-items: center; }
+.vd-eco-heat-hour,
+.vd-eco-heat-metric { color: var(--muted); font-size: .72rem; font-weight: 600; }
+.vd-eco-heat-hour { text-align: center; }
+.vd-eco-heat-metric { line-height: 1.15; }
+.vd-eco-heat-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 28px;
+  border-radius: 6px;
+  font-size: .72rem;
+  font-weight: 700;
+}
+@media (max-width: 760px) {
+  .vd-eco-heat-full { display: none; }
+  .vd-eco-heat-split { display: grid; gap: 14px; }
+}
+@media (max-width: 520px) {
+  .vd-eco-heat-hour.is-skip-2 { visibility: hidden; }
+}
+@media (max-width: 420px) {
+  .vd-eco-heat-hour.is-skip-2 { visibility: visible; }
+  .vd-eco-heat-hour.is-skip-3 { visibility: hidden; }
+}
