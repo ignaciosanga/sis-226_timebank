@@ -190,7 +190,7 @@ test('creates a user, sends only DTO fields, reloads the list and clears credent
 
 test('invalid account fields block the request before it reaches the API', async () => {
   const view = await openView()
-  view.openCreate(); fillForm(view, 'nueva@gmail.com'); view.form.password = 'corta'
+  view.openCreate(); fillForm(view, 'nueva@@gmail.com'); view.form.password = 'corta'
   await view.submitCreate()
   assert.ok(view.errors.value.correo)
   assert.ok(view.errors.value.password)

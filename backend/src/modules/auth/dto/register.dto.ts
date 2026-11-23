@@ -10,7 +10,6 @@ import {
   MinLength,
   IsUUID,
   Max,
-  Matches,
 } from 'class-validator';
 
 export class RegisterDto {
@@ -35,15 +34,13 @@ export class RegisterDto {
   @ApiProperty({
     example: 'ana@ucb.edu.bo',
     format: 'email',
-    description: 'Dominio exacto ucb.edu.bo; se normaliza antes de validar',
+    description:
+      'Cualquier correo valido; la cuenta queda pendiente hasta confirmar el enlace enviado a ese correo',
   })
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,
   )
-  @IsEmail()
-  @Matches(/^[^@\s]+@ucb\.edu\.bo$/, {
-    message: 'El correo debe pertenecer al dominio exacto @ucb.edu.bo',
-  })
+  @IsEmail({}, { message: 'Escribe un correo electrónico válido' })
   @MaxLength(254)
   correo!: string;
 

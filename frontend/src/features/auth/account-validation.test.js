@@ -3,11 +3,11 @@ import assert from 'node:assert/strict'
 import { DEMO_CAREERS } from '../timebank/catalogs.js'
 import { emptyAccountForm, toRegisterPayload, validateAccount } from './account-validation.js'
 const valid = () => ({ nombre: ' Ana ', apellido: ' Pérez ', correo: ' ANA@UCB.EDU.BO ', password: 'una-clave-larga', confirmPassword: 'una-clave-larga', idCarrera: DEMO_CAREERS[0].id_carrera, semestre: '3' })
-test('accounts accept only the exact institutional email domain, ignoring case and outer whitespace', () => {
-  for (const correo of ['ana@ucb.edu.bo', '  ANA@UCB.EDU.BO  ', 'ana.perez+demo@ucb.edu.bo']) {
+test('accounts accept institutional and guest emails, ignoring case and outer whitespace, and reject malformed ones', () => {
+  for (const correo of ['ana@ucb.edu.bo', '  ANA@UCB.EDU.BO  ', 'ana.perez+demo@ucb.edu.bo', 'evaluador@gmail.com', 'jurado@estudiante.ucb.edu.bo']) {
     assert.deepEqual(validateAccount({ ...valid(), correo }, DEMO_CAREERS), {})
   }
-  for (const correo of ['ana@gmail.com', 'ana@estudiante.ucb.edu.bo', 'ana@falsoucb.edu.bo', 'ana@ucb.edu.bo.example.com', 'ana@ucb.edu.box', 'ana@@ucb.edu.bo', '@ucb.edu.bo', 'ana perez@ucb.edu.bo', 'ana@ucb.edu.bo\nextra']) {
+  for (const correo of ['ana@@ucb.edu.bo', 'ana@gmail', 'ana@',  '@ucb.edu.bo', 'ana perez@ucb.edu.bo', 'ana@ucb.edu.bo\nextra']) {
     assert.ok(validateAccount({ ...valid(), correo }, DEMO_CAREERS).correo, correo)
   }
 })
