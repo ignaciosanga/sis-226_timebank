@@ -166,3 +166,43 @@ Atendiendo la observación de incluir explícitamente el **Knowledge Gap Index**
 ### Dependencias
 
 - Carga de vistas y datos reales de BD V6 en Neon para activar el flujo 100% real en producción sin aviso demo.
+
+---
+
+## Parcial 3 — Monitor de Economía Dinámica, Horarios y Cancelaciones
+
+- **Fecha:** 2026-11-22
+- **Estado:** En progreso (implementado, sincronizado con `origin/main` y verificado con pruebas unitarias y build; pendiente validación en vivo con datos reales tras corrección de `groupBy` en `analytics.js` por Frontend)
+- **Responsables:** Pablo Soto, Gustavo Walter Quisbert Chana (Equipo Dashboards)
+
+### Descripción
+
+Se implementó el panel **Monitor de Economía Dinámica** dentro del dashboard de administración en Vue 3 para analizar la distribución de precios publicados frente a precios pactados con precisión decimal exacta (`NUMERIC`), identificar las franjas horarias pico en zona horaria `America/La_Paz`, auditar las cancelaciones por actor e injustificadas y monitorear el indicador agregado de cuentas activas con créditos sin uso.
+
+### Funcionalidades
+
+- **Normalización y precisión decimal (`economy.js`):**
+  - Ordenamiento y preservación de importes como strings decimales exactos (`compareDecimalStrings`, `decimalString`) sin conversión flotante (`"3.7"` ordenado antes de `"10"`).
+  - Relleno completo de las 24 horas locales (`00:00`–`23:00`), identificación de las 3 horas pico y cálculo seguro de tasa de cancelación sin divisiones por cero.
+  - Normalización defensiva de cancelaciones por actor, anticipación media, reglas de penalización e inactividad ante respuestas vacías o `null`.
+- **Tira de calor de 24 horas (`charts/EconomyHourHeat.vue`):** visualización responsive en dos filas (*Reservas* y *Cancelaciones*), 24 columnas en escritorio y dos bloques de 12 horas en móvil, con etiquetas accesibles y porcentaje por hora.
+- **Vista (`EconomyPanel.vue`) e integración (`AdminDashboardVue.vue`):**
+  - 4 tarjetas KPI (precio publicado más frecuente, precio pactado más frecuente, reservas por hora de inicio y cancelaciones de esa cohorte).
+  - Gráfico comparativo horizontal de precios publicados vs. pactados (`BarChart`).
+  - Tira de calor de 24 horas con chips de horas pico y tooltip explicativo de zona horaria.
+  - Bloque de cancelaciones por actor (`DonutChart` con colores explícitos), registradas, injustificadas, anticipación media, sin clasificar y pie de umbral/penalización.
+  - Indicador agregado de cuentas activas sin movimientos, saldo estancado y créditos retenidos, con aviso de definición provisional.
+  - Integrado en `AdminDashboardVue.vue` consumiendo directamente `props.sources.economy`, `props.errors.economy` y `emit('retry')` (sin peticiones duplicadas ni envío de `groupBy`).
+
+### Evidencias y pruebas
+
+- Rama `equipo/dashboards-parcial3-vue` sincronizada limpiamente con `origin/main` (`4aabf88`, 0 conflictos).
+- `node --test src/features/metrics/vue-dashboards/economy.test.js`: **8/8 pruebas aprobadas**.
+- `npm test` en `frontend/` (incluyendo `economy.test.js`, `knowledge-score.test.js`, `knowledge-gap.test.js`, `report-data.test.js` y `openapi-contract.test.js`): **164/164 pruebas aprobadas**.
+- `npm run build` en `frontend/`: compilación de producción limpia en Vite (6.56 s).
+- Verificación visual en navegador sobre `/administracion/metricas` en modo demostración (`?demo=1`).
+
+### Pruebas pendientes o limitaciones
+
+- **Dependencia externa (Frontend — `frontend/src/services/analytics.js`):** `getEconomy(filters)` en `main` todavía envía el parámetro `groupBy=day` desde `loadReportSources()`, lo que genera HTTP 400 (`property groupBy should not exist`) contra `AcademicPeriodDto` en `GET /analytics/economy`. Queda pendiente el ajuste de Frontend para completar la validación en vivo con datos reales de Neon.
+- **Definición de inactividad (Backend / PO):** `GET /analytics/economy` entrega agregados de inactividad (`cuentas_sin_movimientos`, `saldo_actual_sin_movimientos`, `retenidos_actuales_sin_movimientos`) sin lista individual de usuarios por privacidad y con `criterio_sin_uso_PO: null` a la espera de definición formal de negocio.

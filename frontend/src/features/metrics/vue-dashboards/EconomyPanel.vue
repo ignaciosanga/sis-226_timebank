@@ -32,8 +32,8 @@ function creditsLabel(values) {
 
 function peakLabel(row) {
   const reservas = `${row.reservas} ${row.reservas === 1 ? 'reserva' : 'reservas'}`
-  const percent = Math.round((row.cancelaciones * 100) / row.reservas)
-  return `${row.label} · ${reservas} · ${percent}% canceladas`
+  const percent = row.ratio ? row.ratio.percent : '0%'
+  return `${row.label} · ${reservas} · ${percent} canceladas`
 }
 
 const rulesChip = computed(() => {
@@ -203,7 +203,7 @@ const penalizacionLabel = computed(() => normalized.value.reglas.penalizacion ??
           <article class="vd-kpi">
             <div class="vd-kpi-label">Saldo estancado</div>
             <div class="vd-kpi-value is-gold">{{ inactivity.saldo_actual_sin_movimientos }}</div>
-            <div class="vd-kpi-hint">Suma actual, tal como llega</div>
+            <div class="vd-kpi-hint">Suma de saldos actuales en créditos</div>
           </article>
           <article class="vd-kpi">
             <div class="vd-kpi-label">Retenidos</div>

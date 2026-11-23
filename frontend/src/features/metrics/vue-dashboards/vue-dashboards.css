@@ -167,6 +167,7 @@
   opacity: 0;
   pointer-events: none;
 }
+.vd-eco-info:hover .vd-eco-tip,
 .vd-eco-info:focus-visible .vd-eco-tip { opacity: 1; }
 .vd-eco-scale { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: .76rem; font-weight: 600; }
 .vd-eco-scale-chip { width: 16px; height: 10px; border-radius: 3px; border: 1px solid rgba(0, 0, 0, .06); }

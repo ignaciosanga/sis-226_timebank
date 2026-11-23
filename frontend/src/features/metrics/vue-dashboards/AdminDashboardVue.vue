@@ -1,7 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useAppStore } from '../../../stores/app'
-import { getEconomy } from '../../../services/analytics'
 import { demoEnabled } from '../../demo/mode.js'
 import DonutChart from './charts/DonutChart.vue'
 import LineChart from './charts/LineChart.vue'
@@ -29,31 +28,10 @@ const scoreReady = computed(() => demoEnabled || reputationReady(reputationData.
 const gapData = computed(() => demoEnabled ? academicData.value : academicGapPayload(academicData.value))
 const reputationLoading = computed(() => props.loading), academicLoading = computed(() => props.loading)
 const reputationError = computed(() => props.errors.reputation || ''), academicError = computed(() => props.errors.academic || '')
-const loadAcademic = () => emit('retry'), loadReputation = () => emit('retry')
-const economyRequest = ref(null)
-const economyRequestError = ref('')
-const economyRequestLoading = ref(false)
-const economyUsesRequest = ref(false)
-const economySource = computed(() => economyUsesRequest.value ? economyRequest.value : (props.sources.economy || null))
-const economyData = computed(() => demoEnabled ? buildSyntheticEconomyPayload() : economySource.value)
-const economyLoading = computed(() => demoEnabled ? false : (economyUsesRequest.value ? economyRequestLoading.value : props.loading))
-const economyError = computed(() => demoEnabled ? '' : (economyUsesRequest.value ? economyRequestError.value : (props.errors.economy || '')))
-watch(() => props.sources.economy, () => { economyUsesRequest.value = false })
-async function loadEconomy(filters) {
-  if (demoEnabled) return
-  const query = filters && typeof filters === 'object' ? filters : { groupBy: periodGranularity.value === 'week' ? 'day' : 'month' }
-  economyUsesRequest.value = true
-  economyRequestLoading.value = true
-  economyRequestError.value = ''
-  try {
-    economyRequest.value = await getEconomy(query)
-  } catch (failure) {
-    economyRequest.value = null
-    economyRequestError.value = failure?.message || 'No se pudo cargar el monitor de economía.'
-  } finally {
-    economyRequestLoading.value = false
-  }
-}
+const loadAcademic = () => emit('retry'), loadReputation = () => emit('retry'), loadEconomy = () => emit('retry')
+const economyData = computed(() => demoEnabled ? buildSyntheticEconomyPayload() : props.sources.economy || null)
+const economyLoading = computed(() => demoEnabled ? false : props.loading)
+const economyError = computed(() => demoEnabled ? '' : props.errors.economy || '')
 const showDemoNotice = computed(() => demoEnabled)
 const tabs = [{ id:'command',label:'Command Center' },{ id:'economy',label:'Economía dinámica' },{ id:'reputation',label:'Reputación y tutores' },{ id:'all',label:'Vista completa' },{ id:'hu04',label:'Resumen general' },{ id:'hu05',label:'Intercambios y horarios' },{ id:'hu06',label:'Comunidad' },{ id:'hu07',label:'Habilidades y demanda' }]
 watch(periodGranularity, value => { if (!demoEnabled) emit('period', value === 'week' ? 'day' : 'month') })
