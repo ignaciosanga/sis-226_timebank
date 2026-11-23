@@ -7,6 +7,7 @@ import { initials } from '../../features/timebank/format'
 import UcbLogo from '../ui/UcbLogo.vue'
 import ChatbotWidget from '../../features/help/ChatbotWidget.vue'
 import NotificationBell from './NotificationBell.vue'
+import WelcomeGuide from '../../features/welcome/WelcomeGuide.vue'
 import { demoEnabled } from '../../features/demo/mode.js'
 const resetDemo = () => window.location.reload()
 const exitDemo = () => { const url = new URL(window.location.href); url.searchParams.delete('demo'); window.location.assign(url.href) }
@@ -42,5 +43,6 @@ watch(() => route.fullPath, () => { mobileMenuOpen.value = false })
     <main id="main-content" class="main-content" tabindex="-1"><div v-if="demoEnabled" class="synthetic-demo" role="note"><Info :size="20" aria-hidden="true" /><div><strong>Demostración local · 100 ofertas sintéticas</strong><span>Personas, clases y opiniones ficticias. Los cambios se reinician al recargar.</span></div><span class="vd-demo-links"><RouterLink to="/perfil/resumen">Panel Estudiante</RouterLink><RouterLink to="/administracion/metricas">Panel Administrador</RouterLink></span><button type="button" @click="resetDemo">Restablecer</button><button type="button" @click="exitDemo">Salir de demo</button></div><div v-else-if="!route.meta.adminDemo" class="demo-context"><Info :size="16" aria-hidden="true" /><span>Versión de prueba del Banco de Tiempo UCB. Los datos pueden reiniciarse.</span></div><slot /></main>
     <Transition name="toast"><div v-if="store.toast" class="toast" :class="`toast-${store.toast.type}`" role="status"><span class="toast-dot"></span>{{ store.toast.message }}</div></Transition>
     <ChatbotWidget :session-key="store.user.id" />
+    <WelcomeGuide />
   </div>
 </template>

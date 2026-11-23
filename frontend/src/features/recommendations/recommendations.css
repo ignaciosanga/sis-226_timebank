@@ -1,0 +1,14 @@
+.tutor-recommendations { margin:0 0 24px; padding:22px; border:1px solid var(--line); border-radius:14px; background:#fff; }
+.tutor-recommendations > header { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+.tutor-recommendations > header > div { display:flex; align-items:center; gap:9px; color:#005289; }
+.tutor-recommendations h2 { margin:0; font-size:1.05rem; }
+.recommendation-demo { font-size:.78rem; color:#586c7b; }
+.recommendation-subject { margin:7px 0 16px; color:#586c7b; }
+.recommendation-list { display:grid; gap:0; }
+.recommendation-list article { padding:16px 0; border-top:1px solid var(--line); }
+.recommendation-person { display:flex; align-items:center; flex-wrap:wrap; gap:8px 14px; }
+.recommendation-affinity { margin-left:auto; color:#005289; font-size:.85rem; }
+.recommendation-list article p { margin:9px 0; }
+.recommendation-list footer { display:flex; justify-content:space-between; flex-wrap:wrap; align-items:center; gap:12px; margin-top:12px; font-size:.88rem; }
+.tutor-recommendations .recommendation-note { margin:12px 0 0; font-size:.82rem; color:#586c7b; line-height:1.5; }
+@media(max-width:550px) { .tutor-recommendations { padding:18px; } .recommendation-affinity { margin-left:0; } }

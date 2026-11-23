@@ -16,8 +16,9 @@ const cards = computed(() => overviewCards(data.value))
 let requestId = 0
 
 async function load() {
-  if (!allowed.value) { data.value = null; return }
   const current = ++requestId
+  data.value = null; error.value = ''; loading.value = false
+  if (!allowed.value) return
   loading.value = true; error.value = ''
   try {
     const result = await getOverview(periodRange(days.value))
@@ -28,7 +29,7 @@ async function load() {
     if (current === requestId) loading.value = false
   }
 }
-watch([allowed, days], load, { immediate: true })
+watch([allowed, days, () => store.user.id], load, { immediate: true })
 </script>
 
 <template>
