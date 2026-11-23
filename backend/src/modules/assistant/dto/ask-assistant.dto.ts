@@ -126,6 +126,28 @@ export class AssistantQuotaDto {
   @ApiProperty() restantes!: number;
 }
 
+export class AssistantProposalDto {
+  @ApiProperty({ enum: ['solicitar_tutoria', 'ofertar_habilidad'] })
+  tipo!: 'solicitar_tutoria' | 'ofertar_habilidad';
+  @ApiProperty({ example: 'Solicitar Cálculo I con Ana Rojas' })
+  resumen!: string;
+  @ApiPropertyOptional({ format: 'uuid' }) id_oferta?: string;
+  @ApiPropertyOptional({ format: 'uuid' }) providerId?: string;
+  @ApiPropertyOptional({ format: 'uuid' }) availabilityId?: string;
+  @ApiProperty({ format: 'uuid' }) skillId!: string;
+  @ApiProperty() materia!: string;
+  @ApiPropertyOptional() tutor?: string;
+  @ApiPropertyOptional() titulo?: string;
+  @ApiPropertyOptional({ example: '3.5' }) costo_creditos?: string;
+  @ApiPropertyOptional({ format: 'date-time' }) fechaInicio?: string;
+  @ApiPropertyOptional({ format: 'date-time' }) fechaFin?: string;
+  @ApiPropertyOptional({
+    enum: ['Basico', 'Intermedio', 'Avanzado', 'Experto'],
+  })
+  nivel?: string;
+  @ApiPropertyOptional() tieneHabilidad?: boolean;
+}
+
 export class AssistantAnswerDto {
   @ApiProperty({ example: 'Te llevo a tu perfil…' })
   answer!: string;
@@ -133,6 +155,8 @@ export class AssistantAnswerDto {
   actions!: AssistantActionDto[];
   @ApiProperty({ type: [AssistantOfferCardDto] })
   offers!: AssistantOfferCardDto[];
+  @ApiProperty({ type: AssistantProposalDto, nullable: true })
+  proposal!: AssistantProposalDto | null;
   @ApiProperty({ type: AssistantQuotaDto })
   quota!: AssistantQuotaDto;
 }

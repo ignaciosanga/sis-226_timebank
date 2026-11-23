@@ -33,6 +33,8 @@ watch(() => props.open, (open) => {
   if (!open) return
   Object.assign(form, emptyOfferForm(), { titulo: '', descripcion: '', costoCreditos: '' })
   if (ownSkills.value.length === 1) form.skillId = ownSkills.value[0].id_habilidad
+  const preset = store.takeOfferPreset()
+  if (preset) Object.assign(form, { skillId: preset.skillId || form.skillId, titulo: preset.titulo || '', costoCreditos: preset.costoCreditos || '' })
   errors.value = {}; draft.value = null; bannerFile.value = null; bannerPreview.value = ''; bannerError.value = ''; publishError.value = ''; requestKey.value = ''
 }, { immediate: true })
 watch(() => store.authenticated, (authenticated) => { if (!authenticated) emit('close') })

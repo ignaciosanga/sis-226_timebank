@@ -9,6 +9,7 @@ import { highlightTarget, quotaLabel, safeAction, waitForTarget } from './screen
 import AssistantAvatar from './AssistantAvatar.vue'
 import AssistantAnswer from './AssistantAnswer.vue'
 import { ACCESSORY_OPTIONS, avatarTone, COLOR_OPTIONS, DEFAULT_AVATAR, normalizeAvatar, STYLE_OPTIONS } from './avatar-options.js'
+import { dateLabel, timeLabel } from '../timebank/format'
 import './chatbot.css'
 
 const props = defineProps({ sessionKey: { type: String, default: '' } })
@@ -91,7 +92,7 @@ async function send() {
     const result = await askAssistant(question, history, route.path)
     if (current !== conversation) return
     const action = safeAction(result.actions?.[0])
-    messages.value.push({ id: ++nextMessageId, role: 'assistant', text: result.answer, offers: Array.isArray(result.offers) ? result.offers.slice(0, 3) : [], action })
+    messages.value.push({ id: ++nextMessageId, role: 'assistant', text: result.answer, offers: Array.isArray(result.offers) ? result.offers.slice(0, 3) : [], action, proposal: validProposal(result.proposal), proposalState: 'idle', proposalError: '', proposalDone: '' })
     if (profile.value && result.quota) profile.value = { ...profile.value, quota: result.quota }
     talking.value = true
     clearTimeout(talkTimer)
@@ -116,6 +117,38 @@ async function send() {
       await scrollToEnd()
       composer.value?.focus()
     }
+  }
+}
+function validProposal(value) {
+  if (!value || typeof value !== 'object' || typeof value.skillId !== 'string') return null
+  if (value.tipo === 'solicitar_tutoria' && value.providerId && value.availabilityId && value.fechaInicio && value.fechaFin) return value
+  if (value.tipo === 'ofertar_habilidad') return value
+  return null
+}
+async function confirmProposal(message) {
+  const proposal = message.proposal
+  if (!proposal || message.proposalState === 'working' || !store.requireSession()) return
+  message.proposalState = 'working'; message.proposalError = ''
+  try {
+    if (proposal.tipo === 'solicitar_tutoria') {
+      await store.sendExchange({ providerId: proposal.providerId, skillId: proposal.skillId, availabilityId: proposal.availabilityId, fechaInicio: proposal.fechaInicio, fechaFin: proposal.fechaFin })
+      message.proposalDone = 'Solicitud enviada. Cuando el tutor la acepte se retienen los créditos; puedes verla en Intercambios.'
+      message.proposalState = 'done'
+      showMood('happy')
+      store.showToast('Solicitud enviada. Puedes verla en Intercambios.')
+      return
+    }
+    if (!store.mySkills.some((skill) => skill.id_habilidad === proposal.skillId)) await store.publishSkill({ skillId: proposal.skillId, nivel: proposal.nivel || 'Intermedio' })
+    store.offerPreset = { skillId: proposal.skillId, titulo: proposal.titulo || '', costoCreditos: proposal.costo_creditos || '' }
+    message.proposalDone = 'Abrí el formulario con la materia lista. Elige el horario, revisa el precio y pulsa Publicar oferta.'
+    message.proposalState = 'done'
+    showMood('happy')
+    open.value = false
+    await router.push({ path: '/', query: { ofertar: '1' } })
+  } catch (error) {
+    message.proposalState = 'idle'
+    message.proposalError = error?.status === 409 ? 'Ese horario ya no está disponible o ya enviaste una solicitud para esa clase.' : (error?.message || 'No se pudo completar. Intenta de nuevo.')
+    showMood('error')
   }
 }
 function onComposerKeydown(event) {
@@ -200,6 +233,15 @@ onBeforeUnmount(() => { clearTimeout(talkTimer); clearTimeout(dozeTimer); clearT
                 <ul v-if="message.offers?.length" class="nexo-chat-offers" aria-label="Tutorías encontradas">
                   <li v-for="card in message.offers" :key="card.id_oferta"><button type="button" @click="openOffer(card)"><em class="nexo-offer-tag"><Sparkles :size="12" aria-hidden="true" />Sugerida por {{ avatar.nombre }}</em><strong>{{ card.titulo }}</strong><small>{{ card.materia }} · {{ card.tutor }}</small><span class="nexo-offer-foot"><b>{{ card.costo_creditos }} {{ Number(card.costo_creditos) === 1 ? 'crédito' : 'créditos' }}</b><i>Ver oferta<ArrowRight :size="14" aria-hidden="true" /></i></span></button></li>
                 </ul>
+                <div v-if="message.proposal && message.proposalState !== 'cancelled'" class="nexo-proposal" :class="{ 'is-done': message.proposalState === 'done' }">
+                  <em class="nexo-offer-tag"><Sparkles :size="12" aria-hidden="true" />{{ message.proposalState === 'done' ? 'Hecho' : 'Para confirmar' }}</em>
+                  <strong>{{ message.proposal.resumen }}</strong>
+                  <small v-if="message.proposal.tipo === 'solicitar_tutoria'">{{ message.proposal.titulo }} · {{ dateLabel(message.proposal.fechaInicio) }}, {{ timeLabel(message.proposal.fechaInicio) }}–{{ timeLabel(message.proposal.fechaFin) }} · {{ message.proposal.costo_creditos }} {{ Number(message.proposal.costo_creditos) === 1 ? 'crédito' : 'créditos' }}</small>
+                  <small v-else>Nivel {{ message.proposal.nivel }}{{ message.proposal.costo_creditos ? ` · ${message.proposal.costo_creditos} créditos` : '' }} · {{ message.proposal.tieneHabilidad ? 'ya está en tu perfil' : 'se agrega a tu perfil' }} y se abre el formulario</small>
+                  <p v-if="message.proposalState === 'done'" class="nexo-proposal-done" role="status">{{ message.proposalDone }}</p>
+                  <p v-if="message.proposalError" class="nexo-proposal-error" role="alert">{{ message.proposalError }}</p>
+                  <div v-if="message.proposalState !== 'done'" class="nexo-proposal-actions"><button class="button button-primary" type="button" :disabled="message.proposalState === 'working'" @click="confirmProposal(message)">{{ message.proposalState === 'working' ? 'Enviando…' : 'Confirmar' }}</button><button class="button button-outline" type="button" :disabled="message.proposalState === 'working'" @click="message.proposalState = 'cancelled'">Cancelar</button></div>
+                </div>
                 <button v-if="message.action" class="nexo-chat-action" type="button" @click="runAction(message.action)"><MapPin :size="14" aria-hidden="true" />{{ message.action.label }} · mostrar de nuevo</button>
                 <button v-if="message.needsKey" class="nexo-chat-action" type="button" @click="tab = 'ajustes'"><KeyRound :size="14" aria-hidden="true" />Agregar mi API key de Groq</button>
               </article>

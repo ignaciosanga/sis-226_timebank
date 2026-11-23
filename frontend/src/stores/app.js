@@ -20,6 +20,7 @@ const sessionData = () => ({ ownSkills: [], ownAvailability: [], requests: [], r
 let toastTimer
 export const useAppStore = defineStore('app', {
   state: () => ({
+    offerPreset: null,
     authenticated: false,
     profile: null,
     careers: [],
@@ -219,6 +220,11 @@ export const useAppStore = defineStore('app', {
     requireSession() {
       if (!this.authenticated) { this.requestLogin(); return false }
       return true
+    },
+    takeOfferPreset() {
+      const preset = this.offerPreset
+      this.offerPreset = null
+      return preset
     },
     async publishSkill(input) {
       await timebank.publishSkill(input)
