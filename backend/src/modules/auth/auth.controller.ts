@@ -29,7 +29,7 @@ class RegistrationResponse extends PublicUser {
   @ApiProperty({
     example: true,
     description:
-      'Cuenta Pendiente, saldo cero y sin sesion; revisar correo institucional',
+      'Cuenta Pendiente, saldo cero y sin sesion; revisar el correo registrado',
   })
   verification_required!: boolean;
 }

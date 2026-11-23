@@ -82,7 +82,7 @@ function register() { store.closeLogin(); router.push('/registro') }
       role="status"
     >
       <p>
-        Tu cuenta necesita verificar el correo institucional.
+        Tu cuenta necesita verificar el correo.
       </p>
 
       <button

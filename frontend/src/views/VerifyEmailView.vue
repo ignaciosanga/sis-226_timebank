@@ -37,7 +37,7 @@ async function resendVerification() {
   const correo = email.value.trim().toLowerCase()
 
   if (!correo) {
-    resendError.value = 'Escribe tu correo institucional.'
+    resendError.value = 'Escribe tu correo electrónico.'
     return
   }
 
@@ -69,7 +69,7 @@ async function goToLogin() {
       <h1>Un paso más para conectar.</h1>
 
       <p>
-        Verifica tu correo institucional para comenzar a compartir
+        Verifica tu correo para comenzar a compartir
         habilidades y participar en la comunidad Nexo U.
       </p>
 

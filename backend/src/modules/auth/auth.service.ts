@@ -79,7 +79,7 @@ export class AuthService {
     if (valid && user?.estado === UserStatus.PENDIENTE)
       throw new ForbiddenException({
         code: 'EMAIL_VERIFICATION_REQUIRED',
-        message: 'Confirma tu correo institucional antes de iniciar sesion',
+        message: 'Confirma tu correo antes de iniciar sesion',
       });
     if (!valid || !user?.active)
       throw new UnauthorizedException('Credenciales invalidas');

@@ -24,7 +24,7 @@ button,a.home{display:inline-flex;justify-content:center;width:100%;min-height:4
 button:disabled{opacity:.6;cursor:default}#result{min-height:1.5em;margin:16px 0 0;font-weight:600}#result.ok{color:#11603f}#result.error{color:#8a2b20}
 a.home{margin-top:12px;background:#fff;color:#005289;border:1px solid #005289}a.home[hidden],button[hidden]{display:none}
 </style></head>
-<body><main><p class="brand">Nexo U</p><h1>Confirma tu correo institucional</h1>
+<body><main><p class="brand">Nexo U</p><h1>Confirma tu correo</h1>
 <p>Presiona el botón para activar tu cuenta y recibir tus créditos de bienvenida.</p>
 <form><button type="submit">Confirmar mi correo</button></form><p role="status" id="result"></p>
 <a class="home" href="${home}" hidden>Ir a Nexo U</a></main>
