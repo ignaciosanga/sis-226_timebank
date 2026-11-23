@@ -13,6 +13,8 @@ import { isSingleCredit, offerCreditCost } from '../features/offers/tutoring-mod
 import { SYSTEMS_CURRICULUM } from '../features/curriculum/systems-curriculum'
 import { levelLabel } from '../features/timebank/catalogs'
 import { useLiveRefresh } from '../features/timebank/use-live-refresh'
+import { tutoringEnabled } from '../services/tutoring'
+import { demoEnabled } from '../features/demo/mode.js'
 const store = useAppStore()
 const route = useRoute()
 const router = useRouter()
@@ -35,7 +37,8 @@ const normalized = (value) => String(value).normalize('NFD').replace(/[\u0300-\u
 const allOffers = computed(() => {
   const rows = new Map(store.offers.map((row) => [`${row.id_usuario}:${row.id_habilidad}`, row]))
   for (const row of store.offerDetails) rows.set(`${row.id_usuario}:${row.id_habilidad}`, { ...rows.get(`${row.id_usuario}:${row.id_habilidad}`), ...row })
-  return [...rows.values()].filter((row) => row.id_usuario !== store.user.id).map((row) => ({
+  const publishedOnly = tutoringEnabled && !demoEnabled
+  return [...rows.values()].filter((row) => row.id_usuario !== store.user.id && (!publishedOnly || row.id_oferta)).map((row) => ({
     ...row, user: store.findUser(row.id_usuario) || row.tutor, skill: store.findSkill(row.id_habilidad),
     detail: store.findOffer(row.id_usuario, row.id_habilidad),
     slots: store.communityAvailability.filter((slot) => slot.id_usuario === row.id_usuario && slot.estado === 'disponible' && Date.parse(slot.fecha_fin) > Date.now()),

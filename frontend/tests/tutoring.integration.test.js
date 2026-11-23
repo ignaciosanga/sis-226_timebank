@@ -56,7 +56,7 @@ beforeEach(async () => {
   store.skills = [{ id_habilidad: 'programming', nombre: 'Programación II', estado: 'activo' }]
   store.community = [{ id: 'tutor', nombre: 'Ana', apellido: 'Rojas' }, { id: 'other', nombre: 'Diego', apellido: 'Flores' }]
   store.offers = [{ id_usuario: 'tutor', id_habilidad: 'programming', nivel: 'Avanzado' }, { id_usuario: 'other', id_habilidad: 'programming', nivel: 'Intermedio' }]
-  store.offerDetails = [{ ...store.offers[0], costo_creditos: 7, titulo: 'Recursividad paso a paso', descripcion: 'Practicaremos con ejercicios guiados.', bannerUrl: 'https://example.test/banner.webp', metricas: { promedio: 4.8, opiniones: 12, tutorias_completadas: 18 } }]
+  store.offerDetails = [{ ...store.offers[0], id_oferta: 'offer-recursion', costo_creditos: 7, titulo: 'Recursividad paso a paso', descripcion: 'Practicaremos con ejercicios guiados.', bannerUrl: 'https://example.test/banner.webp', metricas: { promedio: 4.8, opiniones: 12, tutorias_completadas: 18 } }]
   const future = new Date(Date.now() + 4 * 86400000), date = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/La_Paz', year: 'numeric', month: '2-digit', day: '2-digit' }).format(future)
   slot = { id_disponibilidad: 'slot', id_usuario: 'tutor', fecha_inicio: toZonedISO(date, '16:00'), fecha_fin: toZonedISO(date, '18:00'), estado: 'disponible' }
   store.communityAvailability = [slot]
@@ -128,7 +128,7 @@ test('cards preserve the tutor format, show subject-specific metrics and use Otr
   assert.match(html, /18 tutorías/); assert.match(html, /4,8/); assert.match(html, /Otros tutores/)
   assert.doesNotMatch(html, /Mejores tutores|Leaderboard|1 crédito por 15/); assert.match(html, /7 créditos por clase/)
   const view = setup((await vite.ssrLoadModule(`/src/views/HomeView.vue${suffix}`)).default, {})
-  view.query.value = 'programacion'; assert.equal(view.offers.value.length, 2)
+  view.query.value = 'programacion'; assert.equal(view.offers.value.length, 1); assert.ok(view.offers.value.every((row) => row.id_oferta))
   assert.equal(calls.length, 0)
 })
 

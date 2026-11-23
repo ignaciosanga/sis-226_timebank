@@ -11,6 +11,7 @@ import { Environment } from '../../config/environment';
 import { ExchangesService } from '../exchanges/exchanges.service';
 import { RequestStatus, ReservationStatus } from '../exchanges/exchange.types';
 import { SkillsService } from '../skills/skills.service';
+import { SkillsQueryDto } from '../skills/dto/skills-query.dto';
 import { OffersQueryDto } from '../tutoring/dto/offers-query.dto';
 import { TutoringService } from '../tutoring/tutoring.service';
 import { UserSkillsService } from '../user-skills/user-skills.service';
@@ -35,6 +36,7 @@ import {
   AssistantAvatarDto,
   AssistantKeyDto,
   AssistantOfferCardDto,
+  AssistantProposalDto,
   AssistantProfileDto,
   AssistantQuotaDto,
 } from './dto/ask-assistant.dto';
@@ -57,7 +59,10 @@ type TurnContext = {
   userId: string;
   actions: AssistantActionDto[];
   offers: AssistantOfferCardDto[];
+  proposal: AssistantProposalDto | null;
 };
+
+const LEVELS = ['Basico', 'Intermedio', 'Avanzado', 'Experto'];
 
 const MAX_TOOL_ROUNDS = 4;
 const dateLabel = (value: Date | string) =>
@@ -144,7 +149,6 @@ export class AssistantService {
       throw new ServiceUnavailableException(
         'El servidor no tiene habilitadas las llaves personales',
       );
-    const model = this.config.get('ASSISTANT_MODEL', { infer: true });
     let response: Response;
     try {
       response = await fetcher(this.modelsUrl(), {
@@ -197,7 +201,12 @@ export class AssistantService {
         },
         HttpStatus.TOO_MANY_REQUESTS,
       );
-    const context: TurnContext = { userId, actions: [], offers: [] };
+    const context: TurnContext = {
+      userId,
+      actions: [],
+      offers: [],
+      proposal: null,
+    };
     const messages: ChatMessage[] = [
       {
         role: 'system',
@@ -257,7 +266,8 @@ export class AssistantService {
     return {
       answer: guardAnswer(answer).slice(0, 2000),
       actions: context.actions.slice(0, 1),
-      offers: context.offers.slice(0, 3),
+      offers: context.proposal ? [] : context.offers.slice(0, 3),
+      proposal: context.proposal,
       quota: nextQuota,
     };
   }
@@ -349,6 +359,8 @@ export class AssistantService {
         );
       if (name === 'mi_resumen')
         return JSON.stringify(await this.summary(context.userId));
+      if (name === 'proponer_accion')
+        return JSON.stringify(await this.propose(context, args));
       if (name === 'mostrar_en_pantalla') {
         const key = String(args.seccion ?? '') as ScreenSection;
         const section = SCREEN_SECTIONS[key];
@@ -360,6 +372,85 @@ export class AssistantService {
     } catch {
       return JSON.stringify({ error: 'No se pudo consultar ahora' });
     }
+  }
+
+  private async propose(context: TurnContext, args: Record<string, unknown>) {
+    if (args.tipo === 'solicitar_tutoria') {
+      const id = String(args.id_oferta ?? '');
+      const page = await this.tutoring.list(
+        Object.assign(new OffersQueryDto(), {
+          page: 1,
+          limit: 200,
+          excludeTutorId: context.userId,
+        }),
+      );
+      const offer = page.data.find((row) => row.id_oferta === id);
+      if (!offer)
+        return { error: 'Primero usa buscar_ofertas y elige un id_oferta' };
+      if (Date.parse(String(offer.fecha_inicio)) <= Date.now())
+        return { error: 'Esa oferta ya empezó' };
+      const tutor = `${offer.tutor.nombre} ${offer.tutor.apellido}`.trim();
+      context.proposal = {
+        tipo: 'solicitar_tutoria',
+        resumen: `Solicitar ${offer.materia.nombre} con ${tutor}`,
+        id_oferta: offer.id_oferta,
+        providerId: offer.id_tutor,
+        availabilityId: offer.id_disponibilidad,
+        skillId: offer.id_habilidad,
+        materia: offer.materia.nombre,
+        tutor,
+        titulo: offer.titulo,
+        costo_creditos: String(offer.costo_creditos),
+        fechaInicio: new Date(offer.fecha_inicio).toISOString(),
+        fechaFin: new Date(offer.fecha_fin).toISOString(),
+      };
+      return {
+        preparada: context.proposal.resumen,
+        fecha: dateLabel(offer.fecha_inicio),
+        precio: `${context.proposal.costo_creditos} créditos`,
+        aviso:
+          'Aún no se envió. Pide a la persona que revise la tarjeta y pulse Confirmar.',
+      };
+    }
+    if (args.tipo === 'ofertar_habilidad') {
+      const text = String(args.materia ?? '');
+      const catalog = await this.skills.list(
+        Object.assign(new SkillsQueryDto(), { page: 1, limit: 500 }),
+      );
+      const [skill] = rankByTokens(
+        catalog.data,
+        text,
+        (row) => `${row.nombre} ${row.codigo ?? ''}`,
+        1,
+      );
+      if (!skill)
+        return { error: 'No encontré esa materia en el catálogo de Nexo U' };
+      const mine = await this.userSkills.list(context.userId).catch(() => []);
+      const owned = mine.find((row) => row.id_habilidad === skill.id_habilidad);
+      const nivel = LEVELS.includes(String(args.nivel))
+        ? String(args.nivel)
+        : (owned?.nivel ?? 'Intermedio');
+      const precio = /^\d{1,4}(\.\d)?$/.test(String(args.precio ?? ''))
+        ? String(args.precio)
+        : undefined;
+      context.proposal = {
+        tipo: 'ofertar_habilidad',
+        resumen: `Ofertar ${skill.nombre}`,
+        skillId: skill.id_habilidad,
+        materia: skill.nombre,
+        nivel,
+        titulo: `Tutoría de ${skill.nombre}`,
+        costo_creditos: precio,
+        tieneHabilidad: Boolean(owned),
+      };
+      return {
+        preparada: context.proposal.resumen,
+        nivel,
+        aviso:
+          'Aún no se publicó. Al confirmar se abre el formulario con la materia lista; la persona elige horario, precio y pulsa Publicar oferta.',
+      };
+    }
+    return { error: 'Tipo de acción desconocido' };
   }
 
   private async searchOffers(context: TurnContext, text: string) {
@@ -388,6 +479,7 @@ export class AssistantService {
     return {
       total: cards.length,
       ofertas: cards.map((card) => ({
+        id_oferta: card.id_oferta,
         titulo: card.titulo,
         materia: card.materia,
         tutor: card.tutor,

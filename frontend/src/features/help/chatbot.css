@@ -96,3 +96,11 @@
 .nexo-answer p + p, .nexo-answer p + ol, .nexo-answer p + ul, .nexo-answer ol + p, .nexo-answer ul + p { margin-top:8px; }
 .nexo-answer ol, .nexo-answer ul { margin:0; padding-left:20px; display:grid; gap:4px; }
 .nexo-answer strong { color:var(--ucb-blue-dark, #003c66); font-weight:700; }
+.nexo-proposal { display:grid; gap:6px; margin-top:8px; padding:12px 14px; border:1px solid #cfe0ec; border-radius:12px; background:linear-gradient(160deg, #f4f9fd, #ffffff); }
+.nexo-proposal strong { font-size:.92rem; color:var(--ink); }
+.nexo-proposal small { color:var(--muted); font-size:.78rem; line-height:1.45; }
+.nexo-proposal-actions { display:flex; gap:8px; margin-top:4px; }
+.nexo-proposal-actions .button { min-height:36px; padding:6px 14px; font-size:.82rem; }
+.nexo-proposal-done { margin:0; color:#11603f; font-size:.8rem; font-weight:600; }
+.nexo-proposal-error { margin:0; color:#8a2b20; font-size:.8rem; }
+.nexo-proposal.is-done { border-color:#bfe3d0; background:#f3fbf7; }
