@@ -9,6 +9,7 @@ import {
   Plus,
 } from '@lucide/vue'
 import { useAppStore } from '../stores/app'
+import { useWelcomeStore } from '../stores/welcome'
 import Dialog from '../features/admin/AdminDialog.vue'
 import UcbLogo from '../components/ui/UcbLogo.vue'
 import ReportPanel from '../features/metrics/ReportPanel.vue'
@@ -19,6 +20,7 @@ import { levelLabel } from '../features/timebank/catalogs'
 import CoursePublishDialog from '../features/curriculum/CoursePublishDialog.vue'
 
 const store = useAppStore()
+const welcome = useWelcomeStore()
 const route = useRoute()
 const showingSummary = computed(() => route.name === 'student-metrics')
 const showingRoadmap = computed(() => route.name === 'learning-path')
@@ -215,6 +217,7 @@ async function saveProfile() {
               <Pencil :size="18" />
               Editar perfil
             </button>
+            <button v-if="store.authenticated" class="text-link" type="button" data-welcome-replay @click="welcome.open()">Ver guía de bienvenida</button>
           </div>
         </div>
       </article>
@@ -511,4 +514,4 @@ async function saveProfile() {
   flex-wrap: wrap;
   gap: 1rem;
 }
-</style>
+</style>

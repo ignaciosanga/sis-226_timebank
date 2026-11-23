@@ -6,10 +6,12 @@ import DonutChart from './charts/DonutChart.vue'
 import LineChart from './charts/LineChart.vue'
 import BarChart from './charts/BarChart.vue'
 import { buildStudentSprint0Data, formatDateTime } from './sprint0-data.js'
+import { studentReportData } from '../report-data.js'
 import './vue-dashboards.css'
 
+const props = defineProps({ reportData: { type: Object, default: null } })
 const store = useAppStore()
-const data = computed(() => buildStudentSprint0Data(store, { isDemo: demoEnabled }))
+const data = computed(() => props.reportData || (demoEnabled ? buildStudentSprint0Data(store, { isDemo: true }) : studentReportData({}, store)))
 
 // Filtros HU02
 const movementTypeFilter = ref('Todos')
@@ -112,7 +114,7 @@ function movementClass(tipo) {
           <h4>Evolución del saldo en el tiempo</h4>
           <span class="vd-card-note">Saldo resultante tras cada movimiento</span>
         </div>
-        <LineChart :points="data.balanceSeries" color="#005289" unit="créditos" />
+        <LineChart v-if="data.balanceSeries.length" :points="data.balanceSeries" color="#005289" unit="créditos" /><p v-else class="vd-empty">El historial de saldos no está disponible. Consulta los movimientos para ver los importes registrados.</p>
       </article>
 
       <article class="vd-card">
@@ -147,8 +149,8 @@ function movementClass(tipo) {
                 <td>{{ formatDateTime(m.fecha) }}</td>
                 <td><span class="vd-badge" :class="movementClass(m.tipo)">{{ m.tipo }}</span></td>
                 <td>{{ m.descripcion }}</td>
-                <td :class="m.cantidad >= 0 ? 'vd-num-pos' : 'vd-num-neg'">
-                  {{ m.cantidad >= 0 ? `+${m.cantidad}` : m.cantidad }}
+                <td :class="(m.positive ?? m.cantidad >= 0) ? 'vd-num-pos' : 'vd-num-neg'">
+                  {{ m.displayAmount ?? (m.cantidad >= 0 ? `+${m.cantidad}` : m.cantidad) }}
                 </td>
                 <td><strong>{{ m.saldoPosterior }}</strong></td>
               </tr>

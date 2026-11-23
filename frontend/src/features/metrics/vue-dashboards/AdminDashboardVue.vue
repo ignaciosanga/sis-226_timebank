@@ -1,7 +1,6 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useAppStore } from '../../../stores/app'
-import { getAcademic, getReputation } from '../../../services/analytics'
 import { demoEnabled } from '../../demo/mode.js'
 import DonutChart from './charts/DonutChart.vue'
 import LineChart from './charts/LineChart.vue'
@@ -9,100 +8,30 @@ import BarChart from './charts/BarChart.vue'
 import HeatmapChart from './charts/HeatmapChart.vue'
 import KnowledgeScorePanel from './KnowledgeScorePanel.vue'
 import CommandCenterPanel from './CommandCenterPanel.vue'
+import ReportContractState from '../ReportContractState.vue'
 import { buildAdminSprint0Data } from './sprint0-data.js'
 import { buildSyntheticReputationPayload } from './knowledge-score.js'
 import { buildSyntheticAcademicPayload } from './knowledge-gap.js'
+import { academicGapPayload, academicGapReady, adminReportData, reputationReady } from '../report-data.js'
 import './vue-dashboards.css'
-
+const props = defineProps({ reportData: { type: Object, default: null }, sources: { type: Object, default: () => ({}) }, errors: { type: Object, default: () => ({}) }, loading: Boolean })
+const emit = defineEmits(['retry', 'period'])
 const store = useAppStore()
-const data = computed(() => buildAdminSprint0Data())
-const activeTab = ref('command')
-const periodGranularity = ref('week')
-
-const reputationData = ref(null)
-const reputationLoading = ref(false)
-const reputationError = ref('')
-
-const academicData = ref(null)
-const academicLoading = ref(false)
-const academicError = ref('')
-const usingAcademicDemo = ref(demoEnabled)
-
-async function loadReputation() {
-  if (demoEnabled) {
-    reputationData.value = buildSyntheticReputationPayload()
-    reputationError.value = ''
-    reputationLoading.value = false
-    return
-  }
-  reputationLoading.value = true
-  reputationError.value = ''
-  try {
-    reputationData.value = await getReputation()
-  } catch (failure) {
-    reputationData.value = null
-    reputationError.value = failure?.message || 'No se pudieron cargar las métricas de reputación.'
-  } finally {
-    reputationLoading.value = false
-  }
-}
-
-async function loadAcademic() {
-  if (demoEnabled) {
-    academicData.value = buildSyntheticAcademicPayload()
-    academicError.value = ''
-    academicLoading.value = false
-    usingAcademicDemo.value = true
-    return
-  }
-  academicLoading.value = true
-  academicError.value = ''
-  try {
-    const res = await getAcademic()
-    const hasActivity = Array.isArray(res?.data) && res.data.some((r) => r.solicitudes > 0 || r.tutores_activos > 0)
-    if (hasActivity) {
-      academicData.value = res
-      usingAcademicDemo.value = false
-    } else {
-      // Para el deploy previo a cargar datos en Neon, respaldamos con muestra sintética y mostramos el aviso demo.
-      academicData.value = buildSyntheticAcademicPayload()
-      usingAcademicDemo.value = true
-    }
-  } catch (failure) {
-    academicData.value = null
-    academicError.value = failure?.message || 'No se pudo cargar el Command Center.'
-    usingAcademicDemo.value = false
-  } finally {
-    academicLoading.value = false
-  }
-}
-
-onMounted(() => {
-  loadAcademic()
-  loadReputation()
-})
-
-const showDemoNotice = computed(() => {
-  if (demoEnabled) return true
-  if (activeTab.value === 'command') return usingAcademicDemo.value
-  if (activeTab.value === 'reputation') return false
-  return true
-})
-
-const tabs = [
-  { id: 'command', label: 'Command Center' },
-  { id: 'reputation', label: 'Reputación y tutores' },
-  { id: 'all', label: 'Vista completa' },
-  { id: 'hu04', label: 'Resumen general' },
-  { id: 'hu05', label: 'Intercambios y horarios' },
-  { id: 'hu06', label: 'Comunidad' },
-  { id: 'hu07', label: 'Habilidades y demanda' },
-]
-
-const show = (id) => activeTab.value === 'all' || activeTab.value === id
-const activitySeries = computed(() =>
-  periodGranularity.value === 'week' ? data.value.hu04.activityByWeek : data.value.hu04.activityByMonth,
-)
+const data = computed(() => props.reportData || (demoEnabled ? buildAdminSprint0Data() : adminReportData()))
+const activeTab = ref('command'), periodGranularity = ref('week')
+const reputationData = computed(() => demoEnabled ? buildSyntheticReputationPayload() : props.sources.reputation || null)
+const academicData = computed(() => demoEnabled ? buildSyntheticAcademicPayload() : props.sources.academic || null)
+const gapReady = computed(() => demoEnabled || academicGapReady(academicData.value))
+const scoreReady = computed(() => demoEnabled || reputationReady(reputationData.value))
+const gapData = computed(() => demoEnabled ? academicData.value : academicGapPayload(academicData.value))
+const reputationLoading = computed(() => props.loading), academicLoading = computed(() => props.loading)
+const reputationError = computed(() => props.errors.reputation || ''), academicError = computed(() => props.errors.academic || '')
+const loadAcademic = () => emit('retry'), loadReputation = () => emit('retry')
+const showDemoNotice = computed(() => demoEnabled)
+const tabs = [{ id:'command',label:'Command Center' },{ id:'reputation',label:'Reputación y tutores' },{ id:'all',label:'Vista completa' },{ id:'hu04',label:'Resumen general' },{ id:'hu05',label:'Intercambios y horarios' },{ id:'hu06',label:'Comunidad' },{ id:'hu07',label:'Habilidades y demanda' }]
+watch(periodGranularity, value => { if (!demoEnabled) emit('period', value === 'week' ? 'day' : 'month') })
+const show = id => activeTab.value === 'all' || activeTab.value === id
+const activitySeries = computed(() => periodGranularity.value === 'week' ? data.value.hu04.activityByWeek : data.value.hu04.activityByMonth)
 </script>
 
 <template>
@@ -125,22 +54,27 @@ const activitySeries = computed(() =>
 
     <!-- Command Center · Knowledge Gap Index -->
     <CommandCenterPanel
-      v-if="show('command')"
-      :academic="academicData"
+      v-if="show('command') && gapReady"
+      :academic="gapData"
       :loading="academicLoading"
       :error="academicError"
       @retry="loadAcademic"
     />
 
+    <ReportContractState v-if="show('command') && !gapReady" kind="academic" :payload="academicData" :loading="loading" :error="academicError" />
+
     <!-- Reputación y reconocimiento de tutores (Knowledge Score) -->
     <KnowledgeScorePanel
-      v-if="show('reputation')"
+      v-if="show('reputation') && scoreReady"
       :reputation="reputationData"
       :users="store.community"
       :loading="reputationLoading"
       :error="reputationError"
       @retry="loadReputation"
     />
+
+    <ReportContractState v-if="show('reputation') && !scoreReady" kind="reputation" :payload="reputationData" :loading="loading" :error="reputationError" />
+    <p v-if="!showDemoNotice && (show('hu05') || show('hu06'))" class="field-hint">Se muestran los datos publicados por el sistema. Las series de solicitudes, motivos, semestres y mapas de horarios que aún no están disponibles permanecen vacíos.</p>
 
     <!-- Dashboard general de la plataforma -->
     <section v-if="show('hu04')" class="vd-section" aria-labelledby="hu04-title">
@@ -162,7 +96,7 @@ const activitySeries = computed(() =>
         </article>
         <article class="vd-kpi">
           <div class="vd-kpi-label">Tasa de completitud</div>
-          <div class="vd-kpi-value is-green">{{ data.hu04.kpis.completionRate }}%</div>
+          <div class="vd-kpi-value is-green">{{ typeof data.hu04.kpis.completionRate === 'number' ? `${data.hu04.kpis.completionRate}%` : 'Sin datos' }}</div>
           <div class="vd-kpi-hint">Intercambios finalizados con éxito</div>
         </article>
         <article class="vd-kpi">
@@ -183,7 +117,7 @@ const activitySeries = computed(() =>
                 :class="{ 'is-active': periodGranularity === 'week' }"
                 @click="periodGranularity = 'week'"
               >
-                Por semana
+                {{ showDemoNotice ? 'Por semana' : 'Por día' }}
               </button>
               <button
                 type="button"
