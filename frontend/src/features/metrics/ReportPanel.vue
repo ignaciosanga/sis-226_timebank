@@ -40,7 +40,15 @@ onBeforeUnmount(() => { version++ })
       <p v-if="loading" class="overview-state" role="status">Cargando los datos de tu informe…</p>
       <div v-if="Object.keys(errors).length" class="notice notice-error" role="alert"><p>No pudimos cargar parte de la información. Los demás apartados siguen disponibles.</p><ul><li v-for="(message, key) in errors" :key="key">{{ sourceLabels[key] }}: {{ message }}</li></ul><button class="text-link" type="button" :disabled="loading" @click="load">Volver a intentar</button></div>
       <AdminDashboardVue v-if="audience === 'admin'" :key="store.user.id" :report-data="demoEnabled ? null : reportData" :sources="sources" :errors="errors" :loading="loading" @retry="load" @period="setPeriod" />
-      <StudentDashboardVue v-else :key="store.user.id" :report-data="demoEnabled ? null : reportData" />
+      <StudentDashboardVue
+        v-else
+        :key="store.user.id"
+        :report-data="demoEnabled ? null : reportData"
+        :sources="sources"
+        :errors="errors"
+        :loading="loading"
+        @retry="load"
+      />
       <p v-if="audience === 'student' && sources.roadmap" class="field-hint">Tu avance académico se registra en <RouterLink to="/perfil/ruta">Mi ruta de aprendizaje</RouterLink> y es independiente de tus tutorías completadas.</p>
     </div>
     <div v-else class="report-placeholder"><LockKeyhole :size="30" aria-hidden="true" /><h3>{{ access === 'login' ? 'Ingresa para consultar tu informe' : 'Este informe es para administración' }}</h3><p>{{ access === 'login' ? 'Inicia sesión con tu cuenta de Nexo U para consultar tu actividad.' : 'Usa una cuenta de administrador para consultar las métricas de la comunidad.' }}</p><button v-if="access === 'login'" class="button button-primary" type="button" @click="store.requestLogin">Iniciar sesión</button><RouterLink v-else class="text-link" to="/">Volver a la comunidad</RouterLink></div>

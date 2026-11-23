@@ -27,6 +27,25 @@ export function sendExchange({ providerId, skillId, availabilityId, fechaInicio,
 export const respondExchange = (id, action) => post(`/exchanges/${id}/${action}`)
 
 export const getMyReservations = () => apiRequest('/reservations/me')
+export async function getMyClasses({ page = 1, limit = 100 } = {}) {
+  const rows = []
+  let meta
+  let resumen = null
+  do {
+    const result = await apiRequest(`/intercambios/mis-clases?page=${page}&limit=${limit}`)
+    if (!Array.isArray(result?.data)
+      || !result?.meta
+      || !Number.isInteger(result.meta.totalPages)
+      || result.meta.totalPages < 0) {
+      throw new Error('La respuesta de mis clases no tiene el formato esperado.')
+    }
+    rows.push(...result.data)
+    meta = result.meta
+    if (result.resumen) resumen = result.resumen
+    page += 1
+  } while (page <= meta.totalPages)
+  return { data: rows, meta, resumen }
+}
 export const confirmReservation = (id) => post(`/reservations/${id}/confirm`)
 export const cancelReservation = (id, motivo) => post(`/reservations/${id}/cancel`, { motivo })
 
