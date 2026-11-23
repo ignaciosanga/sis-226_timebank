@@ -132,7 +132,7 @@ export class Environment {
 
   @IsString()
   @MinLength(1)
-  ASSISTANT_MODEL = 'llama-3.3-70b-versatile';
+  ASSISTANT_MODEL = 'openai/gpt-oss-120b';
 
   @IsInt()
   @Min(1000)

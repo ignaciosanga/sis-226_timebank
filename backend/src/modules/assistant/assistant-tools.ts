@@ -78,6 +78,42 @@ export const ASSISTANT_TOOLS = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'proponer_accion',
+      description:
+        'Prepara una acción para que la persona la confirme en una tarjeta: solicitar una tutoría concreta o publicar una oferta de una materia. No ejecuta nada; la persona decide con el botón Confirmar.',
+      parameters: {
+        type: 'object',
+        properties: {
+          tipo: {
+            type: 'string',
+            enum: ['solicitar_tutoria', 'ofertar_habilidad'],
+          },
+          id_oferta: {
+            type: 'string',
+            description:
+              'Para solicitar_tutoria: el id_oferta devuelto por buscar_ofertas',
+          },
+          materia: {
+            type: 'string',
+            description: 'Para ofertar_habilidad: nombre de la materia',
+          },
+          nivel: {
+            type: 'string',
+            enum: ['Basico', 'Intermedio', 'Avanzado', 'Experto'],
+          },
+          precio: {
+            type: 'string',
+            description:
+              'Para ofertar_habilidad: precio total en créditos, como "3" o "2.5", si la persona lo dijo',
+          },
+        },
+        required: ['tipo'],
+      },
+    },
+  },
 ] as const;
 
 const STOP_WORDS = new Set([

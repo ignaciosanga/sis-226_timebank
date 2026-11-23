@@ -7,15 +7,16 @@ export function safeAction(action) {
   return { route: action.route, target, label: String(action.label ?? '') }
 }
 
-export function highlightTarget(target, root = document, duration = 4200) {
+export function highlightTarget(target, root = document, duration = 5200, hint = 'Aquí') {
   if (!target) return false
   const element = root.querySelector(`[data-tour="${target}"]`)
   if (!element) return false
   element.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
   element.classList.remove(GLOW_CLASS)
   void element.offsetWidth
+  element.setAttribute('data-nexo-hint', hint)
   element.classList.add(GLOW_CLASS)
-  setTimeout(() => element.classList.remove(GLOW_CLASS), duration)
+  setTimeout(() => { element.classList.remove(GLOW_CLASS); element.removeAttribute('data-nexo-hint') }, duration)
   return true
 }
 

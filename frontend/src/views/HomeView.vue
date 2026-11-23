@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { CalendarDays, Clock3, GraduationCap, Plus, RefreshCw, Search } from '@lucide/vue'
 import { useAppStore } from '../stores/app'
+import TutorRecommendations from '../features/recommendations/TutorRecommendations.vue'
 import OfferDialog from '../features/offers/OfferDialog.vue'
 import TutorOfferDialog from '../features/tutoring/TutorOfferDialog.vue'
 import TutorMetrics from '../features/tutoring/TutorMetrics.vue'
@@ -12,6 +13,8 @@ import { isSingleCredit, offerCreditCost } from '../features/offers/tutoring-mod
 import { SYSTEMS_CURRICULUM } from '../features/curriculum/systems-curriculum'
 import { levelLabel } from '../features/timebank/catalogs'
 import { useLiveRefresh } from '../features/timebank/use-live-refresh'
+import { tutoringEnabled } from '../services/tutoring'
+import { demoEnabled } from '../features/demo/mode.js'
 const store = useAppStore()
 const route = useRoute()
 const router = useRouter()
@@ -34,13 +37,15 @@ const normalized = (value) => String(value).normalize('NFD').replace(/[\u0300-\u
 const allOffers = computed(() => {
   const rows = new Map(store.offers.map((row) => [`${row.id_usuario}:${row.id_habilidad}`, row]))
   for (const row of store.offerDetails) rows.set(`${row.id_usuario}:${row.id_habilidad}`, { ...rows.get(`${row.id_usuario}:${row.id_habilidad}`), ...row })
-  return [...rows.values()].filter((row) => row.id_usuario !== store.user.id).map((row) => ({
+  const publishedOnly = tutoringEnabled && !demoEnabled
+  return [...rows.values()].filter((row) => row.id_usuario !== store.user.id && (!publishedOnly || row.id_oferta)).map((row) => ({
     ...row, user: store.findUser(row.id_usuario) || row.tutor, skill: store.findSkill(row.id_habilidad),
     detail: store.findOffer(row.id_usuario, row.id_habilidad),
     slots: store.communityAvailability.filter((slot) => slot.id_usuario === row.id_usuario && slot.estado === 'disponible' && Date.parse(slot.fecha_fin) > Date.now()),
   })).filter((row) => row.skill?.estado === 'activo')
 })
 const requestedCourse = computed(() => SYSTEMS_CURRICULUM.find(c => c.codigo === route.query.materia && normalized(c.nombre) === normalized(query.value.trim())))
+const recommendationSkill = computed(() => store.skills.find(skill => skill.estado === 'activo' && (requestedCourse.value ? skill.codigo === requestedCourse.value.codigo || normalized(skill.nombre) === normalized(requestedCourse.value.nombre) : normalized(skill.nombre) === normalized(query.value.trim()))))
 const offers = computed(() => allOffers.value.filter((row) => (!category.value || row.skill.id_categoria === category.value) && (requestedCourse.value ? row.skill.codigo === requestedCourse.value.codigo || normalized(row.skill.nombre) === normalized(requestedCourse.value.nombre) : normalized(row.skill.nombre).includes(normalized(query.value.trim())))))
 function openDetail(offer, tab = 'description') { detailTab.value = tab; selectedOffer.value = offer }
 watch([() => route.query.oferta, () => allOffers.value.length], ([id]) => {
@@ -68,12 +73,13 @@ const { refreshing, refresh } = useLiveRefresh(() => store.refreshLive())
       <p class="public-credit-rule">Cada tutor define el <strong>costo total de su clase en créditos</strong>.</p>
       <RouterLink class="button button-primary" to="/registro">Crear cuenta</RouterLink>
     </aside>
-    <section class="feed-column"><header class="discover-card"><div class="discover-heading"><h1>¿Qué quieres aprender hoy?</h1><p>Conecta con alguien que comparte lo que sabe.</p></div><label class="catalog-search" data-tour="buscar-ofertas"><Search :size="20" aria-hidden="true" /><input v-model="query" type="search" placeholder="Buscar materia por nombre" aria-label="Buscar materia por nombre" /></label><label class="skill-category-filter select-wrap" for="skill-category"><span>Área</span><select id="skill-category" v-model="category"><option value="">Todas</option><option v-for="item in store.categories" :key="item.id_categoria" :value="item.id_categoria">{{ item.nombre }}</option></select></label></header>
+    <section class="feed-column"><header class="discover-card"><div class="discover-heading"><h1>¿Qué quieres aprender hoy?</h1><p>Conecta con alguien que comparte lo que sabe.</p></div><label class="catalog-search" data-tour="buscar-ofertas"><Search :size="20" aria-hidden="true" /><input v-model="query" type="search" list="nexo-course-suggestions" placeholder="Buscar materia por nombre" aria-label="Buscar materia por nombre" /></label><datalist id="nexo-course-suggestions"><option v-for="skill in store.skills.filter(row => row.estado === 'activo')" :key="skill.id_habilidad" :value="skill.nombre" /></datalist><label class="skill-category-filter select-wrap" for="skill-category"><span>Área</span><select id="skill-category" v-model="category"><option value="">Todas</option><option v-for="item in store.categories" :key="item.id_categoria" :value="item.id_categoria">{{ item.nombre }}</option></select></label></header>
       <div class="section-heading feed-heading offer-catalog-heading">
         <div><h2>Habilidades para intercambiar</h2><p role="status">{{ offers.length }} {{ offers.length === 1 ? 'oferta disponible' : 'ofertas disponibles' }}<button class="refresh-link" type="button" :disabled="refreshing" :aria-label="refreshing ? 'Actualizando ofertas' : 'Actualizar ofertas'" @click="refresh"><RefreshCw :size="14" :class="{ spinning: refreshing }" aria-hidden="true" />{{ refreshing ? 'Actualizando…' : 'Actualizar' }}</button></p></div>
         <button v-if="canOffer" class="button button-offer" data-tour="ofertar" type="button" aria-haspopup="dialog" @click="openOffer"><Plus :size="18" aria-hidden="true" />Ofertar una habilidad</button>
         <span v-else class="feed-community"><GraduationCap :size="16" />Comunidad UCB</span>
       </div>
+      <TutorRecommendations :skill="recommendationSkill" :offers="allOffers" @select="openDetail($event)" />
       <div v-if="offers.length" class="course-list">
         <article v-for="offer in offers" :key="`${offer.id_usuario}-${offer.id_habilidad}`" class="skill-offer tutor-feed-card">
           <header class="skill-person"><span class="avatar">{{ initials(offer.user) }}</span><div class="tutor-feed-identity"><div class="tutor-feed-name"><strong>{{ fullName(offer.user) }}</strong><TutorMetrics :detail="offer.detail" /></div><small>{{ store.careers.find(career => career.id_carrera === offer.user?.idCarrera)?.nombre }}</small></div><span class="skill-level">{{ levelLabel(offer.nivel) }}</span></header>

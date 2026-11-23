@@ -3574,6 +3574,67 @@
         ]
       }
     },
+    "/tutoring/recommendations": {
+      "get": {
+        "operationId": "MatchingController_recommend",
+        "parameters": [
+          {
+            "name": "skillId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "fechaInicio",
+            "required": false,
+            "in": "query",
+            "description": "ISO-8601 con zona; enviar ambas fechas",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fechaFin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "modalidad",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Presencial",
+                "Virtual",
+                "Hibrida",
+                "Cualquiera"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Hasta tres tutores por afinidad de BD; excluye la cuenta propia y conflictos del horario solicitado",
+        "tags": [
+          "Matching"
+        ]
+      }
+    },
     "/assistant/ask": {
       "post": {
         "operationId": "AssistantController_ask",
@@ -5819,6 +5880,77 @@
           "fecha_inicio"
         ]
       },
+      "AssistantProposalDto": {
+        "type": "object",
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "solicitar_tutoria",
+              "ofertar_habilidad"
+            ]
+          },
+          "resumen": {
+            "type": "string",
+            "example": "Solicitar Cálculo I con Ana Rojas"
+          },
+          "id_oferta": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "providerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "availabilityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "skillId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "materia": {
+            "type": "string"
+          },
+          "tutor": {
+            "type": "string"
+          },
+          "titulo": {
+            "type": "string"
+          },
+          "costo_creditos": {
+            "type": "string",
+            "example": "3.5"
+          },
+          "fechaInicio": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fechaFin": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "nivel": {
+            "type": "string",
+            "enum": [
+              "Basico",
+              "Intermedio",
+              "Avanzado",
+              "Experto"
+            ]
+          },
+          "tieneHabilidad": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "tipo",
+          "resumen",
+          "skillId",
+          "materia"
+        ]
+      },
       "AssistantQuotaDto": {
         "type": "object",
         "properties": {
@@ -5861,6 +5993,15 @@
               "$ref": "#/components/schemas/AssistantOfferCardDto"
             }
           },
+          "proposal": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AssistantProposalDto"
+              }
+            ]
+          },
           "quota": {
             "$ref": "#/components/schemas/AssistantQuotaDto"
           }
@@ -5869,6 +6010,7 @@
           "answer",
           "actions",
           "offers",
+          "proposal",
           "quota"
         ]
       },

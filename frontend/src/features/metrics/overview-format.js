@@ -9,11 +9,14 @@ export function periodRange(days, now = new Date()) {
   return { from: new Date(now.getTime() - days * 86400000).toISOString(), to: now.toISOString() }
 }
 
-// Los créditos llegan como string entero (pueden ser enormes): no se pasan por Number.
+// Los créditos llegan como texto decimal exacto, incluso en sumas grandes.
 export function formatCredits(value) {
   const text = String(value ?? '0')
-  if (!/^-?\d+$/.test(text)) return '0'
-  return text.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(text)
+  if (!match) return '0'
+  const fraction = (match[3] || '').replace(/0+$/, '')
+  const whole = match[2].replace(/^0+(?=\d)/, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  return `${whole === '0' && !fraction ? '' : match[1]}${whole}${fraction ? `,${fraction}` : ''}`
 }
 
 const count = (value) => String(value ?? 0)

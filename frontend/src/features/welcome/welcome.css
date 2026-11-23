@@ -1,0 +1,45 @@
+.welcome-layer { position:fixed; inset:0; z-index:160; display:grid; place-items:center; padding:24px; }
+.welcome-shade { position:absolute; inset:0; pointer-events:none; }
+.welcome-solid-shade { background:rgba(13,35,52,.68); }
+.welcome-panel { position:relative; overflow:auto; max-height:calc(100dvh - 48px); background:#fff; color:#273d4c; border-radius:20px; box-shadow:0 24px 80px rgba(7,27,45,.3); outline:none; }
+.welcome-intro-panel { width:min(790px,100%); display:grid; grid-template-columns:240px 1fr; }
+.welcome-close { position:absolute; top:14px; right:14px; z-index:1; background:#fff; }
+.welcome-identity { display:flex; align-items:center; justify-content:center; flex-direction:column; gap:22px; padding:42px 24px; background:#005289; color:white; }
+.welcome-identity p { margin:0; font-size:1.12rem; font-weight:600; line-height:1.6; text-align:center; }
+.welcome-wordmark { font-family:'Sora',sans-serif; font-size:1.1rem; font-weight:700; }
+.welcome-intro-copy { padding:48px 38px 28px; }
+.welcome-greeting { margin:0 0 12px; font-size:.9rem; color:#586c7b; }
+.welcome-panel h1 { margin:0 0 16px; font-size:clamp(1.4rem,2.3vw,1.9rem); line-height:1.35; letter-spacing:-.035em; }
+.welcome-panel p { line-height:1.6; }
+.welcome-benefits { display:grid; gap:12px; padding:0; margin:22px 0 26px; list-style:none; }
+.welcome-benefits li { display:flex; align-items:flex-start; gap:10px; line-height:1.45; }
+.welcome-benefits svg { color:#005289; flex:none; margin-top:2px; }
+.welcome-intro-copy > .button { width:100%; justify-content:center; }
+.welcome-skip { display:flex; justify-content:center; align-items:center; gap:7px; padding:12px 0; border:0; background:transparent; color:#005289; font:inherit; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+.welcome-intro-copy > .welcome-skip { width:100%; margin-top:4px; }
+.welcome-panel .welcome-replay-note { margin:10px 0 0; font-size:.82rem; color:#637582; text-align:center; }
+.welcome-tour-panel { position:fixed; padding:28px; max-height:calc(100dvh - 32px); }
+.welcome-tour-heading { display:flex; align-items:center; gap:8px; margin:0 36px 16px 0; font-size:.85rem; color:#005289; font-weight:600; }
+.welcome-tour-panel h2 { margin:0 0 12px; font-size:1.25rem; line-height:1.4; }
+.welcome-tour-panel #welcome-description { margin:0 0 14px; }
+.welcome-panel .welcome-tip { margin:0 0 20px; color:#586c7b; font-size:.9rem; }
+.welcome-step-track { display:flex; gap:7px; margin:0 0 18px; }
+.welcome-step-track span { flex:1; height:4px; border-radius:3px; background:#dfe7ec; }
+.welcome-step-track .is-current { background:#f6c500; }
+.welcome-step-track .is-done { background:#005289; }
+.welcome-tour-actions { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.welcome-tour-actions .button { padding:12px 16px; }
+.welcome-layer button:focus-visible { outline:3px solid #005289; outline-offset:4px; }
+@media (max-width:699px) {
+  .welcome-layer { padding:16px; }
+  .welcome-panel { border-radius:16px; }
+  .welcome-intro-panel { grid-template-columns:1fr; max-height:calc(100dvh - 32px); }
+  .welcome-identity { flex-direction:row; justify-content:flex-start; padding:18px 22px; gap:16px; }
+  .welcome-identity .nexo-avatar { --avatar-size:72px !important; }
+  .welcome-identity p { text-align:left; font-size:.9rem; }
+  .welcome-wordmark { display:none; }
+  .welcome-intro-copy { padding:25px 24px 20px; }
+  .welcome-intro-copy h1 { font-size:1.5rem; }
+  .welcome-tour-panel { padding:24px; max-height:56dvh; }
+  .welcome-benefits { gap:9px; margin:17px 0 20px; }
+}

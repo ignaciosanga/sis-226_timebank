@@ -1,64 +1,48 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
-import { ArrowLeftRight, ChartColumn, ExternalLink, LockKeyhole, RefreshCw } from '@lucide/vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { ChartColumn, LockKeyhole, RefreshCw } from '@lucide/vue'
 import { useAppStore } from '../../stores/app'
 import { demoEnabled } from '../demo/mode.js'
-import { lookerEmbedUrl, reportAccess, REPORT_URLS } from './report-config'
+import { reportAccess } from './report-config'
+import { loadReportSources } from '../../services/analytics'
+import { adminReportData, studentReportData } from './report-data.js'
 import StudentDashboardVue from './vue-dashboards/StudentDashboardVue.vue'
 import AdminDashboardVue from './vue-dashboards/AdminDashboardVue.vue'
 
-const props = defineProps({ audience: { type: String, required: true, validator: (value) => ['student', 'admin'].includes(value) } })
+const props = defineProps({ audience: { type: String, required: true, validator: value => ['student', 'admin'].includes(value) } })
 const store = useAppStore()
-const source = computed(() => REPORT_URLS[props.audience])
-const url = computed(() => lookerEmbedUrl(source.value))
-const access = computed(() => (demoEnabled ? 'allowed' : reportAccess(props.audience, { authenticated: store.authenticated, user: store.user })))
-const useVueDashboard = computed(() => access.value === 'allowed')
-const canEmbed = computed(() => !useVueDashboard.value && !!url.value && access.value === 'allowed')
-const loaded = ref(false)
-const frameKey = ref(0)
+const access = computed(() => demoEnabled ? 'allowed' : reportAccess(props.audience, { authenticated: store.authenticated, user: store.user }))
 const title = computed(() => props.audience === 'admin' ? 'Informe de métricas generales de Nexo U' : 'Informe de mi resumen personal de Nexo U')
-const state = computed(() => !source.value ? 'pending' : !url.value ? 'invalid' : access.value)
-const heading = computed(() => ({ pending: props.audience === 'admin' ? 'Las métricas de la comunidad estarán aquí' : 'Tu resumen personal estará aquí', invalid: 'El informe no está disponible', login: 'Ingresa para consultar tu informe', admin: 'Este informe es para administración' })[state.value])
-const description = computed(() => {
-  if (state.value === 'pending') return props.audience === 'admin'
-    ? 'Aquí aparecerá el informe de participación, intercambios y habilidades de la comunidad cuando esté disponible.'
-    : 'Aquí podrás consultar tu resumen de tiempo, movimientos e intercambios cuando el informe esté disponible.'
-  return ({ invalid: 'Estamos revisando el acceso al informe. Mientras tanto, puedes continuar usando Nexo U.', login: 'Inicia sesión con tu cuenta de Nexo U para continuar.', admin: 'Usa una cuenta de administrador para consultar las métricas de la comunidad.' })[state.value]
-})
-function reload() { loaded.value = false; frameKey.value += 1 }
-watch([url, access], reload)
+const sources = ref({}), errors = ref({}), loading = ref(false)
+const groupBy = ref('day')
+function setPeriod(value) { groupBy.value = value; load() }
+const reportData = computed(() => props.audience === 'admin' ? adminReportData(sources.value) : studentReportData(sources.value, store))
+const sourceLabels = { overview:'resumen', users:'comunidad', exchanges:'intercambios', credits:'créditos', skills:'materias', academic:'demanda académica', reputation:'reputación', economy:'economía', account:'saldo', movements:'movimientos', reservations:'reservas', classes:'clases completadas', roadmap:'avance académico' }
+let version = 0
+async function load() {
+  const current = ++version
+  sources.value = {}; errors.value = {}; loading.value = false
+  if (access.value !== 'allowed' || demoEnabled) return
+  loading.value = true
+  try {
+    const result = await loadReportSources(props.audience, { groupBy: groupBy.value })
+    if (version === current) { sources.value = result.sources; errors.value = result.errors }
+  } finally { if (version === current) loading.value = false }
+}
+watch([access, () => store.user.id, () => props.audience], load, { immediate: true })
+onBeforeUnmount(() => { version++ })
 </script>
 
 <template>
   <section class="report-panel" :aria-label="title">
-    <header class="report-panel-heading">
-      <div><ChartColumn :size="20" aria-hidden="true" /><h2>{{ audience === 'admin' ? 'La comunidad en perspectiva' : 'Tu actividad en perspectiva' }}</h2></div>
-      <span v-if="!useVueDashboard && state === 'pending'" class="report-status">En preparación</span>
-      <div v-else-if="canEmbed" class="report-tools">
-        <button type="button" class="report-tool" @click="reload"><RefreshCw :size="16" aria-hidden="true" />Recargar informe</button>
-        <a class="report-tool" :href="url" target="_blank" rel="noopener noreferrer">Abrir en otra pestaña<ExternalLink :size="16" aria-hidden="true" /><span class="sr-only"> (nueva pestaña)</span></a>
-      </div>
-    </header>
-
-    <!-- Stable handoff containers for the Dashboards team. No demo metrics. -->
-    <div :id="audience === 'admin' ? 'dashboard-administrador' : 'dashboard-estudiante'" class="report-container" :class="{ 'report-container-embedded': canEmbed || useVueDashboard }" :data-report-audience="audience">
-      <template v-if="useVueDashboard">
-        <AdminDashboardVue v-if="audience === 'admin'" />
-        <StudentDashboardVue v-else />
-      </template>
-      <template v-else-if="canEmbed">
-        <p v-if="!loaded" class="report-loading" role="status">Abriendo informe… Si no aparece, puedes abrirlo en otra pestaña.</p>
-        <iframe :key="frameKey" class="report-iframe" :src="url" :title="title" loading="lazy" allowfullscreen referrerpolicy="no-referrer" @load="loaded = true"></iframe>
-      </template>
-      <div v-else class="report-placeholder">
-        <div class="report-symbol" aria-hidden="true"><ArrowLeftRight v-if="state === 'pending'" :size="32" :stroke-width="1.5" /><LockKeyhole v-else :size="30" :stroke-width="1.5" /></div>
-        <h3>{{ heading }}</h3>
-        <p>{{ description }}</p>
-        <button v-if="state === 'login'" class="button button-primary" type="button" @click="store.requestLogin">Iniciar sesión</button>
-        <RouterLink v-else-if="state === 'pending'" class="button button-outline" :to="audience === 'admin' ? '/administracion' : '/intercambios'">{{ audience === 'admin' ? 'Ir a gestión de usuarios' : 'Ver mis intercambios' }}</RouterLink>
-        <RouterLink v-else class="text-link" to="/">Volver a la comunidad</RouterLink>
-      </div>
+    <header class="report-panel-heading"><div><ChartColumn :size="20" aria-hidden="true" /><h2>{{ audience === 'admin' ? 'La comunidad en perspectiva' : 'Tu actividad en perspectiva' }}</h2></div><button v-if="access === 'allowed' && !demoEnabled" class="report-tool" type="button" :disabled="loading" @click="load"><RefreshCw :size="16" />Actualizar informe</button></header>
+    <div v-if="access === 'allowed'" :id="audience === 'admin' ? 'dashboard-administrador' : 'dashboard-estudiante'" class="report-container report-container-embedded" :data-report-audience="audience">
+      <p v-if="loading" class="overview-state" role="status">Cargando los datos de tu informe…</p>
+      <div v-if="Object.keys(errors).length" class="notice notice-error" role="alert"><p>No pudimos cargar parte de la información. Los demás apartados siguen disponibles.</p><ul><li v-for="(message, key) in errors" :key="key">{{ sourceLabels[key] }}: {{ message }}</li></ul><button class="text-link" type="button" :disabled="loading" @click="load">Volver a intentar</button></div>
+      <AdminDashboardVue v-if="audience === 'admin'" :key="store.user.id" :report-data="demoEnabled ? null : reportData" :sources="sources" :errors="errors" :loading="loading" @retry="load" @period="setPeriod" />
+      <StudentDashboardVue v-else :key="store.user.id" :report-data="demoEnabled ? null : reportData" />
+      <p v-if="audience === 'student' && sources.roadmap" class="field-hint">Tu avance académico se registra en <RouterLink to="/perfil/ruta">Mi ruta de aprendizaje</RouterLink> y es independiente de tus tutorías completadas.</p>
     </div>
-    <p v-if="canEmbed" class="report-caption">Los filtros y la fecha de actualización se consultan dentro del informe.</p>
+    <div v-else class="report-placeholder"><LockKeyhole :size="30" aria-hidden="true" /><h3>{{ access === 'login' ? 'Ingresa para consultar tu informe' : 'Este informe es para administración' }}</h3><p>{{ access === 'login' ? 'Inicia sesión con tu cuenta de Nexo U para consultar tu actividad.' : 'Usa una cuenta de administrador para consultar las métricas de la comunidad.' }}</p><button v-if="access === 'login'" class="button button-primary" type="button" @click="store.requestLogin">Iniciar sesión</button><RouterLink v-else class="text-link" to="/">Volver a la comunidad</RouterLink></div>
   </section>
 </template>

@@ -38,6 +38,10 @@ const offer = {
   tutor: { nombre: 'Valeria', apellido: 'Mendoza' },
   costo_creditos: '3.5',
   fecha_inicio: new Date('2026-11-25T19:00:00Z'),
+  fecha_fin: new Date('2026-11-25T20:00:00Z'),
+  id_tutor: '22222222-2222-4222-8222-222222222222',
+  id_habilidad: '33333333-3333-4333-8333-333333333333',
+  id_disponibilidad: '44444444-4444-4444-8444-444444444444',
 };
 
 function setup(overrides: Partial<Environment> = {}) {
@@ -68,7 +72,19 @@ function setup(overrides: Partial<Environment> = {}) {
       { habilidad: { nombre: 'Excel' }, nivel: 'Avanzado' },
     ]),
   };
-  const skills = { requireActive: jest.fn(async () => ({ nombre: 'Excel' })) };
+  const skills = {
+    requireActive: jest.fn(async () => ({ nombre: 'Excel' })),
+    list: jest.fn(async () => ({
+      data: [
+        {
+          id_habilidad: '55555555-5555-4555-8555-555555555555',
+          nombre: 'Cálculo I',
+          codigo: 'MAT-132',
+        },
+      ],
+      meta: {},
+    })),
+  };
   const store = new AssistantProfileStore({} as PrismaService, config);
   const service = new AssistantService(
     config,
@@ -152,7 +168,7 @@ describe('AssistantService', () => {
     });
     const { auth, body } = sentBody(fetcher);
     expect(auth).toBe('Bearer app-key');
-    expect(body.tools).toHaveLength(3);
+    expect(body.tools).toHaveLength(4);
     expect(body.messages[0]?.content).toContain('bono de bienvenida de 8');
   });
 
@@ -272,6 +288,7 @@ describe('AssistantService', () => {
       userId: 'ana',
       actions: [],
       offers: [],
+      proposal: null,
     });
     expect(JSON.parse(raw)).toMatchObject({
       nombre: 'Ana',
@@ -284,7 +301,7 @@ describe('AssistantService', () => {
 
   it('una herramienta o sección desconocida no rompe la conversación', async () => {
     const { service } = setup();
-    const context = { userId: 'ana', actions: [], offers: [] };
+    const context = { userId: 'ana', actions: [], offers: [], proposal: null };
     expect(await service.runTool('borrar_todo', '{}', context)).toContain(
       'desconocida',
     );
@@ -298,5 +315,44 @@ describe('AssistantService', () => {
     expect(await service.runTool('mi_resumen', 'no json', context)).toContain(
       'Ana',
     );
+  });
+
+  it('prepara acciones para confirmar sin ejecutarlas', async () => {
+    const { service } = setup();
+    const now = jest
+      .spyOn(Date, 'now')
+      .mockReturnValue(Date.parse('2026-11-22T12:00:00Z'));
+    const context = { userId: 'ana', actions: [], offers: [], proposal: null };
+    const missing = await service.runTool(
+      'proponer_accion',
+      '{"tipo":"solicitar_tutoria","id_oferta":"otra"}',
+      context,
+    );
+    expect(missing).toContain('buscar_ofertas');
+    expect(context.proposal).toBeNull();
+    const request = await service.runTool(
+      'proponer_accion',
+      `{"tipo":"solicitar_tutoria","id_oferta":"${offer.id_oferta}"}`,
+      context,
+    );
+    expect(request).toContain('Confirmar');
+    expect(context.proposal).toMatchObject({
+      tipo: 'solicitar_tutoria',
+      providerId: offer.id_tutor,
+      availabilityId: offer.id_disponibilidad,
+      costo_creditos: '3.5',
+    });
+    await service.runTool(
+      'proponer_accion',
+      '{"tipo":"ofertar_habilidad","materia":"calculo","precio":"2.5"}',
+      context,
+    );
+    expect(context.proposal).toMatchObject({
+      tipo: 'ofertar_habilidad',
+      materia: 'Cálculo I',
+      costo_creditos: '2.5',
+      tieneHabilidad: false,
+    });
+    now.mockRestore();
   });
 });
