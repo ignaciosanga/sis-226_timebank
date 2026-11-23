@@ -8,7 +8,7 @@ const escapeHtml = (value: string) =>
   );
 
 export function verificationEmail(link: string, minutes: number) {
-  const subject = 'Confirma tu cuenta institucional de Nexo U';
+  const subject = 'Confirma tu cuenta de Nexo U';
   const text = `Para activar la cuenta que registraste, abre este enlace y pulsa Confirmar:\n${link}\n\nEl enlace vence en ${minutes} minutos. Si no solicitaste esta cuenta, ignora este correo. No compartas el enlace.`;
   const href = escapeHtml(link);
   const html = `<!doctype html>
@@ -22,7 +22,7 @@ export function verificationEmail(link: string, minutes: number) {
 <span style="display:block;margin-top:2px;font-size:12px;color:#cfe3f3;">Banco de Tiempo Universitario · UCB La Paz</span>
 </td></tr>
 <tr><td style="padding:32px 32px 8px;">
-<h1 style="margin:0 0 12px;font-size:22px;line-height:1.3;color:#16232f;">Confirma tu correo institucional</h1>
+<h1 style="margin:0 0 12px;font-size:22px;line-height:1.3;color:#16232f;">Confirma tu correo</h1>
 <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#52606d;">Ya casi está. Confirma tu cuenta para empezar a intercambiar lo que sabes y recibir tus créditos de bienvenida.</p>
 <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="border-radius:10px;background:#005289;">
 <a href="${href}" style="display:inline-block;padding:14px 28px;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px;">Confirmar mi correo</a>

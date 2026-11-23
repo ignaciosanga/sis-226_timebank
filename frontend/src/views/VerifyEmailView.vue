@@ -18,26 +18,40 @@ const resendError = ref('')
 
 const token =
   typeof route.query.token === 'string' ? route.query.token : ''
+const password = ref('')
+const confirmError = ref('')
 
-onMounted(async () => {
+onMounted(() => {
   if (!token) return
-
-  status.value = 'verifying'
-
-  try {
-    await store.verifyEmail(token)
-    status.value = 'verified'
-  } catch (failure) {
-    status.value = 'error'
-    message.value = failure.message
-  }
+  status.value = 'confirm'
+  router.replace({ name: 'verify-email' })
 })
+
+async function confirmAccount() {
+  if (!password.value || status.value === 'verifying') return
+  confirmError.value = ''
+  status.value = 'verifying'
+  try {
+    await store.verifyEmail(token, password.value)
+    password.value = ''
+    status.value = 'verified'
+    await router.replace('/')
+  } catch (failure) {
+    if (failure.status === 401) {
+      status.value = 'confirm'
+      confirmError.value = 'La contraseña no coincide con la de esta cuenta. Si no creaste esta cuenta, ignora el correo o regístrate de nuevo con tu propia contraseña.'
+    } else {
+      status.value = 'error'
+      message.value = failure.status === 429 ? 'Hiciste muchos intentos. Espera un minuto y vuelve a intentar.' : failure.message
+    }
+  }
+}
 
 async function resendVerification() {
   const correo = email.value.trim().toLowerCase()
 
   if (!correo) {
-    resendError.value = 'Escribe tu correo institucional.'
+    resendError.value = 'Escribe tu correo electrónico.'
     return
   }
 
@@ -69,7 +83,7 @@ async function goToLogin() {
       <h1>Un paso más para conectar.</h1>
 
       <p>
-        Verifica tu correo institucional para comenzar a compartir
+        Verifica tu correo para comenzar a compartir
         habilidades y participar en la comunidad Nexo U.
       </p>
 
@@ -92,7 +106,22 @@ async function goToLogin() {
       class="registration-form-panel"
       aria-labelledby="verification-title"
     >
-      <template v-if="status === 'verifying'">
+      <template v-if="status === 'confirm'">
+        <h2 id="verification-title">Activa tu cuenta</h2>
+        <p class="lead-copy">
+          Escribe la contraseña que elegiste al registrarte. Con eso confirmamos que eres tú, activamos tu cuenta e iniciamos tu sesión.
+        </p>
+        <form class="flow-form" @submit.prevent="confirmAccount">
+          <div class="field">
+            <label for="verification-password">Contraseña</label>
+            <input id="verification-password" v-model="password" type="password" autocomplete="current-password" maxlength="128" required data-autofocus />
+          </div>
+          <p v-if="confirmError" class="notice notice-error" role="alert">{{ confirmError }}</p>
+          <button class="button button-primary button-full" type="submit" :disabled="!password">Activar e ingresar</button>
+        </form>
+      </template>
+
+      <template v-else-if="status === 'verifying'">
         <h2 id="verification-title">Verificando tu correo</h2>
         <p class="lead-copy">
           Estamos comprobando el enlace. No cierres esta página.
@@ -149,7 +178,7 @@ async function goToLogin() {
         <form class="flow-form" @submit.prevent="resendVerification">
           <div class="field">
             <label for="verification-email">
-              Correo institucional
+              Correo electrónico
             </label>
             <input
               id="verification-email"
@@ -157,7 +186,7 @@ async function goToLogin() {
               type="email"
               autocomplete="email"
               maxlength="254"
-              placeholder="nombre@ucb.edu.bo"
+              placeholder="tu@correo.com"
               required
             />
           </div>

@@ -190,8 +190,16 @@ export const useAppStore = defineStore('app', {
       return auth.register(payload)
     },
 
-    async verifyEmail(token) {
-      return auth.verifyEmail(token)
+    async verifyEmail(token, password) {
+      const result = await auth.verifyEmail(token, password)
+      if (result?.access_token && result.user) {
+        this.profile = result.user
+        this.authenticated = true
+        this.loginOpen = false
+        await this.loadSessionData()
+        this.showToast(`Hola, ${this.profile.nombre}. Tu cuenta está activa.`)
+      }
+      return result
     },
 
     async resendVerification(correo) {

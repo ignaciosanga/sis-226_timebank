@@ -124,15 +124,19 @@ describe('Cuenta institucional, activacion y bono (memoria; correo y Google simu
       .expect(401);
     const blocked = await login(input.correo).expect(403);
     expect(blocked.body.code).toBe('EMAIL_VERIFICATION_REQUIRED');
-    await api()
+    const again = await api()
       .post('/auth/register')
-      .send({ ...input, password: 'OtraClave123!' })
-      .expect(409);
+      .send({ ...input, nombre: 'Otra' })
+      .expect(201);
+    expect(again.body.id).toBe(id);
+    await confirm(token).expect(400);
+    const renewed = tokenFor(input.correo);
+    expect(renewed).not.toBe(token);
     await api()
       .post('/auth/login')
       .send({ correo: input.correo, password: 'incorrecta' })
       .expect(401);
-    await confirm(token).expect(200);
+    await confirm(renewed).expect(200);
     snapshot = await saved(id);
     expect(snapshot.user).toMatchObject({
       estado: 'Activo',
@@ -192,7 +196,7 @@ describe('Cuenta institucional, activacion y bono (memoria; correo y Google simu
   it('rechaza invalido/vencido, rota en reenvio y conserva correos invalidos como negativos', async () => {
     await api()
       .post('/auth/register')
-      .send(body('ana@example.test'))
+      .send(body('ana@@example.test'))
       .expect(400);
     const input = body(),
       user = (await api().post('/auth/register').send(input).expect(201)).body;
@@ -224,7 +228,7 @@ describe('Cuenta institucional, activacion y bono (memoria; correo y Google simu
       .findByEmail(input.correo);
     expect(user?.estado).toBe('Pendiente');
     await confirm(tokenFor(input.correo)).expect(400);
-    await api().post('/auth/register').send(input).expect(409);
+    await api().post('/auth/register').send(input).expect(201);
     await api()
       .post('/auth/resend-verification')
       .send({ correo: input.correo })
@@ -425,5 +429,47 @@ describe('Cuenta institucional, activacion y bono (memoria; correo y Google simu
     await expect(
       calendar.createEvent('simulated-code', session),
     ).rejects.toThrow('Autorizacion de Google');
+  });
+
+  it('quien registra un correo ajeno no bloquea al dueño y confirmar exige la contraseña', async () => {
+    const input = body();
+    const squatter = (
+      await api()
+        .post('/auth/register')
+        .send({ ...input, password: 'ClaveDelIntruso123!' })
+        .expect(201)
+    ).body;
+    const squatterToken = tokenFor(input.correo);
+    await api()
+      .post('/auth/verify-email')
+      .send({ token: squatterToken, password })
+      .expect(401);
+    expect((await saved(squatter.id)).user.estado).toBe('Pendiente');
+    await api().post('/auth/register').send(input).expect(201);
+    await confirm(squatterToken).expect(400);
+    const ownerToken = tokenFor(input.correo);
+    await api()
+      .post('/auth/verify-email')
+      .send({ token: ownerToken, password: 'ClaveDelIntruso123!' })
+      .expect(401);
+    const session = await api()
+      .post('/auth/verify-email')
+      .send({ token: ownerToken, password })
+      .expect(200);
+    expect(session.body).toMatchObject({
+      status: 'verified',
+      login_required: false,
+      token_type: 'Bearer',
+    });
+    await api()
+      .get('/credits/me')
+      .auth(session.body.access_token, { type: 'bearer' })
+      .expect(200)
+      .expect((r) => expect(r.body.saldo).toBe('8'));
+    await api()
+      .post('/auth/login')
+      .send({ correo: input.correo, password: 'ClaveDelIntruso123!' })
+      .expect(401);
+    await api().post('/auth/register').send(input).expect(409);
   });
 });

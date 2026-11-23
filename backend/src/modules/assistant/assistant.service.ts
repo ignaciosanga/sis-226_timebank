@@ -4,6 +4,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -50,9 +51,10 @@ type ChatMessage =
   | { role: 'system' | 'user'; content: string }
   | { role: 'assistant'; content: string | null; tool_calls?: ToolCall[] }
   | { role: 'tool'; tool_call_id: string; content: string };
+type ChatCompletionMessage = { content?: unknown; tool_calls?: ToolCall[] };
 type ChatCompletion = {
   choices?: {
-    message?: { content?: unknown; tool_calls?: ToolCall[] };
+    message?: ChatCompletionMessage;
   }[];
 };
 type TurnContext = {
@@ -77,6 +79,8 @@ const dateLabel = (value: Date | string) =>
 
 @Injectable()
 export class AssistantService {
+  private readonly logger = new Logger(AssistantService.name);
+
   constructor(
     private readonly config: ConfigService<Environment, true>,
     private readonly store: AssistantProfileStore,
@@ -221,13 +225,23 @@ export class AssistantService {
     ];
     let answer = '';
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-      const message = await this.complete(
-        apiKey,
-        messages,
-        fetcher,
-        Boolean(ownKey),
-        round < MAX_TOOL_ROUNDS - 1,
-      );
+      let message: ChatCompletionMessage;
+      try {
+        message = await this.complete(
+          apiKey,
+          messages,
+          fetcher,
+          Boolean(ownKey),
+          round < MAX_TOOL_ROUNDS - 1,
+        );
+      } catch (error) {
+        if (
+          round > 0 &&
+          (context.actions.length || context.offers.length || context.proposal)
+        )
+          break;
+        throw error;
+      }
       const calls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
       if (!calls.length) {
         answer =
@@ -297,7 +311,7 @@ export class AssistantService {
     fetcher: typeof fetch,
     ownKey: boolean,
     allowTools: boolean,
-  ) {
+  ): Promise<ChatCompletionMessage> {
     const model = this.config.get('ASSISTANT_MODEL', { infer: true });
     let response: Response;
     try {
@@ -314,9 +328,6 @@ export class AssistantService {
             messages,
             temperature: 0.2,
             max_tokens: 1200,
-            ...(model.startsWith('openai/gpt-oss')
-              ? { reasoning_effort: 'low' }
-              : {}),
             ...(allowTools
               ? { tools: ASSISTANT_TOOLS, tool_choice: 'auto' }
               : {}),
@@ -327,6 +338,7 @@ export class AssistantService {
         },
       );
     } catch {
+      this.logger.warn('Proveedor de IA sin respuesta a tiempo');
       throw new BadGatewayException('El asistente no respondio a tiempo');
     }
     if (ownKey && (response.status === 401 || response.status === 403))
@@ -337,8 +349,17 @@ export class AssistantService {
       throw new ServiceUnavailableException(
         'El asistente esta ocupado, intenta en un momento',
       );
-    if (!response.ok)
+    if (!response.ok) {
+      const detail = String(
+        (await response.text?.().catch(() => '')) ?? '',
+      ).slice(0, 300);
+      this.logger.warn(
+        `Proveedor de IA respondio ${response.status}: ${detail}`,
+      );
+      if (allowTools && response.status === 400)
+        return this.complete(apiKey, messages, fetcher, ownKey, false);
       throw new BadGatewayException('El asistente no esta disponible');
+    }
     const body = (await response.json().catch(() => null)) as ChatCompletion;
     const message = body?.choices?.[0]?.message;
     if (!message)

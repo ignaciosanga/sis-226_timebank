@@ -4021,7 +4021,7 @@
             "type": "string",
             "example": "ana@ucb.edu.bo",
             "format": "email",
-            "description": "Dominio exacto ucb.edu.bo; se normaliza antes de validar"
+            "description": "Cualquier correo valido; la cuenta queda pendiente hasta confirmar el enlace enviado a ese correo"
           },
           "password": {
             "type": "string",
@@ -4104,7 +4104,7 @@
           "verification_required": {
             "type": "boolean",
             "example": true,
-            "description": "Cuenta Pendiente, saldo cero y sin sesion; revisar correo institucional"
+            "description": "Cuenta Pendiente, saldo cero y sin sesion; revisar el correo registrado"
           }
         },
         "required": [
@@ -4127,63 +4127,15 @@
             "description": "Credencial de un solo uso recibida por correo; nunca es un Bearer de sesion",
             "minLength": 43,
             "maxLength": 43
+          },
+          "password": {
+            "type": "string",
+            "description": "Contraseña elegida al registrarse; si se envía y coincide, activa la cuenta e inicia sesión",
+            "maxLength": 128
           }
         },
         "required": [
           "token"
-        ]
-      },
-      "VerificationResponse": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "verified"
-            ]
-          },
-          "login_required": {
-            "type": "boolean",
-            "example": true
-          }
-        },
-        "required": [
-          "status",
-          "login_required"
-        ]
-      },
-      "ResendVerificationDto": {
-        "type": "object",
-        "properties": {
-          "correo": {
-            "type": "string",
-            "format": "email",
-            "example": "ana@ucb.edu.bo"
-          }
-        },
-        "required": [
-          "correo"
-        ]
-      },
-      "LoginDto": {
-        "type": "object",
-        "properties": {
-          "correo": {
-            "type": "string",
-            "example": "ana@example.test",
-            "format": "email"
-          },
-          "password": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 128,
-            "writeOnly": true,
-            "format": "password"
-          }
-        },
-        "required": [
-          "correo",
-          "password"
         ]
       },
       "PublicUser": {
@@ -4247,6 +4199,72 @@
           "semestre",
           "rol",
           "roles"
+        ]
+      },
+      "VerificationResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "verified"
+            ]
+          },
+          "login_required": {
+            "type": "boolean",
+            "example": true
+          },
+          "access_token": {
+            "type": "string",
+            "description": "Solo cuando se confirmó con la contraseña"
+          },
+          "token_type": {
+            "type": "string",
+            "enum": [
+              "Bearer"
+            ]
+          },
+          "user": {
+            "$ref": "#/components/schemas/PublicUser"
+          }
+        },
+        "required": [
+          "status",
+          "login_required"
+        ]
+      },
+      "ResendVerificationDto": {
+        "type": "object",
+        "properties": {
+          "correo": {
+            "type": "string",
+            "format": "email",
+            "example": "ana@ucb.edu.bo"
+          }
+        },
+        "required": [
+          "correo"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "correo": {
+            "type": "string",
+            "example": "ana@example.test",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "writeOnly": true,
+            "format": "password"
+          }
+        },
+        "required": [
+          "correo",
+          "password"
         ]
       },
       "LoginResponse": {

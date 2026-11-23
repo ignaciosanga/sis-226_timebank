@@ -38,11 +38,26 @@ export class AuthService {
     }
     const repository = this.users.repository;
     const correo = input.correo.trim().toLowerCase();
-    if (!/^[^@\s]+@ucb\.edu\.bo$/.test(correo))
-      throw new ForbiddenException('Solo se permiten cuentas @ucb.edu.bo');
-    if (await repository.findByEmail(correo))
+    const existing = await repository.findByEmail(correo);
+    if (existing && existing.estado !== UserStatus.PENDIENTE)
       throw new ConflictException('Correo no disponible');
     const passwordHash = await this.passwords.hash(input.password);
+    if (existing) {
+      const challenge = this.verification.challenge();
+      const user = await this.verification.replacePending(
+        existing.id,
+        {
+          nombre: input.nombre,
+          apellido: input.apellido,
+          id_carrera: input.idCarrera,
+          semestre: input.semestre,
+          password_hash: passwordHash,
+        },
+        challenge.stored,
+      );
+      await this.verification.deliver(correo, challenge.token);
+      return { ...toPublicUser(user), verification_required: true as const };
+    }
     try {
       const profile = {
         nombre: input.nombre,
@@ -81,11 +96,35 @@ export class AuthService {
     if (valid && user?.estado === UserStatus.PENDIENTE)
       throw new ForbiddenException({
         code: 'EMAIL_VERIFICATION_REQUIRED',
-        message: 'Confirma tu correo institucional antes de iniciar sesion',
+        message: 'Confirma tu correo antes de iniciar sesion',
       });
     if (!valid || !user?.active)
       throw new UnauthorizedException('Credenciales invalidas');
     return this.sessionFor(user);
+  }
+
+  async confirmEmail(token: string, password?: string) {
+    if (password === undefined) return this.verification.confirm(token);
+    const ownerId = await this.verification.pendingOwner(token);
+    const owner = ownerId
+      ? await this.users.repository.findById(ownerId)
+      : null;
+    const valid = await this.passwords.verifyOrDummy(
+      owner?.passwordHash,
+      password,
+    );
+    if (!ownerId || !valid)
+      throw new UnauthorizedException(
+        'La contraseña no coincide con la de esta cuenta',
+      );
+    await this.verification.confirm(token);
+    const user = await this.users.repository.findById(ownerId);
+    if (!user) throw new UnauthorizedException('Credenciales invalidas');
+    return {
+      status: 'verified' as const,
+      login_required: false as const,
+      ...(await this.sessionFor(user)),
+    };
   }
 
   async sessionFor(user: UserRecord) {

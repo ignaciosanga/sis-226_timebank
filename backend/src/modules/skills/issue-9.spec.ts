@@ -41,16 +41,20 @@ describe('Issue #9: validaciones y operaciones focalizadas, sin BD', () => {
     },
   );
 
+  it.each(['evaluador@gmail.com', 'jurado@sub.ucb.edu.bo'])(
+    'admite correos externos válidos para invitados %s',
+    async (correo) => {
+      const errors = await validate(plainToInstance(RegisterDto, { correo }));
+      expect(errors.some((error) => error.property === 'correo')).toBe(false);
+    },
+  );
+
   it.each([
-    'ana@gmail.com',
-    'ana@sub.ucb.edu.bo',
-    'ana@ucb.edu.bo.evil.test',
-    'ana@fakeucb.edu.bo',
     'ana@ucb.edu.bo@evil.test',
     'ana@ucb.edu.bo\n.evil',
     'ana＠ucb.edu.bo',
     'ana@ucb.edu.bo.',
-  ])('rechaza dominio aparente %s', async (correo) => {
+  ])('rechaza correos mal formados %s', async (correo) => {
     const errors = await validate(plainToInstance(RegisterDto, { correo }));
     expect(errors.some((error) => error.property === 'correo')).toBe(true);
   });

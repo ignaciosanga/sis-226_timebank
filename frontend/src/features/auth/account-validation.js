@@ -9,7 +9,6 @@ export function validateAccount(input, careers, { confirm = false } = {}) {
   }
   const email = String(input.correo ?? '').trim()
   if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.correo = 'Escribe un correo electrónico válido.'
-  else if (email.split('@')[1].toLowerCase() !== 'ucb.edu.bo') errors.correo = 'Utiliza tu correo institucional terminado en @ucb.edu.bo.'
   if (typeof input.password !== 'string' || input.password.length < 12 || input.password.length > 128) errors.password = 'La contraseña debe tener entre 12 y 128 caracteres.'
   if (confirm && input.confirmPassword !== input.password) errors.confirmPassword = 'Las contraseñas deben coincidir.'
   if (!careers.some((career) => career.id_carrera === input.idCarrera && career.estado === 'activo')) errors.idCarrera = 'Selecciona una carrera activa.'

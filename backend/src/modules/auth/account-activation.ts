@@ -43,7 +43,7 @@ export function grantWelcomeBonus(
     retenidos_anterior: user.creditos_retenidos,
     retenidos_posterior: user.creditos_retenidos,
     created_at: now,
-    descripcion: 'Bono de bienvenida al verificar la cuenta institucional',
+    descripcion: 'Bono de bienvenida al verificar la cuenta',
   });
   user.saldo = addCredits(user.saldo, value);
 }
