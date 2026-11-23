@@ -25,31 +25,16 @@ button:disabled{opacity:.6;cursor:default}#result{min-height:1.5em;margin:16px 0
 a.home{margin-top:12px;background:#fff;color:#005289;border:1px solid #005289}a.home[hidden],button[hidden]{display:none}
 </style></head>
 <body><main><p class="brand">Nexo U</p><h1>Confirma tu correo</h1>
-<p>Presiona el botón para activar tu cuenta y recibir tus créditos de bienvenida.</p>
-<form><button type="submit">Confirmar mi correo</button></form><p role="status" id="result"></p>
-<a class="home" href="${home}" hidden>Ir a Nexo U</a></main>
+<p id="result">Te llevamos a Nexo U para que confirmes tu cuenta con tu contraseña.</p>
+<a class="home" href="${home}">Ir a Nexo U</a></main>
 <script nonce="${nonce}">
 const token = new URLSearchParams(location.hash.slice(1)).get('token');
 history.replaceState(null, '', location.pathname);
-const result = document.getElementById('result');
-const home = document.querySelector('a.home');
-document.querySelector('form').onsubmit = async (event) => {
-  event.preventDefault();
-  const button = document.querySelector('button');
-  button.disabled = true;
-  try {
-    const response = await fetch('/auth/verify-email', {
-      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({token})
-    });
-    result.className = response.ok ? 'ok' : 'error';
-    result.textContent = response.ok
-      ? 'Correo confirmado. Ya puedes iniciar sesión en Nexo U.'
-      : 'El enlace no es válido o venció. Solicita un nuevo correo desde Nexo U.';
-    if (response.ok) { button.hidden = true; home.hidden = false; }
-  } catch {
-    result.className = 'error';
-    result.textContent = 'No se pudo conectar. Intenta nuevamente.';
-  } finally { button.disabled = false; }
-};
+const base = ${JSON.stringify(frontendUrl.replace(/\/+$/, ''))};
+if (token && /^[A-Za-z0-9_-]{43}$/.test(token) && base) {
+  location.replace(base + '/#/verificar-correo?token=' + encodeURIComponent(token));
+} else {
+  document.getElementById('result').textContent = 'El enlace no es válido o venció. Solicita un nuevo correo desde Nexo U.';
+}
 </script></body></html>`;
 }
