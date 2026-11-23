@@ -15,11 +15,14 @@ export async function googleSignIn(body) {
 
 export const register = (payload) => apiRequest('/auth/register', { method: 'POST', body: payload })
 
-export const verifyEmail = (token) =>
-  apiRequest('/auth/verify-email', {
+export async function verifyEmail(token, password) {
+  const data = await apiRequest('/auth/verify-email', {
     method: 'POST',
-    body: { token },
+    body: password === undefined ? { token } : { token, password },
   })
+  if (data?.access_token) setToken(data.access_token)
+  return data
+}
 
 export const resendVerification = (correo) =>
   apiRequest('/auth/resend-verification', {

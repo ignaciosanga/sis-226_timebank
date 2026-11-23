@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   ServiceUnavailableException,
@@ -12,6 +13,7 @@ import {
   EXCHANGE_REPOSITORY,
   ExchangeRepository,
 } from '../exchanges/exchange.repository';
+import { adaptStoredUser, StoredUser, UserRecord } from '../users/user.types';
 import { UsersService } from '../users/users.service';
 import { activateAccount } from './account-activation';
 import { REGISTRATION_POLICY, RegistrationPolicy } from './registration-policy';
@@ -94,6 +96,38 @@ export class EmailVerificationService {
       message:
         'Si existe una cuenta pendiente, recibiras un enlace de verificacion',
     };
+  }
+
+  pendingOwner(token: string): Promise<string | null> {
+    return this.persistence.read(
+      (state) =>
+        state.verifications.get(verificationHash(token))?.id_usuario ?? null,
+    );
+  }
+
+  async replacePending(
+    userId: string,
+    changes: Pick<
+      StoredUser,
+      'nombre' | 'apellido' | 'id_carrera' | 'semestre' | 'password_hash'
+    >,
+    stored: ReturnType<EmailVerificationService['challenge']>['stored'],
+  ): Promise<UserRecord> {
+    const row = await this.persistence.transaction((state) => {
+      const user = state.users.get(userId);
+      if (!user || user.estado !== UserStatus.PENDIENTE)
+        throw new ConflictException('Correo no disponible');
+      Object.assign(user, changes);
+      for (const token of state.verifications.values())
+        if (token.id_usuario === userId && !token.consumed_at)
+          token.consumed_at = stored.created_at;
+      state.verifications.set(stored.token_hash, {
+        ...stored,
+        id_usuario: userId,
+      });
+      return user;
+    });
+    return adaptStoredUser(row);
   }
 
   confirm(token: string) {

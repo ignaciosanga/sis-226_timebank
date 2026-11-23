@@ -12,6 +12,7 @@ import {
   ApiCreatedResponse,
   ApiOkResponse,
   ApiProperty,
+  ApiPropertyOptional,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -29,7 +30,7 @@ class RegistrationResponse extends PublicUser {
   @ApiProperty({
     example: true,
     description:
-      'Cuenta Pendiente, saldo cero y sin sesion; revisar correo institucional',
+      'Cuenta Pendiente, saldo cero y sin sesion; revisar el correo registrado',
   })
   verification_required!: boolean;
 }
@@ -37,6 +38,12 @@ class RegistrationResponse extends PublicUser {
 class VerificationResponse {
   @ApiProperty({ enum: ['verified'] }) status!: 'verified';
   @ApiProperty({ example: true }) login_required!: boolean;
+  @ApiPropertyOptional({
+    description: 'Solo cuando se confirmó con la contraseña',
+  })
+  access_token?: string;
+  @ApiPropertyOptional({ enum: ['Bearer'] }) token_type?: 'Bearer';
+  @ApiPropertyOptional({ type: PublicUser }) user?: PublicUser;
 }
 
 class LoginResponse {
@@ -77,8 +84,9 @@ export class AuthController {
     description:
       'Consume el enlace y activa con bono una sola vez; reutilizarlo no entrega otra sesion ni bono',
   })
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   confirmEmail(@Body() input: VerifyEmailDto) {
-    return this.verification.confirm(input.token);
+    return this.auth.confirmEmail(input.token, input.password);
   }
   @Post('resend-verification')
   @HttpCode(202)
