@@ -228,3 +228,17 @@ test('booking uses the tutor price unchanged for different durations and blocks 
   assert.equal(view.cost.value, null); assert.match(view.error.value, /costo definido/)
   assert.equal(calls.length, 0)
 })
+test('a reserved offer keeps its published credit cost on the card instead of Costo por definir', async () => {
+  store.offers = [store.offers[0]]
+  responses.set('GET /tutoring/offers', () => json({ data: [], meta: { totalPages: 1 } }))
+  await store.loadTutoring()
+  let html = await render(Home)
+  assert.match(html, /7 créditos por clase/)
+  assert.doesNotMatch(html, /Costo por definir/)
+
+  store.offerDetails = []
+  store.reservations = [{ ...complete, id_reserva: 'reserved-one', id_ofertante: 'tutor', id_habilidad: 'programming', estado: 'Confirmada', costo_creditos: '3.7' }]
+  html = await render(Home)
+  assert.match(html, /3\.7 créditos por clase/)
+  assert.doesNotMatch(html, /Costo por definir/)
+})

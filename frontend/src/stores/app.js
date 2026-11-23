@@ -54,11 +54,32 @@ export const useAppStore = defineStore('app', {
       return this.community.find((user) => user.id === id)
     },
     findSkill(id) { return this.skills.find((skill) => skill.id_habilidad === id) },
-    findOffer(userId, skillId) { return this.offerDetails.find((row) => row.id_usuario === userId && row.id_habilidad === skillId) },
+    findOffer(userId, skillId) {
+      const detail = this.offerDetails.find((row) => row.id_usuario === userId && row.id_habilidad === skillId)
+      if (detail) return detail
+      const related = [...this.reservations, ...this.requests].find(
+        (row) =>
+          row.id_ofertante === userId &&
+          row.id_habilidad === skillId &&
+          (row.costo_creditos ?? row.creditos_requeridos ?? row.creditos ?? row.monto_creditos) != null,
+      )
+      if (!related) return undefined
+      return {
+        id_usuario: userId,
+        id_habilidad: skillId,
+        costo_creditos: related.costo_creditos ?? related.creditos_requeridos ?? related.creditos ?? related.monto_creditos,
+      }
+    },
     async loadTutoring() {
       if (!tutoring.tutoringEnabled) return
       this.tutoringState = 'loading'
-      try { this.offerDetails = await tutoring.getTutorOffers(); this.tutoringState = 'ready' }
+      try {
+        const fresh = await tutoring.getTutorOffers()
+        const merged = new Map(this.offerDetails.map((row) => [`${row.id_usuario}:${row.id_habilidad}`, row]))
+        for (const row of fresh) merged.set(`${row.id_usuario}:${row.id_habilidad}`, row)
+        this.offerDetails = [...merged.values()]
+        this.tutoringState = 'ready'
+      }
       catch { this.tutoringState = 'error' }
     },
     async loadReviews() {
