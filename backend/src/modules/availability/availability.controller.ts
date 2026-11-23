@@ -86,9 +86,6 @@ export class AvailabilityController {
 }
 
 @ApiTags('Disponibilidad')
-@ApiBearerAuth()
-@ApiUnauthorizedResponse()
-@UseGuards(JwtAuthGuard)
 @Controller('users')
 export class PublishedAvailabilityController {
   constructor(private readonly availability: AvailabilityService) {}

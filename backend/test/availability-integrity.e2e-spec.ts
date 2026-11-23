@@ -26,6 +26,7 @@ describe('Integridad de disponibilidad por HTTP con memoria y JWT reales', () =>
   let app: INestApplication;
   let repository: AvailabilityRepository;
   let token: string;
+  let studentId: string;
   const slot = {
     fechaInicio: '2030-01-07T09:00:00-04:00',
     fechaFin: '2030-01-07T10:00:00-04:00',
@@ -101,11 +102,25 @@ describe('Integridad de disponibilidad por HTTP con memoria y JWT reales', () =>
       .send({ correo, password })
       .expect(200);
     token = login.body.access_token as string;
+    studentId = login.body.user.id as string;
   });
 
   afterEach(async () => {
     jest.restoreAllMocks();
     await app?.close();
+  });
+
+  it('permite consultar horarios publicados sin JWT y mantiene protegida la lista propia', async () => {
+    const created = await createSlot();
+
+    await client()
+      .get(`/users/${studentId}/availability`)
+      .expect(200)
+      .expect([created]);
+
+    await client()
+      .get('/availability/me')
+      .expect(401);
   });
 
   it('conserva ambos campos de dos PATCH parciales concurrentes sobre el mismo horario', async () => {
