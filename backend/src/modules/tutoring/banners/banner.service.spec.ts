@@ -4,11 +4,12 @@ import {
   ForbiddenException,
   GoneException,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import sharp from 'sharp';
@@ -82,19 +83,19 @@ describe('Banners persistentes y cargas abandonadas', () => {
     await rm(target, { recursive: true, force: true });
   });
 
-  it('recupera una carga idempotente concurrente con un solo archivo', async () => {
+  it('confirma una carga idempotente concurrente con bytes y metadata sin archivos', async () => {
     const key = randomUUID();
     const results = await Promise.all([
       service.upload(actor, upload(), key),
       service.upload(actor, upload(), key),
     ]);
     expect(results[0]).toEqual(results[1]);
-    expect(await readdir(directory)).toHaveLength(1);
+    expect(await readdir(directory)).toHaveLength(0);
     expect(await persistence.read((state) => state.banners.size)).toBe(1);
     const next = new TutoringBannerService(persistence, config);
     await next.onModuleInit();
     expect(await next.upload(actor, upload(), key)).toEqual(results[0]);
-    expect(await readdir(directory)).toHaveLength(1);
+    expect(await readdir(directory)).toHaveLength(0);
     expect(
       await persistence.read((state) => ({
         saldo: state.users.get(actor)!.saldo,
@@ -118,7 +119,7 @@ describe('Banners persistentes y cargas abandonadas', () => {
         key,
       ),
     ).rejects.toBeInstanceOf(ConflictException);
-    expect(await readdir(directory)).toHaveLength(1);
+    expect(await readdir(directory)).toHaveLength(0);
     expect(await persistence.read((state) => state.banners.size)).toBe(1);
   });
 
@@ -182,7 +183,7 @@ describe('Banners persistentes y cargas abandonadas', () => {
       width: 3,
       height: 2,
     });
-    expect(await readdir(directory)).toHaveLength(1);
+    expect(await readdir(directory)).toHaveLength(0);
     await expect(
       persistence.transaction((state) =>
         next.validateAndAttach(state, actor, result.url, randomUUID()),
@@ -209,7 +210,7 @@ describe('Banners persistentes y cargas abandonadas', () => {
         (state) => state.banners.get(id)!.attached_offer_id,
       ),
     ).toBeNull();
-    expect(await readdir(directory)).toHaveLength(1);
+    expect(await readdir(directory)).toHaveLength(0);
     expect(
       await persistence.transaction((state) =>
         service.validateAndAttach(state, actor, result.url, offerId),
@@ -229,6 +230,9 @@ describe('Banners persistentes y cargas abandonadas', () => {
     expect(
       await persistence.read((state) => state.banners.get(id)!.deleted_at),
     ).not.toBeNull();
+    expect(
+      await persistence.read((state) => state.banners.get(id)!.content_bytes),
+    ).toBeNull();
     await expect(service.upload(actor, upload(), key)).rejects.toBeInstanceOf(
       GoneException,
     );
@@ -251,6 +255,73 @@ describe('Banners persistentes y cargas abandonadas', () => {
       service.upload(actor, upload(), randomUUID()),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(await readdir(directory)).toHaveLength(0);
+  });
+
+  it('no depende de un directorio local disponible para subir ni reintentar', async () => {
+    const unavailable = join(directory, 'archivo-no-directorio');
+    await writeFile(unavailable, 'ocupado');
+    const next = new TutoringBannerService(
+      persistence,
+      new ConfigService({
+        BANNER_STORAGE_DIR: unavailable,
+        PUBLIC_API_URL: 'http://127.0.0.1:4103',
+      }),
+    );
+    await next.onModuleInit();
+    const key = randomUUID();
+    const result = await next.upload(actor, upload(), key);
+    expect(await next.upload(actor, upload(), key)).toEqual(result);
+    const stored = await persistence.read(
+      (state) => [...state.banners.values()][0],
+    );
+    expect(stored!.content_bytes).toBeInstanceOf(Uint8Array);
+    expect(stored!.content_bytes!.length).toBe(stored!.byte_size);
+  });
+
+  it('revierte bytes, metadata e idempotencia si falla el commit de la carga', async () => {
+    const transaction = persistence.transaction.bind(persistence);
+    const spy = jest.spyOn(persistence, 'transaction');
+    spy.mockImplementationOnce(transaction); // limpieza previa
+    spy.mockImplementationOnce((work) =>
+      transaction(async (state) => {
+        await work(state);
+        throw new ServiceUnavailableException('Fallo de persistencia');
+      }),
+    );
+    await expect(
+      service.upload(actor, upload(), randomUUID()),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    spy.mockRestore();
+    expect(
+      await persistence.read((state) => [
+        state.banners.size,
+        state.idempotency.size,
+      ]),
+    ).toEqual([0, 0]);
+    expect(await readdir(directory)).toHaveLength(0);
+  });
+
+  it('rechaza adjuntar bytes persistidos corruptos aunque exista un archivo correcto', async () => {
+    const result = await service.upload(actor, upload(), randomUUID());
+    const id = result.url.split('/').at(-1)!;
+    await persistence.transaction(async (state) => {
+      const banner = state.banners.get(id)!;
+      await writeFile(
+        join(directory, banner.storage_name),
+        banner.content_bytes!,
+      );
+      banner.content_bytes![0] = banner.content_bytes![0]! ^ 1;
+    });
+    await expect(
+      persistence.transaction((state) =>
+        service.validateAndAttach(state, actor, result.url, randomUUID()),
+      ),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(
+      await persistence.read(
+        (state) => state.banners.get(id)!.attached_offer_id,
+      ),
+    ).toBeNull();
   });
 
   it('valida multipart HTTP real y envia bytes publicados sin recorrer Response en el interceptor', async () => {

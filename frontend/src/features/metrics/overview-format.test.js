@@ -13,6 +13,10 @@ test('formatCredits agrupa miles sin perder precisión y rechaza basura', () => 
   assert.equal(formatCredits('0'), '0')
   assert.equal(formatCredits(undefined), '0')
   assert.equal(formatCredits('<b>x</b>'), '0')
+  assert.equal(formatCredits('3.7'), '3,7')
+  assert.equal(formatCredits('-0.5'), '-0,5')
+  assert.equal(formatCredits('12345678901234567890.05'), '12.345.678.901.234.567.890,05')
+  assert.equal(formatCredits('-0.00'), '0')
 })
 
 test('overviewCards mapea la respuesta del backend y tolera campos faltantes', () => {
@@ -29,4 +33,11 @@ test('overviewCards mapea la respuesta del backend y tolera campos faltantes', (
   assert.equal(byKey.horas.value, '13.5')
   assert.equal(byKey.saldo.value, '12.000')
   assert.equal(overviewCards({}).length, 5)
+})
+
+test('los créditos decimales y sus agregados grandes no se convierten en cero ni pierden dígitos', () => {
+  assert.equal(formatCredits('3.7'), '3,7')
+  assert.equal(formatCredits('-0.50'), '-0,5')
+  assert.equal(formatCredits('12345678901234567890.25'), '12.345.678.901.234.567.890,25')
+  assert.equal(formatCredits('-0.00'), '0')
 })

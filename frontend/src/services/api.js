@@ -22,9 +22,10 @@ let token = readToken()
 let unauthorizedHandler = () => {}
 
 export class ApiError extends Error {
-  constructor(status, message) {
+  constructor(status, message, code) {
     super(message)
     this.status = status
+    if (typeof code === 'string') this.code = code
   }
 }
 
@@ -52,7 +53,7 @@ function errorMessage(status, data) {
 export async function apiRequest(path, { method = 'GET', body, idempotencyKey } = {}) {
   if (localDemoRequest) {
     const response = await localDemoRequest(path, { method, body, idempotencyKey })
-    if (response.status >= 400) throw new ApiError(response.status, response.data.message)
+    if (response.status >= 400) throw new ApiError(response.status, response.data.message, response.data.code)
     return response.data
   }
   const headers = { Accept: 'application/json' }
@@ -70,7 +71,7 @@ export async function apiRequest(path, { method = 'GET', body, idempotencyKey } 
   const data = await response.json().catch(() => null)
   if (!response.ok) {
     if (response.status === 401 && token) unauthorizedHandler()
-    throw new ApiError(response.status, errorMessage(response.status, data))
+    throw new ApiError(response.status, errorMessage(response.status, data), data?.code)
   }
   return data
 }

@@ -1,4 +1,4 @@
-/** Metadata persistente; los bytes se conservan fuera de la carpeta publica. */
+/** Bytes y metadata se confirman juntos; null identifica una carga anterior. */
 export interface TutoringBanner {
   id_banner: string;
   id_tutor: string;
@@ -6,6 +6,7 @@ export interface TutoringBanner {
   mime_type: string;
   byte_size: number;
   sha256: string;
+  content_bytes: Uint8Array<ArrayBuffer> | null;
   created_at: Date;
   expires_at: Date;
   attached_offer_id: string | null;

@@ -17,6 +17,7 @@
     "docker:down": "docker compose down",
     "db:init": "prisma migrate deploy && node scripts/seed-local.cjs",
     "db:migrate": "prisma migrate deploy",
+    "banners:recover": "node scripts/recover-banners.cjs",
     "db:seed:local": "node scripts/seed-local.cjs",
     "db:seed:academic": "node scripts/seed-academic.cjs",
     "demo:academic": "npm run build && node scripts/prepare-academic-demo.cjs",
