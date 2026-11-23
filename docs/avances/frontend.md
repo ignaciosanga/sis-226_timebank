@@ -3,6 +3,54 @@
 El historial anterior del equipo está en
 [frontend/docs/avances/frontend.md](../../frontend/docs/avances/frontend.md).
 
+## Preparación de ofertas desde Inicio y navegación Horarios
+
+- **Fecha:** 2026-10-27.
+- **Estado:** Interfaz preparada localmente; publicación pendiente de integración.
+- **Responsables:** Miguel Sanchez, equipo Frontend.
+- **Rama:** `frontend/ofertar-habilidad`, desde `f2272d0`.
+
+### Descripción
+
+Se agrega el botón amarillo Ofertar una habilidad junto al catálogo de Inicio.
+El estudiante puede elegir una habilidad de su Perfil, fecha y horario de La Paz,
+validar los campos y revisar la oferta. Publicar oferta queda deshabilitado:
+el contrato actual de disponibilidad no permite asociar una habilidad. El
+formulario explica que no guarda ni publica datos y descarta el borrador al cerrar.
+
+Disponibilidad se llama Horarios en los menús y Mis horarios en la vista. Se
+retira de ella la publicación de horarios generales y se conservan la consulta,
+edición y desactivación de los existentes. Se mantiene `/disponibilidad` y el
+nombre de ruta `availability`. **En esta rama no se pueden crear horarios nuevos
+hasta conectar el contrato de ofertas**, según el alcance preparado acordado.
+
+### Compatibilidad y dependencias
+
+- Sin cambios en Backend, Base de Datos, Dashboards, servicios HTTP o store.
+- Perfil abre el formulario preparado de Inicio con `/?ofertar=1`.
+- La validación exige habilidad propia activa, fecha real, inicio futuro y
+  límites de 15 minutos con final posterior al inicio en la misma fecha.
+- APIs y Backend deben acordar el contrato de habilidad con horario; Base de
+  Datos debe resolver su persistencia. La lectura del catálogo y de Horarios
+  también necesitará esa relación. No se inventa un endpoint ni se envían
+  campos nuevos al contrato de disponibilidad actual.
+- La ampliación de materias requiere el catálogo del equipo responsable; no se
+  agrega un catálogo local alternativo.
+- La entrega técnica está en
+  [Ofertas y entrega a APIs](../../frontend/docs/ofertas-habilidades.md).
+
+### Evidencias y pruebas
+
+- Doce pruebas nuevas de validación y funcionamiento con Vue, router y HTTP
+  controlado: revisión sin solicitudes de red, roles, descarte, cierre de sesión
+  y conservación de edición/desactivación mediante los servicios existentes.
+- `npm --prefix frontend test`: 65 pruebas aprobadas, cero fallos, incluidas
+  estas pruebas y las verificaciones anteriores.
+- `npm --prefix frontend run build`: compilación de producción correcta.
+- Pendientes: revisión visual en navegador e intercambio real con el contrato
+  de ofertas integrado. Las pruebas no escriben en el backend desplegado.
+- Commit y PR: pendientes; cambios locales para revisión del equipo integrador.
+
 ## Navegación por sesión, créditos en Perfil e Inicio para visitantes
 
 - **Fecha:** 2026-10-26.

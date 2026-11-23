@@ -16,6 +16,7 @@ import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
+  ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -54,6 +55,12 @@ export class ReservationsController {
     return this.exchanges.getReservation(user.id, id);
   }
   @Post(':id/confirm')
+  @ApiOperation({
+    summary:
+      'Confirmar participacion y liquidar al recibir ambas confirmaciones',
+    description:
+      'Bearer de un participante, cuerpo {} e Idempotency-Key. Solo despues del fin. La primera confirmacion mantiene Confirmada y la retencion; la segunda consume y transfiere una sola vez RESERVAS.creditos y devuelve Completada. Repetir una persona no sustituye a la otra. Reservas de oferta o fraccionarias requieren esquema decimal compatible; en esquema entero devuelven 409 DECIMAL_SETTLEMENT_PENDING. La cancelacion ya comprometida impide pagar.',
+  })
   @ApiOkResponse({ type: ReservationResponse })
   @HttpCode(200)
   @IdempotencyHeader()
@@ -67,6 +74,11 @@ export class ReservationsController {
     return this.exchanges.confirmReservation(user.id, id, key);
   }
   @Post(':id/cancel')
+  @ApiOperation({
+    summary: 'Cancelar y liberar exactamente el importe retenido',
+    description:
+      'Una sola Liberacion por el importe de la reserva, sin pago al tutor. Participantes antes del inicio; despues requiere ADMIN. El horario de una oferta vuelve a estar disponible. Reintentos no repiten la liberacion.',
+  })
   @ApiOkResponse({ type: ReservationResponse })
   @HttpCode(200)
   @IdempotencyHeader()

@@ -16,6 +16,11 @@ import {
 } from '../src/modules/exchanges/exchange.repository';
 import { MemoryUsersRepository } from '../src/modules/users/memory-users.repository';
 import { USERS_REPOSITORY } from '../src/modules/users/users.repository';
+import { VerificationMailer } from '../src/modules/auth/verification-mailer';
+import {
+  mailCapture,
+  confirmFromMailbox,
+} from './support/verification.fixture';
 
 interface Actor {
   id: string;
@@ -26,19 +31,27 @@ interface Actor {
 
 interface ExchangeResponse {
   id_solicitud: string;
+  nombre_solicitante?: string;
+  apellido_solicitante?: string;
+  nombre_ofertante?: string;
+  apellido_ofertante?: string;
   estado: string;
   fecha_inicio_propuesta: string;
   fecha_fin_propuesta: string;
-  creditos_requeridos: number;
+  creditos_requeridos: string;
   created_at: string;
   respondida_at: string | null;
 }
 
 interface ReservationResponse {
   id_reserva: string;
+  nombre_solicitante: string;
+  apellido_solicitante: string;
+  nombre_ofertante: string;
+  apellido_ofertante: string;
   id_solicitud: string;
   estado: string;
-  creditos: number;
+  creditos: string;
   confirmacion_solicitante_at: string | null;
   confirmacion_ofertante_at: string | null;
   cancelado_por: string | null;
@@ -59,15 +72,16 @@ interface MovementResponse {
   tipo: string;
   id_usuario: string;
   id_reserva: string | null;
-  cantidad: number;
-  saldo_anterior: number;
-  saldo_posterior: number;
-  retenidos_anterior: number;
-  retenidos_posterior: number;
+  cantidad: string;
+  saldo_anterior: string;
+  saldo_posterior: string;
+  retenidos_anterior: string;
+  retenidos_posterior: string;
   created_at: string;
 }
 
 describe('Reservas y creditos atomicos por HTTP con memoria y JWT reales', () => {
+  const mailbox = mailCapture();
   let app: INestApplication;
   let admin: Actor;
   let requester: Actor;
@@ -101,14 +115,18 @@ describe('Reservas y creditos atomicos por HTTP con memoria y JWT reales', () =>
     actor.token = response.body.access_token as string;
   }
 
-  async function register(isAdmin = false): Promise<Actor> {
-    const correo = `intercambio-${randomUUID()}@example.test`;
+  async function register(
+    isAdmin = false,
+    nombre = 'Ana',
+    apellido = 'Intercambios',
+  ): Promise<Actor> {
+    const correo = `intercambio-${randomUUID()}@ucb.edu.bo`;
     const password = randomBytes(24).toString('base64url');
     const response = await client()
       .post('/auth/register')
       .send({
-        nombre: 'Ana',
-        apellido: 'Intercambios',
+        nombre,
+        apellido,
         correo,
         password,
         idCarrera: '30000000-0000-4000-8000-000000000001',
@@ -121,6 +139,7 @@ describe('Reservas y creditos atomicos por HTTP con memoria y JWT reales', () =>
       password,
       token: '',
     };
+    await confirmFromMailbox(app, mailbox, correo);
     if (isAdmin)
       await app
         .get<MemoryUsersRepository>(USERS_REPOSITORY)
@@ -228,7 +247,10 @@ describe('Reservas y creditos atomicos por HTTP con memoria y JWT reales', () =>
   beforeEach(async () => {
     const module = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(VerificationMailer)
+      .useValue(mailbox)
+      .compile();
     app = module.createNestApplication({ logger: false });
     configureApp(app);
     failResponseForKey = undefined;
@@ -258,10 +280,10 @@ describe('Reservas y creditos atomicos por HTTP con memoria y JWT reales', () =>
       },
     });
     await app.init();
-    admin = await register(true);
-    requester = await register();
-    provider = await register();
-    other = await register();
+    admin = await register(true, 'Admin', 'Prueba');
+    requester = await register(false, 'Lucia', 'Solicitante');
+    provider = await register(false, 'Marco', 'Ofertante');
+    other = await register(false, 'Carlos', 'Alternativo');
 
     const start = Math.ceil((Date.now() + 3_600_000) / 60_000) * 60_000;
     fechaInicio = new Date(start).toISOString();
@@ -290,19 +312,49 @@ describe('Reservas y creditos atomicos por HTTP con memoria y JWT reales', () =>
     await client().get('/reservations/me').expect(401);
   });
 
+  it('devuelve los nombres de los participantes en solicitudes y reservas', async () => {
+    const exchange = await createExchange();
+
+    const listedRequests = await requests(requester);
+
+    expect(listedRequests).toHaveLength(1);
+    expect(listedRequests[0]).toMatchObject({
+      id_solicitante: requester.id,
+      id_ofertante: provider.id,
+      nombre_solicitante: 'Lucia',
+      apellido_solicitante: 'Solicitante',
+      nombre_ofertante: 'Marco',
+      apellido_ofertante: 'Ofertante',
+    });
+
+    await acceptExchange(exchange);
+
+    const listedReservations = await reservations(requester);
+
+    expect(listedReservations).toHaveLength(1);
+    expect(listedReservations[0]).toMatchObject({
+      id_solicitante: requester.id,
+      id_ofertante: provider.id,
+      nombre_solicitante: 'Lucia',
+      apellido_solicitante: 'Solicitante',
+      nombre_ofertante: 'Marco',
+      apellido_ofertante: 'Ofertante',
+    });
+  });
+
   it('persiste solicitudes, reservas y saldos en el modelo de 12 tablas con creditos enteros', async () => {
     const exchange = await createExchange();
     expect(exchange).toMatchObject({
       fecha_inicio_propuesta: fechaInicio,
       fecha_fin_propuesta: fechaFin,
-      creditos_requeridos: 4,
+      creditos_requeridos: '4',
       estado: 'Solicitada',
       respondida_at: null,
     });
     expect(Number.isNaN(Date.parse(exchange.created_at))).toBe(false);
     const reservation = await acceptExchange(exchange);
     expect(reservation).toMatchObject({
-      creditos: 4,
+      creditos: '4',
       estado: 'Confirmada',
       confirmacion_solicitante_at: null,
       confirmacion_ofertante_at: null,
@@ -320,8 +372,8 @@ describe('Reservas y creditos atomicos por HTTP con memoria y JWT reales', () =>
     expect(stored.owner).toMatchObject({
       id_usuario: requester.id,
       rol: 'Estudiante',
-      saldo: 8,
-      creditos_retenidos: 4,
+      saldo: '8',
+      creditos_retenidos: '4',
     });
     for (const removed of [
       'accounts',
@@ -337,11 +389,11 @@ describe('Reservas y creditos atomicos por HTTP con memoria y JWT reales', () =>
     expect(held).toMatchObject({
       id_usuario: requester.id,
       id_reserva: reservation.id_reserva,
-      cantidad: 4,
-      saldo_anterior: 8,
-      saldo_posterior: 8,
-      retenidos_anterior: 0,
-      retenidos_posterior: 4,
+      cantidad: '4',
+      saldo_anterior: '8',
+      saldo_posterior: '8',
+      retenidos_anterior: '0',
+      retenidos_posterior: '4',
     });
     expect(held).not.toHaveProperty('id_cuenta');
     expect(await wallet(requester)).not.toHaveProperty('id_cuenta');
@@ -352,9 +404,9 @@ describe('Reservas y creditos atomicos por HTTP con memoria y JWT reales', () =>
       ...requestBody(),
       fechaFin: new Date(Date.parse(fechaInicio) + 900_000).toISOString(),
     }).expect(201);
-    expect(response.body.creditos_requeridos).toBe(1);
+    expect(response.body.creditos_requeridos).toBe('1');
     const reservation = await acceptExchange(response.body as ExchangeResponse);
-    expect(reservation.creditos).toBe(1);
+    expect(reservation.creditos).toBe('1');
     expect(await wallet(requester)).toMatchObject({
       saldo: '8',
       creditos_retenidos: '1',
@@ -418,7 +470,7 @@ describe('Reservas y creditos atomicos por HTTP con memoria y JWT reales', () =>
     ]);
     expect(responses.map((response) => response.status)).toEqual([200, 200]);
     expect(responses[0]!.body.id_reserva).toBe(responses[1]!.body.id_reserva);
-    expect(responses[0]!.body.creditos).toBe(4);
+    expect(responses[0]!.body.creditos).toBe('4');
     expect(await reservations(requester)).toHaveLength(1);
     expect(await wallet(requester)).toMatchObject({
       saldo: '8',
@@ -532,25 +584,34 @@ describe('Reservas y creditos atomicos por HTTP con memoria y JWT reales', () =>
     expect(await reservations(requester)).toHaveLength(1);
   });
 
-  it('cancelar y reintentar libera una sola vez y no cobra ni transfiere credito', async () => {
+  it('cancelar tarde y reintentar libera una sola vez y multa al actor una sola vez', async () => {
     const reservation = await acceptExchange(await createExchange());
     const path = `/reservations/${reservation.id_reserva}/cancel`;
     const key = randomUUID();
     const body = { motivo: 'Cambio de horario antes del inicio' };
     const canceled = await post(requester, path, body, key).expect(200);
     expect(canceled.body.estado).toBe('Cancelada');
+    expect(canceled.body.cancelacion).toMatchObject({
+      id_usuario: requester.id,
+      clasificacion: 'injustificada',
+      administrativa: false,
+    });
     const retry = await post(requester, path, body, key).expect(200);
     expect(retry.body).toEqual(canceled.body);
-    await post(requester, path, body).expect(200);
+    // HU-08: solo la misma clave reproduce éxito; otra operación es un conflicto.
+    await post(requester, path, body).expect(409);
     expect(await wallet(requester)).toMatchObject({
-      saldo: '8',
+      saldo: '7.5',
       creditos_retenidos: '0',
-      disponibles: '8',
+      disponibles: '7.5',
     });
     expect((await wallet(provider)).saldo).toBe('0');
     const entries = await movements(requester);
     expect(entries.filter((m) => m.tipo === 'Liberacion')).toHaveLength(1);
     expect(entries.filter((m) => m.tipo === 'Consumo')).toEqual([]);
+    expect(entries.filter((m) => m.tipo === 'Penalizacion')).toMatchObject([
+      { cantidad: '-0.5', id_reserva: reservation.id_reserva },
+    ]);
   });
 
   it('dos confirmaciones de participantes y sus reintentos completan y transfieren una sola vez', async () => {
@@ -595,20 +656,20 @@ describe('Reservas y creditos atomicos por HTTP con memoria y JWT reales', () =>
     expect(
       (await movements(requester)).find((m) => m.tipo === 'Consumo'),
     ).toMatchObject({
-      cantidad: -4,
-      saldo_anterior: 8,
-      saldo_posterior: 4,
-      retenidos_anterior: 4,
-      retenidos_posterior: 0,
+      cantidad: '-4',
+      saldo_anterior: '8',
+      saldo_posterior: '4',
+      retenidos_anterior: '4',
+      retenidos_posterior: '0',
     });
     expect(
       (await movements(provider)).find((m) => m.tipo === 'Transferencia'),
     ).toMatchObject({
-      cantidad: 4,
-      saldo_anterior: 0,
-      saldo_posterior: 4,
-      retenidos_anterior: 0,
-      retenidos_posterior: 0,
+      cantidad: '4',
+      saldo_anterior: '0',
+      saldo_posterior: '4',
+      retenidos_anterior: '0',
+      retenidos_posterior: '0',
     });
     await post(admin, `/reservations/${reservation.id_reserva}/cancel`, {
       motivo: 'Una reserva completada no se cancela',

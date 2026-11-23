@@ -64,3 +64,105 @@ En el marco del Sprint 0 (22 oct – 5 nov), se completaron las **7 historias de
 - Actualizar el tablero de Jira pasando todas las HU a estado completado.
 - El equipo de APIs subirá su rama y abrirá un PR a main para la revisión e integración.
 - Validación final con datos reales de producción.
+
+---
+
+## Parcial 3 — Migración a Vue 3 nativo y validación técnica
+
+- **Fecha:** 2026-11-22
+- **Estado:** En progreso
+- **Responsables:** Equipo Dashboards (Gustavo Quisbert, Jefe de Devs)
+
+### Descripción
+
+Tras verificar en producción que el `<iframe>` de Google Looker Studio bloquea el acceso a usuarios autenticados con cuentas institucionales `@ucb.edu.bo` (*"no tienes acceso a Data Studio"* en Google Workspace, incluso con el reporte en modo público) y que no permite aislar de forma segura los datos por estudiante, se implementó una arquitectura nativa en **Vue 3 con gráficos SVG/CSS** en la rama `equipo/dashboards-parcial3-vue` (sincronizada con `origin/apis/integracion-parcial3`, commit `fa79c3f`). Se replicaron todas las visualizaciones base de estudiante y administrador para validar estética, rendimiento y compatibilidad con Docker, Render y el CI antes de completar los paneles decisionales con datos reales.
+
+### Funcionalidades
+
+- **Componentes de gráficos reutilizables (`frontend/src/features/metrics/vue-dashboards/charts/`):**
+  - `DonutChart.vue`: gráfico de anillo interactivo con leyenda y porcentajes.
+  - `LineChart.vue`: gráfico de línea/área con puntos interactivos y tooltip.
+  - `BarChart.vue`: gráfico de barras verticales, horizontales y comparativas agrupadas.
+  - `HeatmapChart.vue`: mapa de calor por día de la semana y franja horaria.
+- **Vista Estudiante (`StudentDashboardVue.vue`):** resumen de créditos (disponibles, retenidos, totales), calificación promedio, servicios ofrecidos vs. recibidos, evolución de saldo, tabla de movimientos con filtro por tipo, servicios por estado y tabla con filtros por tipo y estado.
+- **Vista Administrador (`AdminDashboardVue.vue`):** KPIs generales, actividad por semana/mes, intercambios por estado, solicitudes por estado y tendencia, motivos de cancelación, mapa de calor horario, usuarios por carrera/semestre/estado, crecimiento de registros, ranking de habilidades ofertadas/solicitadas, comparativa oferta vs. demanda y distribución por categoría.
+
+### Evidencias y pruebas
+
+- Rama de trabajo: `equipo/dashboards-parcial3-vue` (sincronizada limpiamente con `origin/apis/integracion-parcial3`, commit `fa79c3f`, sin conflictos).
+- Pruebas ejecutadas:
+  - `npm test` en `frontend/`: **121/121 pruebas aprobadas** (incluidas `openapi-contract.test.js`, `screen-guide.test.js` y `notification-model.test.js`).
+  - `npm run build` en `frontend/`: compilación de producción correcta en Vite.
+  - Verificación visual local en modo demo (`?demo=1`) y con stack completo en Docker (PostgreSQL + Backend + Frontend).
+- Pruebas pendientes o limitaciones:
+  - Las vistas base de resumen en `sprint0-data.js` aún esperan la conexión final con `/analytics/{users,exchanges,credits,skills}` coordinada en el Issue `#50`.
+  - Los cambios temporales en `ReportPanel.vue` y `AppShell.vue` están sujetos a aprobación e integración formal de Frontend/APIs.
+
+### Dependencias
+
+- **Issue #50 (Frontend / APIs):** aprobación de la subcarpeta dedicada `frontend/src/features/metrics/vue-dashboards/` (requerida por el contexto de build `./frontend` en Docker y `buildFilter` en Render), montaje en `ReportPanel.vue` y exposición de los endpoints `/analytics/*` en `analytics.js`.
+- **Issue #51 (Backend / PO):** completar `knowledge_score` (`GET /analytics/reputation`), `reglas_economia.factores`, `inactividad.criterio_sin_uso_PO` y confirmar el endpoint de reputación propia del estudiante. *(Avance verificado el 22/11: `cancelaciones_injustificadas` con multa `0.5` / 5 h ya está integrado en `apis/integracion-parcial3`, y Base de Datos ya unificó créditos a `NUMERIC(12,2)` en V6).*
+
+---
+
+## Parcial 3 — Panel de Puntaje y Reconocimiento de Tutores (*Knowledge Score*)
+
+- **Fecha:** 2026-11-22
+- **Estado:** En progreso (implementado y verificado localmente en `equipo/dashboards-parcial3-vue`; pendiente integración por Issue `#50` y validación con datos reales de producción tras cierre del Issue `#51`)
+- **Responsables:** Gustavo Walter Quisbert Chana (Equipo Dashboards)
+
+### Descripción
+
+Se implementó la vista de **Reputación y reconocimiento de tutores** dentro del panel de administración en Vue 3, adoptando la fórmula alineada con Base de Datos V6 (`v_knowledge_score`) y Backend: `Knowledge Score = 0.5 × tutorías_completadas + 1.5 × promedio` (priorizando siempre el puntaje calculado por el backend cuando llegue numérico), y el umbral oficial para la insignia **«Tutor de alto impacto»** (`opiniones >= 3`, `promedio >= 4.5`, `tutorías_completadas >= 5`, `tasa_cumplimiento >= 90%`).
+
+### Funcionalidades
+
+- **Lógica de cálculo y normalización (`knowledge-score.js`):** cálculo de *Knowledge Score*, evaluación de alto impacto vs. `pocos_datos`, enriquecimiento del contrato `GET /analytics/reputation` con las 49 materias, 7 áreas y 9 semestres del pensum, ordenamiento del ranking, filtros y cálculo de KPIs.
+- **Vista de Reputación (`KnowledgeScorePanel.vue`):**
+  - 4 tarjetas KPI: *Tutores evaluados*, *Promedio global (★)*, *Tutores de alto impacto* y *Cancelaciones injustificadas*.
+  - Filtros interactivos por **Área académica**, **Semestre**, **Materia (49 materias)**, *Solo tutores de alto impacto* y visibilidad de `pocos_datos`.
+  - Gráfico de barras horizontales del Top tutores por *Knowledge Score*.
+  - Tabla de ranking con insignia **«Tutor de alto impacto»**, estado `pocos_datos` y manejo de estados de carga, error y vacío.
+- **Servicio e integración (`analytics.js` + `AdminDashboardVue.vue`):** agregada la función `getReputation()` para consumir `GET /analytics/reputation` (validada por `openapi-contract.test.js`) con respaldo sintético únicamente en `?demo=1`.
+
+### Evidencias y pruebas
+
+- `node --test src/features/metrics/vue-dashboards/knowledge-score.test.js`: **4/4 pruebas aprobadas** (fórmula y prioridad al backend, umbrales de alto impacto, manejo de `pocos_datos`, filtros por materia/área/semestre y KPIs).
+- `npm test` en `frontend/`: **121/121 pruebas aprobadas** (incluida `openapi-contract.test.js` verificando `GET /analytics/reputation` contra `docs/openapi.json`).
+- `npm run build` en `frontend/`: compilación de producción limpia en Vite (7.32 s).
+- Verificación visual en navegador sobre `/administracion/metricas`.
+
+### Dependencias
+
+- **Issue #50 (Frontend / APIs):** aprobación de ubicación en `frontend/src/features/metrics/vue-dashboards/` e integración en `ReportPanel.vue`.
+- **Issue #51 (Backend):** publicar `knowledge_score` calculado en `GET /analytics/reputation` dentro de `apis/integracion-parcial3`.
+
+---
+
+## Parcial 3 — Command Center y *Knowledge Gap Index* (Demanda vs. Tutores por materia)
+
+- **Fecha:** 2026-11-22
+- **Estado:** En progreso (implementado en `equipo/dashboards-parcial3-vue` consumiendo `GET /analytics/academic`, con respaldo de demostración y aviso `.vd-demo-notice` mientras Neon recibe datos reales)
+- **Responsables:** Equipo Dashboards (Gustavo Walter Quisbert Chana, Pablo Soto, Mayte)
+
+### Descripción
+
+Atendiendo la observación de incluir explícitamente el **Knowledge Gap Index** en BI, se implementó el panel **Command Center · Knowledge Gap Index** dentro del dashboard de administración en Vue 3, comparando demanda estudiantil (`solicitudes`) frente a `tutores_activos` en las **49 materias** del pensum de Ingeniería de Sistemas y alineando la fórmula y niveles de alerta con la vista `v_knowledge_gap_index` de Base de Datos V6.
+
+### Funcionalidades
+
+- **Cálculo y normalización (`knowledge-gap.js`):** cálculo de `nivel_brecha = (demanda / tutores_activos) × 100` (y `100%` cuando hay demanda sin tutores), clasificación en alertas (`Sin tutores`, `Crítica`, `Alta`, `Media`, `Baja`, `Sin demanda pendiente`), filtros por área y semestre, y resumen global.
+- **Vista (`CommandCenterPanel.vue`):**
+  - Tarjetas KPI con el título exacto **«Knowledge Gap Index»**, materias críticas/sin tutores, demanda vs. tutores activos y cobertura académica.
+  - Gráfico comparativo **«Knowledge Gap Index — Demanda vs. Tutores por materia»** (Top 10 materias con mayor brecha).
+  - Tabla detallada de las 49 materias con demanda, demanda proyectada estimada, tutores activos, cobertura y nivel de alerta.
+- **Consumo de API (`analytics.js`):** agregada la función `getAcademic()` sobre `GET /analytics/academic` (validada por `openapi-contract.test.js`). Si en el despliegue aún no hay actividad cargada en Neon, muestra la muestra de demostración manteniendo visible el aviso `.vd-demo-notice`.
+
+### Evidencias y pruebas
+
+- `node --test src/features/metrics/vue-dashboards/knowledge-gap.test.js`: pruebas unitarias aprobadas.
+- `npm test` y `npm run build` en `frontend/` aprobados (incluida validación de `docs/openapi.json`).
+
+### Dependencias
+
+- Carga de vistas y datos reales de BD V6 en Neon para activar el flujo 100% real en producción sin aviso demo.

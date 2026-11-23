@@ -57,12 +57,16 @@ export class AdminUsersController {
   }
 
   @Post()
-  @ApiCreatedResponse({ type: PublicUser })
+  @ApiCreatedResponse({
+    type: PublicUser,
+    description:
+      'Perfil Pendiente con verification_required: true; confirmar el correo enviado antes del login',
+  })
   @ApiBadRequestResponse({ description: 'Datos inválidos' })
   @ApiConflictResponse({ description: 'Correo no disponible' })
   @ApiOperation({
     summary:
-      'Alta de estudiante por ADMIN; reutiliza el registro (Argon2id, créditos iniciales) y audita la acción',
+      'Alta pendiente por ADMIN; envía confirmación por correo, saldo cero hasta verificar y audita la acción',
   })
   create(@CurrentUser() admin: PublicUser, @Body() input: RegisterDto) {
     return this.auth.register(input, admin.id);

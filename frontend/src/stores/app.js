@@ -1,9 +1,12 @@
+import { demoEnabled } from '../features/demo/mode.js'
 import { defineStore } from 'pinia'
-import { getToken, onUnauthorized } from '../services/api'
+import { getToken, onUnauthorized, setToken } from '../services/api'
 import * as auth from '../services/auth'
 import * as catalogs from '../services/catalogs'
 import * as timebank from '../services/timebank'
 import * as calendar from '../services/calendar'
+import * as tutoring from '../services/tutoring'
+import { canRateReservation, validateReview } from '../features/offers/tutoring-model'
 import community from '../services/community.json'
 
 const GUEST = { id: '', nombre: 'Invitado', apellido: 'UCB', correo: '', idCarrera: '', semestre: '—', rol: 'Invitado', roles: [] }
@@ -12,7 +15,7 @@ const personFrom = (row) => {
   const [nombre = 'Estudiante', ...rest] = row.nombre.trim().split(/\s+/)
   return { id: row.id_usuario, nombre, apellido: rest.join(' ') }
 }
-const sessionData = () => ({ ownSkills: [], ownAvailability: [], requests: [], reservations: [], accountData: emptyAccount(), movements: [], offers: [], communityAvailability: [] })
+const sessionData = () => ({ ownSkills: [], ownAvailability: [], requests: [], reservations: [], accountData: emptyAccount(), movements: [], offers: [], communityAvailability: [], ownReviews: [], reviewsState: 'pending', offerDetails: [], tutoringState: 'pending' })
 
 let toastTimer
 export const useAppStore = defineStore('app', {
@@ -51,7 +54,38 @@ export const useAppStore = defineStore('app', {
       return this.community.find((user) => user.id === id)
     },
     findSkill(id) { return this.skills.find((skill) => skill.id_habilidad === id) },
+    findOffer(userId, skillId) { return this.offerDetails.find((row) => row.id_usuario === userId && row.id_habilidad === skillId) },
+    async loadTutoring() {
+      if (!tutoring.tutoringEnabled) return
+      this.tutoringState = 'loading'
+      try { this.offerDetails = await tutoring.getTutorOffers(); this.tutoringState = 'ready' }
+      catch { this.tutoringState = 'error' }
+    },
+    async loadReviews() {
+      if (!tutoring.tutoringEnabled || !this.authenticated) return
+      const userId = this.user.id
+      this.reviewsState = 'loading'
+      try {
+        const rows = await tutoring.getMyReviews()
+        if (this.user.id === userId && this.authenticated) { this.ownReviews = rows; this.reviewsState = 'ready' }
+      } catch { if (this.user.id === userId) this.reviewsState = 'error' }
+    },
+    async rateTutor(reservationId, input, key) {
+      if (!this.authenticated) throw new Error('Inicia sesión para calificar al tutor.')
+      const row = this.myReservations.find((item) => item.id_reserva === reservationId)
+      if (!canRateReservation(row, this.user.id)) throw new Error('Solo puedes calificar las clases completadas en las que aprendiste.')
+      if (this.reviewsState !== 'ready') throw new Error('Carga tus opiniones antes de calificar.')
+      if (this.ownReviews.some((review) => review.id_reserva === reservationId)) throw new Error('Ya calificaste esta clase.')
+      const error = validateReview(input)
+      if (error) throw new Error(error)
+      const userId = this.user.id
+      const review = await tutoring.rateTutor(reservationId, input, key)
+      if (this.authenticated && this.user.id === userId) this.ownReviews.push({ ...review, id_reserva: reservationId })
+      await this.loadTutoring()
+      return review
+    },
     async init() {
+      if (demoEnabled) setToken('synthetic-local-session')
       onUnauthorized(() => this.expireSession())
       await this.loadCatalogs()
       if (!getToken()) {
@@ -93,11 +127,13 @@ export const useAppStore = defineStore('app', {
       this.reservations = value(reservations, this.reservations)
       this.accountData = value(accountData, this.accountData)
       this.movements = value(movements, this.movements)
+      await this.loadReviews()
     },
     async loadCommunity() {
       this.communityLoading = true
       try {
         await this.fetchCommunity()
+        await this.loadTutoring()
       } finally {
         this.communityLoading = false
       }
@@ -124,6 +160,10 @@ export const useAppStore = defineStore('app', {
       this.communityAvailability = results.flatMap((result) => result.slots)
     },
     loadSessionData() { return Promise.all([this.loadMine(), this.loadCommunity()]) },
+    async refreshLive() {
+      const community = Promise.allSettled([this.fetchCommunity()]).then(() => this.loadTutoring())
+      await Promise.allSettled([community, this.authenticated ? this.loadMine() : Promise.resolve()])
+    },
     async login(correo, password) {
       this.profile = await auth.login(correo, password)
       this.authenticated = true
@@ -146,13 +186,15 @@ export const useAppStore = defineStore('app', {
       return true
     },
     async register(payload) {
-      await auth.register(payload)
-      try {
-        await this.login(payload.correo, payload.password)
-        return true
-      } catch {
-        return false
-      }
+      return auth.register(payload)
+    },
+
+    async verifyEmail(token) {
+      return auth.verifyEmail(token)
+    },
+
+    async resendVerification(correo) {
+      return auth.resendVerification(correo)
     },
     async updateProfile(changes) {
       this.profile = await auth.updateProfile(changes)

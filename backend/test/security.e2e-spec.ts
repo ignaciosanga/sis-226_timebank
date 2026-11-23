@@ -99,7 +99,7 @@ describe('Seguridad HTTP con repositorio simulado (no es integracion de BD)', ()
   const registration = {
     nombre: 'Ana',
     apellido: 'Perez',
-    correo: 'ana@example.test',
+    correo: 'ana@ucb.edu.bo',
     password: 'clave-segura-de-prueba',
     idCarrera: '30000000-0000-4000-8000-000000000001',
     semestre: 3,
@@ -120,7 +120,7 @@ describe('Seguridad HTTP con repositorio simulado (no es integracion de BD)', ()
     configureApp(app);
     await app.init();
     jwt = app.get(JwtService);
-    token = await jwt.signAsync({ sub: 'usuario-test' });
+    token = await jwt.signAsync({ sub: 'usuario-test', purpose: 'session' });
   });
   beforeEach(() => {
     repository.findById.mockResolvedValue(userFixture({ passwordHash: hash }));
@@ -145,13 +145,17 @@ describe('Seguridad HTTP con repositorio simulado (no es integracion de BD)', ()
     async (kind) => {
       let bad = 'invalid.jwt.signature';
       if (kind === 'expired')
-        bad = await jwt.signAsync({ sub: 'usuario-test' }, { expiresIn: -1 });
+        bad = await jwt.signAsync(
+          { sub: 'usuario-test', purpose: 'session' },
+          { expiresIn: -1 },
+        );
       if (kind === 'wrong-audience')
         bad = await jwt.signAsync(
-          { sub: 'usuario-test' },
+          { sub: 'usuario-test', purpose: 'session' },
           { audience: 'otro' },
         );
-      if (kind === 'missing-sub') bad = await jwt.signAsync({});
+      if (kind === 'missing-sub')
+        bad = await jwt.signAsync({ purpose: 'session' });
       await request(app.getHttpServer())
         .get('/__test__/me')
         .auth(bad, { type: 'bearer' })
@@ -264,6 +268,7 @@ describe('Seguridad HTTP con repositorio simulado (no es integracion de BD)', ()
   it('ignora roles fabricados en un token y usa los del repositorio', async () => {
     const forgedRole = await jwt.signAsync({
       sub: 'usuario-test',
+      purpose: 'session',
       roles: ['ADMIN'],
     });
     await request(app.getHttpServer())

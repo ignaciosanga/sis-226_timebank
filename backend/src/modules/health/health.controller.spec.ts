@@ -22,13 +22,13 @@ describe('Readiness de persistencia', () => {
     });
     expect(connect).not.toHaveBeenCalled();
   });
-  it('requiere las 12 tablas en PostgreSQL', async () => {
-    query.mockResolvedValue([{ total: 12 }]);
+  it('requiere el esquema con verificacion, ofertas y banners en PostgreSQL', async () => {
+    query.mockResolvedValue([{ total: 15 }]);
     await expect(controller('prisma').ready()).resolves.toEqual({
       status: 'ok',
       persistence: 'postgresql',
     });
-    query.mockResolvedValue([{ total: 11 }]);
+    query.mockResolvedValue([{ total: 12 }]);
     await expect(controller('prisma').ready()).rejects.toMatchObject({
       status: 503,
     });

@@ -1,6 +1,14 @@
 import { types } from 'node:util';
 import { AvailabilityStatus } from '../../common/enums/record-status.enum';
-import { MAX_CREDITS, reservationCost } from './credits';
+import {
+  addCredits,
+  compareCredits,
+  CreditValue,
+  formatCredits,
+  reservationCost,
+  subtractCredits,
+  validateReservationInterval,
+} from './credits';
 import {
   ExchangeState,
   Movement,
@@ -8,15 +16,37 @@ import {
   Reservation,
   ReservationStatus,
 } from './exchange.types';
+import { classifyCancellation } from './cancellation-policy';
 
 export interface IntegrityIssue {
   code: string;
   ids: string[];
 }
 
-const validBalance = (value: number) =>
-  Number.isInteger(value) && value >= 0 && value <= MAX_CREDITS;
-const validAmount = (value: number) => validBalance(value) && value > 0;
+const creditComparison = (
+  left: CreditValue,
+  right: CreditValue,
+): number | null => {
+  try {
+    return compareCredits(left, right);
+  } catch {
+    return null;
+  }
+};
+const validBalance = (value: CreditValue) => {
+  const comparison = creditComparison(value, '0');
+  return comparison !== null && comparison >= 0;
+};
+const validAmount = (value: CreditValue) => creditComparison(value, '0') === 1;
+const sameCredits = (left: CreditValue, right: CreditValue) =>
+  creditComparison(left, right) === 0;
+const balanceKey = (value: CreditValue): string => {
+  try {
+    return formatCredits(value);
+  } catch {
+    return `invalid:${String(value)}`;
+  }
+};
 const validDate = (value: Date | null): value is Date =>
   types.isDate(value) && Number.isFinite(value.getTime());
 const sameDate = (left: Date, right: Date) =>
@@ -43,11 +73,12 @@ function groupBy<T>(
  */
 function validLedgerChain(
   records: Movement[],
-  balance: number,
-  retained: number,
+  balance: CreditValue,
+  retained: CreditValue,
 ): boolean {
   if (!records.length) return true;
-  const key = (saldo: number, retenidos: number) => `${saldo}:${retenidos}`;
+  const key = (saldo: CreditValue, retenidos: CreditValue) =>
+    `${balanceKey(saldo)}:${balanceKey(retenidos)}`;
   const edges = new Map<string, string[]>();
   const degrees = new Map<string, number>();
   for (const record of records) {
@@ -98,6 +129,7 @@ export function inspectIntegrity(state: ExchangeState): IntegrityIssue[] {
     'BonoInicial',
     'Recompensa',
     'Penalizacion',
+    'penalizacion_sin_saldo',
     'Transferencia',
     'Ajuste',
     'Retencion',
@@ -110,22 +142,30 @@ export function inspectIntegrity(state: ExchangeState): IntegrityIssue[] {
     if (
       !validBalance(user.saldo) ||
       !validBalance(user.creditos_retenidos) ||
-      user.creditos_retenidos > user.saldo
+      creditComparison(user.creditos_retenidos, user.saldo) === 1
     )
       report('USER_INVALID_BALANCE', userId);
     const ledger = byUser.get(userId) ?? [];
     if (!validLedgerChain(ledger, user.saldo, user.creditos_retenidos))
       report('USER_LEDGER_SNAPSHOT_CHAIN_MISMATCH', userId);
-    const expectedRetained = reservations.reduce(
-      (sum, reservation) =>
-        reservation.id_solicitante === userId &&
-        reservation.estado === ReservationStatus.CONFIRMADA &&
-        validAmount(reservation.creditos)
-          ? sum + reservation.creditos
-          : sum,
-      0,
-    );
-    if (user.creditos_retenidos !== expectedRetained)
+    let expectedRetained: string | null = '0';
+    try {
+      expectedRetained = reservations.reduce(
+        (sum, reservation) =>
+          reservation.id_solicitante === userId &&
+          reservation.estado === ReservationStatus.CONFIRMADA &&
+          validAmount(reservation.creditos)
+            ? addCredits(sum, reservation.creditos)
+            : sum,
+        '0',
+      );
+    } catch {
+      expectedRetained = null;
+    }
+    if (
+      expectedRetained === null ||
+      !sameCredits(user.creditos_retenidos, expectedRetained)
+    )
       report('USER_RESERVATION_RETAINED_MISMATCH', userId);
   }
 
@@ -135,10 +175,10 @@ export function inspectIntegrity(state: ExchangeState): IntegrityIssue[] {
     if (movementKey !== id) report('MOVEMENT_KEY_MISMATCH', id, movementKey);
     if (!state.users.has(movement.id_usuario))
       report('MOVEMENT_USER_NOT_FOUND', id, movement.id_usuario);
+    const amountSign = creditComparison(movement.cantidad, '0');
     if (
-      !Number.isInteger(movement.cantidad) ||
-      movement.cantidad === 0 ||
-      Math.abs(movement.cantidad) > MAX_CREDITS
+      amountSign === null ||
+      (amountSign === 0 && movement.tipo !== 'penalizacion_sin_saldo')
     )
       report('MOVEMENT_INVALID_AMOUNT', id);
     if (!movementTypes.has(movement.tipo)) report('MOVEMENT_INVALID_TYPE', id);
@@ -150,27 +190,43 @@ export function inspectIntegrity(state: ExchangeState): IntegrityIssue[] {
         movement.retenidos_anterior,
         movement.retenidos_posterior,
       ].every(validBalance) ||
-      movement.retenidos_anterior > movement.saldo_anterior ||
-      movement.retenidos_posterior > movement.saldo_posterior
+      creditComparison(movement.retenidos_anterior, movement.saldo_anterior) ===
+        1 ||
+      creditComparison(
+        movement.retenidos_posterior,
+        movement.saldo_posterior,
+      ) === 1
     )
       report('MOVEMENT_INVALID_SNAPSHOT', id);
-    let balanceDelta = movement.cantidad;
-    let retainedDelta = 0;
-    if (movement.tipo === 'Retencion') {
-      balanceDelta = 0;
-      retainedDelta = movement.cantidad;
+    let validDeltas = false;
+    try {
+      let balanceDelta: CreditValue = movement.cantidad;
+      let retainedDelta: CreditValue = '0';
+      if (movement.tipo === 'Retencion') {
+        balanceDelta = '0';
+        retainedDelta = movement.cantidad;
+      }
+      if (movement.tipo === 'Liberacion') {
+        balanceDelta = '0';
+        retainedDelta = subtractCredits('0', movement.cantidad);
+      }
+      if (movement.tipo === 'Consumo') retainedDelta = movement.cantidad;
+      validDeltas =
+        sameCredits(
+          subtractCredits(movement.saldo_posterior, movement.saldo_anterior),
+          balanceDelta,
+        ) &&
+        sameCredits(
+          subtractCredits(
+            movement.retenidos_posterior,
+            movement.retenidos_anterior,
+          ),
+          retainedDelta,
+        );
+    } catch {
+      validDeltas = false;
     }
-    if (movement.tipo === 'Liberacion') {
-      balanceDelta = 0;
-      retainedDelta = -movement.cantidad;
-    }
-    if (movement.tipo === 'Consumo') retainedDelta = movement.cantidad;
-    if (
-      movement.saldo_posterior - movement.saldo_anterior !== balanceDelta ||
-      movement.retenidos_posterior - movement.retenidos_anterior !==
-        retainedDelta
-    )
-      report('MOVEMENT_SNAPSHOT_DELTA_MISMATCH', id);
+    if (!validDeltas) report('MOVEMENT_SNAPSHOT_DELTA_MISMATCH', id);
     if (
       ([
         'Retencion',
@@ -179,16 +235,21 @@ export function inspectIntegrity(state: ExchangeState): IntegrityIssue[] {
         'Recompensa',
         'Transferencia',
       ].includes(movement.tipo) &&
-        movement.cantidad <= 0) ||
+        amountSign !== 1) ||
       (['Consumo', 'Penalizacion'].includes(movement.tipo) &&
-        movement.cantidad >= 0)
+        amountSign !== -1) ||
+      (movement.tipo === 'penalizacion_sin_saldo' && amountSign !== 0)
     )
       report('MOVEMENT_INVALID_SIGN', id);
     if (movement.id_reserva === null) {
       if (
-        ['Retencion', 'Liberacion', 'Consumo', 'Transferencia'].includes(
-          movement.tipo,
-        )
+        [
+          'Retencion',
+          'Liberacion',
+          'Consumo',
+          'Transferencia',
+          'penalizacion_sin_saldo',
+        ].includes(movement.tipo)
       )
         report('MOVEMENT_RESERVATION_REQUIRED', id);
       continue;
@@ -213,11 +274,19 @@ export function inspectIntegrity(state: ExchangeState): IntegrityIssue[] {
           : reservation.id_solicitante;
       if (movement.id_usuario !== expectedUser)
         report('MOVEMENT_USER_MISMATCH', id, reservation.id_reserva);
-      const expectedAmount =
-        movement.tipo === 'Consumo'
-          ? -reservation.creditos
-          : reservation.creditos;
-      if (movement.cantidad !== expectedAmount)
+      let expectedAmount: CreditValue | null = null;
+      try {
+        expectedAmount =
+          movement.tipo === 'Consumo'
+            ? subtractCredits('0', reservation.creditos)
+            : reservation.creditos;
+      } catch {
+        expectedAmount = null;
+      }
+      if (
+        expectedAmount === null ||
+        !sameCredits(movement.cantidad, expectedAmount)
+      )
         report(
           'MOVEMENT_RESERVATION_AMOUNT_MISMATCH',
           id,
@@ -243,12 +312,33 @@ export function inspectIntegrity(state: ExchangeState): IntegrityIssue[] {
       report('REQUEST_SAME_PARTICIPANT', key);
     if (!Object.values(RequestStatus).includes(request.estado))
       report('REQUEST_INVALID_STATUS', key);
+    if (!validAmount(request.creditos_requeridos))
+      report('REQUEST_INVALID_AMOUNT', key);
+    if (request.id_oferta) {
+      const offer = state.offers.get(request.id_oferta);
+      if (!offer) report('REQUEST_OFFER_NOT_FOUND', key, request.id_oferta);
+      else if (
+        offer.id_tutor !== request.id_ofertante ||
+        offer.id_habilidad !== request.id_habilidad ||
+        offer.id_disponibilidad !==
+          state.requestMetadata.get(key)?.availabilityId
+      )
+        report('REQUEST_OFFER_CONTEXT_MISMATCH', key, request.id_oferta);
+    }
     try {
+      validateReservationInterval(
+        request.fecha_inicio_propuesta,
+        request.fecha_fin_propuesta,
+      );
       if (
-        reservationCost(
-          request.fecha_inicio_propuesta,
-          request.fecha_fin_propuesta,
-        ) !== request.creditos_requeridos
+        !request.id_oferta &&
+        !sameCredits(
+          reservationCost(
+            request.fecha_inicio_propuesta,
+            request.fecha_fin_propuesta,
+          ),
+          request.creditos_requeridos,
+        )
       )
         report('REQUEST_COST_MISMATCH', key);
     } catch {
@@ -280,7 +370,7 @@ export function inspectIntegrity(state: ExchangeState): IntegrityIssue[] {
         request.id_solicitante !== reservation.id_solicitante ||
         request.id_ofertante !== reservation.id_ofertante ||
         request.id_habilidad !== reservation.id_habilidad ||
-        request.creditos_requeridos !== reservation.creditos ||
+        !sameCredits(request.creditos_requeridos, reservation.creditos) ||
         !sameDate(request.fecha_inicio_propuesta, reservation.fecha_inicio) ||
         !sameDate(request.fecha_fin_propuesta, reservation.fecha_fin))
     )
@@ -291,7 +381,7 @@ export function inspectIntegrity(state: ExchangeState): IntegrityIssue[] {
       if (!state.users.has(userId))
         report('RESERVATION_USER_NOT_FOUND', id, userId);
     const metadata = state.reservationMetadata.get(id);
-    if (metadata) {
+    if (metadata?.availabilityId) {
       const availability = state.availability.get(metadata.availabilityId);
       if (!availability)
         report(
@@ -307,7 +397,11 @@ export function inspectIntegrity(state: ExchangeState): IntegrityIssue[] {
         );
       else if (
         reservation.estado === ReservationStatus.CONFIRMADA &&
-        (availability.estado !== AvailabilityStatus.DISPONIBLE ||
+        ((availability.estado !== AvailabilityStatus.DISPONIBLE &&
+          !(
+            request?.id_oferta &&
+            availability.estado === AvailabilityStatus.RESERVADO
+          )) ||
           !validDate(availability.fecha_inicio) ||
           !validDate(availability.fecha_fin) ||
           availability.fecha_inicio > reservation.fecha_inicio ||
@@ -320,9 +414,16 @@ export function inspectIntegrity(state: ExchangeState): IntegrityIssue[] {
         );
     }
     try {
+      validateReservationInterval(
+        reservation.fecha_inicio,
+        reservation.fecha_fin,
+      );
       if (
-        reservationCost(reservation.fecha_inicio, reservation.fecha_fin) !==
-        reservation.creditos
+        !request?.id_oferta &&
+        !sameCredits(
+          reservationCost(reservation.fecha_inicio, reservation.fecha_fin),
+          reservation.creditos,
+        )
       )
         report('RESERVATION_COST_MISMATCH', id);
     } catch {
@@ -417,6 +518,38 @@ export function inspectIntegrity(state: ExchangeState): IntegrityIssue[] {
         item.tipo,
       ),
     );
+    // No se reconstruye ni se reclasifica el historial anterior a HU-08.
+    if (metadata?.clasificacionCancelacion) {
+      const classification = metadata.clasificacionCancelacion;
+      const penalties = (byReservation.get(id) ?? []).filter((item) =>
+        ['Penalizacion', 'penalizacion_sin_saldo'].includes(item.tipo),
+      );
+      if (
+        reservation.estado !== ReservationStatus.CANCELADA ||
+        !validDate(reservation.cancelled_at) ||
+        classifyCancellation(
+          metadata.administrativa,
+          reservation.fecha_inicio,
+          reservation.cancelled_at.getTime(),
+        ) !== classification
+      )
+        report('CANCELLATION_CLASSIFICATION_MISMATCH', id);
+      if (classification === 'injustificada') {
+        if (
+          penalties.length !== 1 ||
+          penalties.some(
+            (item) =>
+              item.id_usuario !== reservation.cancelado_por ||
+              !sameCredits(
+                item.cantidad,
+                item.tipo === 'Penalizacion' ? '-0.5' : '0',
+              ),
+          )
+        )
+          report('CANCELLATION_PENALTY_MISMATCH', id);
+      } else if (penalties.length)
+        report('CANCELLATION_UNEXPECTED_PENALTY', id);
+    }
     if (
       events.length !== expected.length ||
       expected.some((type) => !events.some((event) => event.tipo === type))

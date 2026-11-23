@@ -16,8 +16,14 @@ import {
 } from '../src/modules/skills/skills.repository';
 import { USERS_REPOSITORY } from '../src/modules/users/users.repository';
 import { MemoryUsersRepository } from '../src/modules/users/memory-users.repository';
+import { VerificationMailer } from '../src/modules/auth/verification-mailer';
+import {
+  mailCapture,
+  confirmFromMailbox,
+} from './support/verification.fixture';
 
 describe('Flujo v0.2 HTTP real con memoria, Argon2id y JWT', () => {
+  const mailbox = mailCapture();
   let app: INestApplication;
   let users: MemoryUsersRepository;
   let student: { id: string; token: string };
@@ -46,6 +52,7 @@ describe('Flujo v0.2 HTTP real con memoria, Argon2id y JWT', () => {
       .expect(201);
     expect(created.body).not.toHaveProperty('passwordHash');
     expect(created.body.roles).toEqual([Role.ESTUDIANTE]);
+    await confirmFromMailbox(app, mailbox, correo);
     if (isAdmin) await users.grantDevelopmentAdmin(created.body.id);
     const login = await client()
       .post('/auth/login')
@@ -69,14 +76,17 @@ describe('Flujo v0.2 HTTP real con memoria, Argon2id y JWT', () => {
   beforeAll(async () => {
     const module = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(VerificationMailer)
+      .useValue(mailbox)
+      .compile();
     app = module.createNestApplication({ logger: false });
     configureApp(app);
     await app.init();
     users = app.get(USERS_REPOSITORY);
-    student = await register('ana@example.test');
-    other = await register('luis@example.test');
-    admin = await register('admin@example.test', true);
+    student = await register('ana@ucb.edu.bo');
+    other = await register('luis@ucb.edu.bo');
+    admin = await register('admin@ucb.edu.bo', true);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -141,7 +151,7 @@ describe('Flujo v0.2 HTTP real con memoria, Argon2id y JWT', () => {
         .post('/auth/register')
         .send({
           ...registration,
-          correo: `invalido-${randomUUID()}@example.test`,
+          correo: `invalido-${randomUUID()}@ucb.edu.bo`,
           ...input,
         })
         .expect(400);
@@ -152,7 +162,7 @@ describe('Flujo v0.2 HTTP real con memoria, Argon2id y JWT', () => {
       .post('/auth/register')
       .send({
         ...registration,
-        correo: `sin-carrera-${randomUUID()}@example.test`,
+        correo: `sin-carrera-${randomUUID()}@ucb.edu.bo`,
         idCarrera: randomUUID(),
       })
       .expect(404);
@@ -530,17 +540,17 @@ describe('Flujo v0.2 HTTP real con memoria, Argon2id y JWT', () => {
   it('rechaza correo duplicado, credenciales incorrectas y elevacion de rol', async () => {
     await client()
       .post('/auth/register')
-      .send({ ...registration, correo: ' ANA@EXAMPLE.TEST ' })
+      .send({ ...registration, correo: ' ANA@UCB.EDU.BO ' })
       .expect(409);
     await client()
       .post('/auth/login')
-      .send({ correo: 'ana@example.test', password: 'incorrecta' })
+      .send({ correo: 'ana@ucb.edu.bo', password: 'incorrecta' })
       .expect(401);
     await client()
       .post('/auth/register')
       .send({
         ...registration,
-        correo: 'ataque@example.test',
+        correo: 'ataque@ucb.edu.bo',
         roles: ['ADMIN'],
       })
       .expect(400);

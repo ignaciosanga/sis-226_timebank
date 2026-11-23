@@ -3,9 +3,10 @@ import { Movement, RequestStatus, ReservationStatus } from '../exchange.types';
 
 const creditAmount = {
   type: String,
-  pattern: '^\\d+$',
-  example: '4',
-  description: 'Creditos enteros; un credito equivale a 15 minutos',
+  pattern: '^\\d+(?:\\.\\d)?$',
+  example: '3.7',
+  description:
+    'Creditos exactos como texto, enteros o decimas. Precio pactado de oferta o tarifa historica para horarios anteriores.',
 };
 const date = { type: String, format: 'date-time' };
 
@@ -26,9 +27,16 @@ class ExchangeParticipantsResponse {
 }
 
 export class ExchangeRequestResponse extends ExchangeParticipantsResponse {
+  @ApiProperty({
+    type: String,
+    format: 'uuid',
+    nullable: true,
+    description: 'Oferta de origen; NULL en solicitudes historicas sin oferta',
+  })
+  id_oferta!: string | null;
   @ApiProperty(date) fecha_inicio_propuesta!: Date;
   @ApiProperty(date) fecha_fin_propuesta!: Date;
-  @ApiProperty({ type: 'integer', minimum: 1 }) creditos_requeridos!: number;
+  @ApiProperty(creditAmount) creditos_requeridos!: string;
   @ApiProperty({ ...date, nullable: true }) respondida_at!: Date | null;
   @ApiProperty({
     maxLength: 500,
@@ -52,13 +60,23 @@ export class CancellationResponse {
   @ApiProperty({ maxLength: 500 }) motivo!: string;
   @ApiProperty(date) fecha!: Date;
   @ApiProperty() administrativa!: boolean;
+  @ApiProperty({
+    type: String,
+    enum: ['sin_multa', 'injustificada', 'administrativa'],
+    nullable: true,
+    description:
+      'Clasificacion persistida en AUDITORIA; NULL en historial sin clasificar',
+  })
+  clasificacion!: string | null;
 }
 
 export class ReservationResponse extends ExchangeParticipantsResponse {
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) id_oferta!:
+    string | null;
   @ApiProperty({ format: 'uuid' }) id_reserva!: string;
   @ApiProperty(date) fecha_inicio!: Date;
   @ApiProperty(date) fecha_fin!: Date;
-  @ApiProperty({ type: 'integer', minimum: 1 }) creditos!: number;
+  @ApiProperty(creditAmount) creditos!: string;
   @ApiProperty({ enum: ['Presencial', 'Virtual', 'Hibrida'] })
   modalidad!: string;
   @ApiProperty({ type: String, example: 'Por coordinar' }) lugar!: string;
@@ -87,7 +105,7 @@ export class ReservationResponse extends ExchangeParticipantsResponse {
   @ApiProperty({
     type: () => CancellationResponse,
     nullable: true,
-    description: 'Vista derivada de campos de RESERVAS',
+    description: 'Campos de RESERVAS y clasificacion persistida en AUDITORIA',
   })
   cancelacion!: CancellationResponse | null;
 }
@@ -97,7 +115,12 @@ export class AccountResponse {
   @ApiProperty(creditAmount) saldo!: string;
   @ApiProperty({ ...creditAmount, example: '1' }) creditos_retenidos!: string;
   @ApiProperty({ ...creditAmount, example: '3' }) disponibles!: string;
-  @ApiProperty({ enum: ['CREDITO_15_MINUTOS'] }) unidad!: 'CREDITO_15_MINUTOS';
+  @ApiProperty({
+    enum: ['CREDITO', 'CREDITO_15_MINUTOS'],
+    description:
+      'CREDITO en esquema decimal; unidad historica para la base entera',
+  })
+  unidad!: 'CREDITO' | 'CREDITO_15_MINUTOS';
 }
 
 export class MovementResponse {
@@ -110,6 +133,7 @@ export class MovementResponse {
       'BonoInicial',
       'Recompensa',
       'Penalizacion',
+      'penalizacion_sin_saldo',
       'Transferencia',
       'Ajuste',
       'Retencion',
@@ -119,13 +143,22 @@ export class MovementResponse {
     enumName: 'MovementType',
   })
   tipo!: Movement['tipo'];
-  @ApiProperty({ type: 'integer', example: -4 }) cantidad!: number;
-  @ApiProperty({ type: String, pattern: '^-?\\d+$', example: '-4' })
+  @ApiProperty({
+    type: String,
+    pattern: '^-?\\d+(?:\\.\\d)?$',
+    example: '-3.7',
+  })
+  cantidad!: string;
+  @ApiProperty({
+    type: String,
+    pattern: '^-?\\d+(?:\\.\\d)?$',
+    example: '-3.7',
+  })
   monto!: string;
-  @ApiProperty({ type: 'integer', minimum: 0 }) saldo_anterior!: number;
-  @ApiProperty({ type: 'integer', minimum: 0 }) saldo_posterior!: number;
-  @ApiProperty({ type: 'integer', minimum: 0 }) retenidos_anterior!: number;
-  @ApiProperty({ type: 'integer', minimum: 0 }) retenidos_posterior!: number;
+  @ApiProperty(creditAmount) saldo_anterior!: string;
+  @ApiProperty(creditAmount) saldo_posterior!: string;
+  @ApiProperty(creditAmount) retenidos_anterior!: string;
+  @ApiProperty(creditAmount) retenidos_posterior!: string;
   @ApiProperty(date) created_at!: Date;
   @ApiProperty({ type: String, maxLength: 500, nullable: true }) descripcion!:
     string | null;

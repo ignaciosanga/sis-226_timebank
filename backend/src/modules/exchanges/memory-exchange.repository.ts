@@ -6,6 +6,11 @@ import { ExchangeState } from './exchange.types';
 export class MemoryExchangeRepository implements ExchangeRepository {
   readonly scope = 'memory-process' as const;
   private state: ExchangeState = {
+    creditSchema: 'integer',
+    offers: new Map(),
+    banners: new Map(),
+    ratings: new Map(),
+    verifications: new Map(),
     users: new Map(),
     availability: new Map(),
     userSkills: new Map(),
@@ -16,6 +21,7 @@ export class MemoryExchangeRepository implements ExchangeRepository {
     reservationMetadata: new Map(),
     idempotency: new Map(),
     adminAudit: new Map(),
+    notifications: new Map(),
   };
 
   private queue: Promise<void> = Promise.resolve();
