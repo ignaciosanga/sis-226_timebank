@@ -57,8 +57,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
       }
     }
     // No registrar excepciones, body, URL ni cabeceras: pueden incluir secretos.
-    if (status >= 500)
-      this.logger.error(`Fallo HTTP ${status}; metodo ${request.method}`);
+    if (status >= 500) {
+      const route = (request as { route?: { path?: unknown } }).route?.path;
+      const kind =
+        exception instanceof Error ? exception.constructor.name : 'Desconocido';
+      this.logger.error(
+        `Fallo HTTP ${status}; metodo ${request.method}; ruta ${typeof route === 'string' ? route : 'sin ruta'}; error ${kind}`,
+      );
+    }
     response.status(status).json({
       statusCode: status,
       message,
