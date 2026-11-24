@@ -37,7 +37,7 @@ dashboards/
   - **Monitor de Economía Dinámica:** precios publicados vs. pactados con precisión decimal exacta (`NUMERIC`), tira de calor de 24 horas con franjas pico (`America/La_Paz`), desglose de cancelaciones por actor, anticipación media, cancelaciones injustificadas, reglas de penalización e indicador de cuentas con créditos sin uso (`GET /analytics/economy`).
   - **Reputación y reconocimiento de tutores (*Knowledge Score*):** cálculo con la fórmula `0.5 × tutorías_completadas + 1.5 × promedio` (priorizando el valor entregado por el backend cuando esté disponible), reconocimiento de **«Tutor de alto impacto»** (`≥ 3` opiniones, `≥ 4.5★`, `≥ 5` tutorías completadas y `≥ 90%` cumplimiento), manejo del estado `pocos_datos`, gráfico de impacto y filtros por área, semestre y materia (`GET /analytics/reputation`).
   - **Paneles gerenciales base:** resumen general de plataforma, intercambios y mapa de demanda horaria, composición de la comunidad, y análisis de habilidades ofertadas vs. solicitadas.
-- **Módulo Estudiante (`StudentDashboardVue.vue`):** tarjetas de créditos, calificación promedio, servicios ofrecidos vs. recibidos, evolución de saldo, historial filtrable de movimientos y detalle filtrable de servicios.
+- **Módulo Estudiante (`StudentDashboardVue.vue` y `StudentActivityPanel.vue`):** tarjetas de créditos, balance comparativo *Aprendí vs. Enseñé* (clases, horas y créditos), calificación promedio como tutor, evolución de calificaciones y opiniones recientes, agenda de próximas sesiones y solicitudes pendientes, resumen de progreso académico (*Mi ruta*, 49 materias), historial filtrable de movimientos y detalle filtrable de servicios.
 
 ## Fuentes de datos y contratos
 

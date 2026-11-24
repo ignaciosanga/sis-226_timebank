@@ -1,13 +1,11 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed } from 'vue'
 import { BarChart as BarChartIcon, CalendarDays, Clock3, GraduationCap, RefreshCw, Star } from '@lucide/vue'
-import { useRoadmapStore } from '../../../stores/roadmap'
 import BarChart from './charts/BarChart.vue'
 import LineChart from './charts/LineChart.vue'
 import { buildStudentActivity } from './student-activity.js'
 import { buildSyntheticStudentActivity } from './student-activity-data.js'
 import { demoEnabled } from '../../demo/mode.js'
-import { getMyClasses } from '../../../services/timebank'
 
 const props = defineProps({
   store: { type: Object, required: true },
@@ -16,48 +14,16 @@ const props = defineProps({
   errors: { type: Object, default: () => ({}) },
 })
 const emit = defineEmits(['retry'])
-const roadmap = useRoadmapStore()
-const directClasses = ref(null)
-const directLoading = ref(false)
-const directError = ref('')
-
-watch(
-  () => props.store.authenticated ? props.store.user.id : '',
-  () => { if (props.store.authenticated) roadmap.load() },
-  { immediate: true },
-)
-
-onMounted(() => {
-  if (props.store.authenticated) roadmap.load()
-  if (!demoEnabled && props.store.authenticated && !props.sources.classes) loadDirectClasses()
-})
-
-async function loadDirectClasses() {
-  directLoading.value = true
-  directError.value = ''
-  try {
-    directClasses.value = await getMyClasses({ page: 1, limit: 100 })
-  } catch (failure) {
-    directError.value = failure?.message || 'No se pudo cargar el historial de clases.'
-  } finally {
-    directLoading.value = false
-  }
-}
-
-function retry() {
-  if (directError.value) loadDirectClasses()
-  else emit('retry')
-}
 
 const activity = computed(() => {
   if (demoEnabled) {
-    return buildSyntheticStudentActivity(props.store, roadmap.state === 'ready' ? roadmap.progress : null)
+    return buildSyntheticStudentActivity(props.store, props.sources.roadmap || null)
   }
   return buildStudentActivity({
-    classes: props.sources.classes || directClasses.value,
+    classes: props.sources.classes || null,
     reservations: props.sources.reservations || props.store.myReservations,
     requests: props.store.myRequests,
-    roadmap: roadmap.state === 'ready' ? roadmap.progress : null,
+    roadmap: props.sources.roadmap || null,
     userId: props.store.user.id,
   })
 })
@@ -85,10 +51,10 @@ const formatDate = (value) => value
       <span v-if="demoEnabled" class="vd-formula-chip">Datos de demostración</span>
     </header>
 
-    <p v-if="loading || directLoading" class="vd-empty" role="status">Cargando tu actividad académica…</p>
-    <div v-else-if="props.errors.classes || props.errors.roadmap || directError" class="vd-card vd-error-card" role="alert">
+    <p v-if="loading" class="vd-empty" role="status">Cargando tu actividad académica…</p>
+    <div v-else-if="props.errors.classes || props.errors.roadmap" class="vd-card vd-error-card" role="alert">
       <p class="vd-error-text">Parte de tu información no pudo cargarse. Los datos disponibles siguen visibles.</p>
-      <button type="button" class="vd-pill is-active" @click="retry">
+      <button type="button" class="vd-pill is-active" @click="emit('retry')">
         <RefreshCw :size="14" /> Reintentar
       </button>
     </div>

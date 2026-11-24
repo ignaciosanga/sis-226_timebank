@@ -19,7 +19,7 @@ const pct = (val) => `${Math.max(2, Math.round(((Number(val) || 0) / maxValue.va
 </script>
 
 <template>
-  <div class="vd-bar-wrap">
+  <div v-if="items.length" class="vd-bar-wrap">
     <div v-if="series" class="vd-series-legend">
       <span v-for="s in series" :key="s.label" class="vd-series-item">
         <span class="vd-swatch" :style="{ background: s.color }"></span>{{ s.label }}
@@ -76,4 +76,5 @@ const pct = (val) => `${Math.max(2, Math.round(((Number(val) || 0) / maxValue.va
       </div>
     </div>
   </div>
+  <p v-else class="vd-empty">Sin datos disponibles para este período.</p>
 </template>

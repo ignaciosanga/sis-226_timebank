@@ -204,5 +204,35 @@ Se implementó el panel **Monitor de Economía Dinámica** dentro del dashboard 
 
 ### Pruebas pendientes o limitaciones
 
-- **Dependencia externa (Frontend — `frontend/src/services/analytics.js`):** `getEconomy(filters)` en `main` todavía envía el parámetro `groupBy=day` desde `loadReportSources()`, lo que genera HTTP 400 (`property groupBy should not exist`) contra `AcademicPeriodDto` en `GET /analytics/economy`. Queda pendiente el ajuste de Frontend para completar la validación en vivo con datos reales de Neon.
+- **Corrección de Issue #61 aplicada en esta rama (`analytics.js` y `report-data.js`):** se ajustó `getEconomy()` para enviar únicamente `{ from, to, codigo, area, semestre }` (sin `groupBy`), se asignaron colores diferenciados en `byState()` y `skillsByCategory`, y se añadieron respaldos de color/estado vacío en `DonutChart.vue`, `BarChart.vue` y `HeatmapChart.vue`.
 - **Definición de inactividad (Backend / PO):** `GET /analytics/economy` entrega agregados de inactividad (`cuentas_sin_movimientos`, `saldo_actual_sin_movimientos`, `retenidos_actuales_sin_movimientos`) sin lista individual de usuarios por privacidad y con `criterio_sin_uso_PO: null` a la espera de definición formal de negocio.
+
+---
+
+## Parcial 3 — Panel de Actividad y Progreso del Estudiante y cierre de Issue #61
+
+- **Fecha:** 2026-11-23
+- **Estado:** Completado y verificado localmente en `equipo/dashboards-parcial3-vue` (listo para PR a `main`)
+- **Responsables:** Mayte Valentina Torrico Alejandro, Gustavo Walter Quisbert Chana (Equipo Dashboards)
+
+### Descripción
+
+Se completó el **Panel de Actividad y Progreso del Estudiante** en Vue 3 nativo (`StudentActivityPanel.vue`, integrado en `StudentDashboardVue.vue` y conectado vía props desde `ReportPanel.vue`) y se aplicó en esta misma rama la corrección del **Issue `#61`** (`getEconomy` sin `groupBy` en `analytics.js` y paleta de colores diferenciados en `report-data.js` + respaldo defensivo en `DonutChart.vue`, `BarChart.vue` y `HeatmapChart.vue`).
+
+### Funcionalidades
+
+- **Lógica y pruebas de actividad estudiantil (`student-activity.js`, `student-activity-data.js`, `student-activity.test.js`):**
+  - Balance *Aprendí vs. Enseñé* (clases, horas y créditos), priorizando `resumen` del backend.
+  - Promedio de reputación como tutor, evolución de calificaciones y listado de opiniones recientes filtrando estrictamente tutorías impartidas (`ensene`).
+  - Agenda de próximas tutorías confirmadas y solicitudes pendientes aisladas por `userId` autenticado.
+  - Progreso académico de las 49 materias consumiendo `props.sources.roadmap` (`GET /roadmap/me`) sin peticiones duplicadas.
+- **Corrección de Issue `#61`:**
+  - `getEconomy()` en `frontend/src/services/analytics.js` filtra únicamente `{ from, to, codigo, area, semestre }`, eliminando el error `400 property groupBy should not exist`.
+  - `report-data.js` asigna colores semánticos/diferenciados a `exchangesByStatus`, `usersByStatus` y `skillsByCategory`.
+  - `DonutChart.vue` cuenta con paleta de respaldo y `BarChart.vue` / `HeatmapChart.vue` muestran mensaje de estado vacío ante series sin datos.
+
+### Evidencias y pruebas
+
+- `node --test src/features/metrics/vue-dashboards/student-activity.test.js`: **10/10 pruebas aprobadas**.
+- `npm test` en `frontend/` (incluidas `knowledge-score.test.js` [4], `knowledge-gap.test.js` [3], `economy.test.js` [8], `student-activity.test.js` [10], `report-data.test.js` [6], `welcome-bi-recommendations.integration.test.js` [8] y `openapi-contract.test.js`): **175/175 pruebas aprobadas**.
+- `npm run build` en `frontend/`: compilación de producción limpia en Vite (7.51 s).
