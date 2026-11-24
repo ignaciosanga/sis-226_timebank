@@ -71,16 +71,18 @@ function clearFilters() {
   hideLowEvidence.value = false
 }
 
-const topChartItems = computed(() =>
-  filteredRows.value
-    .filter((row) => !row.isLowEvidence)
-    .slice(0, 8)
-    .map((row) => ({
-      label: `${row.tutorNombre} (${row.codigo})`,
-      value: row.knowledge_score,
-      color: row.isHighImpact ? '#c89600' : '#005289',
-    })),
-)
+const hasConsolidatedChart = computed(() => filteredRows.value.some((row) => !row.isLowEvidence))
+
+const topChartItems = computed(() => {
+  const consolidated = filteredRows.value.filter((row) => !row.isLowEvidence)
+  const withScore = filteredRows.value.filter((row) => row.knowledge_score > 0 || row.tutorias_completadas > 0)
+  const source = consolidated.length ? consolidated : withScore.length ? withScore : filteredRows.value
+  return source.slice(0, 8).map((row) => ({
+    label: `${row.tutorNombre} (${row.codigo})`,
+    value: row.knowledge_score,
+    color: row.isHighImpact ? '#c89600' : row.isLowEvidence ? '#5b9ec7' : '#005289',
+  }))
+})
 
 const onlyLowEvidenceVisible = computed(
   () => filteredRows.value.length > 0 && filteredRows.value.every((row) => row.isLowEvidence),
@@ -201,7 +203,12 @@ const onlyLowEvidenceVisible = computed(
         <div class="vd-card-head">
           <h4>Top tutores por Knowledge Score</h4>
           <span class="vd-card-note">
-            Dorado: Tutor de alto impacto · Azul: Evaluado (≥ {{ HIGH_IMPACT_THRESHOLDS.minReviews }} opiniones)
+            <template v-if="hasConsolidatedChart">
+              Dorado: Tutor de alto impacto · Azul: Evaluado (≥ {{ HIGH_IMPACT_THRESHOLDS.minReviews }} opiniones)
+            </template>
+            <template v-else>
+              Celeste: Puntaje preliminar de actividad real (&lt; {{ HIGH_IMPACT_THRESHOLDS.minReviews }} opiniones)
+            </template>
           </span>
         </div>
         <BarChart v-if="topChartItems.length" :items="topChartItems" orientation="horizontal" unit="pts" />

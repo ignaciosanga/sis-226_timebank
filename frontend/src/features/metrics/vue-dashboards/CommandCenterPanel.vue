@@ -33,6 +33,7 @@ const filteredRows = computed(() =>
 )
 
 const summary = computed(() => summarizeKnowledgeGap(filteredRows.value))
+const sinOfertaCount = computed(() => filteredRows.value.filter((r) => r.tutores_activos === 0).length)
 
 const hasFilters = computed(() => Boolean(selectedArea.value || selectedSemester.value || onlyCritical.value))
 
@@ -42,15 +43,16 @@ function clearFilters() {
   onlyCritical.value = false
 }
 
-const gapChartItems = computed(() =>
-  filteredRows.value
-    .filter((r) => r.solicitudes > 0 || r.tutores_activos > 0)
-    .slice(0, 10)
-    .map((r) => ({
-      label: `${r.codigo} · ${r.nombre}`,
-      values: [r.solicitudes, r.tutores_activos],
-    })),
-)
+const gapChartItems = computed(() => {
+  const withActivity = filteredRows.value.filter(
+    (r) => r.solicitudes > 0 || r.tutores_activos > 0 || r.demanda_proyectada_estimada > 0,
+  )
+  const source = withActivity.length ? withActivity : filteredRows.value
+  return source.slice(0, 10).map((r) => ({
+    label: `${r.codigo} · ${r.nombre}`,
+    values: [r.solicitudes, r.tutores_activos],
+  }))
+})
 
 function alertBadgeClass(nivel) {
   if (nivel === 'Sin tutores' || nivel === 'Crítica') return 'vd-badge-danger'
@@ -99,9 +101,9 @@ function alertBadgeClass(nivel) {
 
         <article class="vd-kpi">
           <div class="vd-kpi-label">Materias críticas / sin tutores</div>
-          <div class="vd-kpi-value is-danger">{{ summary.materiasCriticas }}</div>
+          <div class="vd-kpi-value is-danger">{{ summary.materiasCriticas || sinOfertaCount }}</div>
           <div class="vd-kpi-hint">
-            {{ summary.materiasSinTutores }} sin tutores activos · candidatas a incentivo +1.5
+            {{ summary.materiasCriticas ? `${summary.materiasSinTutores} con demanda sin tutor` : `${sinOfertaCount} materias sin oferta activa` }} · candidatas a incentivo +1.5
           </div>
         </article>
 

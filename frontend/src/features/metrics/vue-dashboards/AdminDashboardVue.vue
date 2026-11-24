@@ -2,6 +2,8 @@
 import { computed, ref, watch } from 'vue'
 import { useAppStore } from '../../../stores/app'
 import { demoEnabled } from '../../demo/mode.js'
+import { apiRequest } from '../../../services/api.js'
+import { getSkillProviders } from '../../../services/timebank.js'
 import DonutChart from './charts/DonutChart.vue'
 import LineChart from './charts/LineChart.vue'
 import BarChart from './charts/BarChart.vue'
@@ -21,7 +23,82 @@ const emit = defineEmits(['retry', 'period'])
 const store = useAppStore()
 const data = computed(() => props.reportData || (demoEnabled ? buildAdminSprint0Data() : adminReportData()))
 const activeTab = ref('command'), periodGranularity = ref('week')
-const reputationData = computed(() => demoEnabled ? buildSyntheticReputationPayload() : props.sources.reputation || null)
+const liveFallbackRows = ref([])
+let fallbackReqId = 0
+
+async function loadRealCatalogTutorMetrics() {
+  if (demoEnabled || typeof document === 'undefined') return
+  const repRows = props.sources.reputation?.data
+  if (!props.sources.reputation || (Array.isArray(repRows) && repRows.length > 0)) {
+    liveFallbackRows.value = []
+    return
+  }
+  const reqId = ++fallbackReqId
+  try {
+    const collected = new Map()
+    const completedSkills = Array.isArray(props.sources.skills?.masCompletadas) ? props.sources.skills.masCompletadas : []
+    for (const sk of completedSkills.slice(0, 6)) {
+      const providers = await getSkillProviders(sk.id).catch(() => [])
+      const checks = await Promise.allSettled(
+        providers.map((p) => apiRequest(`/tutoring/reputation?tutorId=${encodeURIComponent(p.id_usuario)}&skillId=${encodeURIComponent(sk.id)}`)),
+      )
+      checks.forEach((res, idx) => {
+        if (res.status !== 'fulfilled') return
+        const r = res.value
+        if ((r?.tutorias_completadas ?? 0) > 0 || (r?.opiniones ?? 0) > 0) {
+          const p = providers[idx]
+          const code = sk.nombre?.slice(0, 12) || 'HAB'
+          collected.set(`${p.id_usuario}:${sk.id}`, {
+            codigo: code,
+            materia: sk.nombre,
+            area: 'general',
+            tutor_id: p.id_usuario,
+            tutor_nombre: p.nombre,
+            tutorias_completadas: r.tutorias_completadas ?? 0,
+            opiniones: r.opiniones ?? 0,
+            promedio: r.promedio ?? null,
+            cancelaciones_injustificadas: r.cancelaciones_injustificadas ?? 0,
+            evidencia: (r.opiniones ?? 0) >= 3 ? 'suficientes_para_orden_descriptivo' : 'pocos_datos',
+          })
+        }
+      })
+    }
+    const offersRes = await apiRequest('/tutoring/offers?page=1&limit=100').catch(() => null)
+    for (const offer of offersRes?.data || []) {
+      const code = offer.materia?.codigo || offer.materia?.nombre || 'TUT'
+      const tutorId = offer.id_tutor || offer.id_usuario
+      const key = `${tutorId}:${offer.id_habilidad || code}`
+      if (!collected.has(key)) {
+        const nombre = [offer.tutor?.nombre, offer.tutor?.apellido].filter(Boolean).join(' ').trim()
+        collected.set(key, {
+          codigo: code,
+          materia: offer.materia?.nombre || code,
+          tutor_id: tutorId,
+          tutor_nombre: nombre || undefined,
+          tutorias_completadas: offer.metricas?.tutorias_completadas ?? 0,
+          opiniones: offer.metricas?.opiniones ?? 0,
+          promedio: offer.metricas?.promedio ?? null,
+          evidencia: (offer.metricas?.opiniones ?? 0) >= 3 ? 'suficientes_para_orden_descriptivo' : 'pocos_datos',
+        })
+      }
+    }
+    if (reqId === fallbackReqId) liveFallbackRows.value = [...collected.values()]
+  } catch {
+    if (reqId === fallbackReqId) liveFallbackRows.value = []
+  }
+}
+
+watch(() => [props.sources.reputation, props.sources.skills], loadRealCatalogTutorMetrics, { immediate: true })
+
+const reputationData = computed(() => {
+  if (demoEnabled) return buildSyntheticReputationPayload()
+  const base = props.sources.reputation || null
+  if (!base) return null
+  if (Array.isArray(base.data) && base.data.length === 0 && liveFallbackRows.value.length > 0) {
+    return { ...base, data: liveFallbackRows.value }
+  }
+  return base
+})
 const academicData = computed(() => demoEnabled ? buildSyntheticAcademicPayload() : props.sources.academic || null)
 const gapReady = computed(() => demoEnabled || academicGapReady(academicData.value))
 const scoreReady = computed(() => demoEnabled || reputationReady(reputationData.value))

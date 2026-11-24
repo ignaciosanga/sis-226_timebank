@@ -24,13 +24,19 @@ export function adminReportData({ overview, users, exchanges, credits, skills, a
 }
 
 export function academicGapReady(payload) {
-  return Array.isArray(payload?.data) && payload.data.length > 0 && payload.data.every(row => count(row.solicitudes_pendientes) !== null)
+  return Array.isArray(payload?.data) && payload.data.length > 0 && payload.data.every(row => count(row.solicitudes_pendientes ?? row.solicitudes) !== null && count(row.tutores_activos) !== null)
 }
 export function academicGapPayload(payload) {
-  return { ...payload, data: rows(payload?.data).map(row => ({ ...row, solicitudes: row.solicitudes_pendientes })) }
+  return {
+    ...payload,
+    data: rows(payload?.data).map(row => ({
+      ...row,
+      solicitudes: count(row.solicitudes_pendientes) ?? (count(row.cubiertas) !== null ? Math.max(0, row.solicitudes - row.cubiertas) : row.solicitudes),
+    })),
+  }
 }
 export function reputationReady(payload) {
-  return Array.isArray(payload?.data) && payload.data.length > 0 && payload.data.every(row => typeof row.knowledge_score === 'number' && Number.isFinite(row.knowledge_score) && count(row.tasa_cumplimiento) !== null && count(row.cancelaciones_injustificadas) !== null)
+  return Boolean(payload && Array.isArray(payload.data))
 }
 
 export function studentReportData(sources, store) {

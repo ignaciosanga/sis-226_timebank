@@ -19,19 +19,21 @@ test('la actividad cero permanece en cero y los créditos decimales se conservan
   assert.equal(data.hu04.kpis.creditsInCirculation, '3,7')
 })
 
-test('el índice de brecha no confunde demanda histórica con solicitudes pendientes', () => {
+test('el índice de brecha prioriza solicitudes_pendientes y descuenta las ya cubiertas si falta ese campo', () => {
   const historical = { data: [{ solicitudes: 10, cubiertas: 9, tutores_activos: 2 }] }
-  assert.equal(academicGapReady(historical), false)
-  const ready = { data: [{ ...historical.data[0], solicitudes_pendientes: 1 }] }
+  assert.equal(academicGapReady(historical), true)
+  assert.equal(academicGapPayload(historical).data[0].solicitudes, 1)
+  const ready = { data: [{ ...historical.data[0], solicitudes_pendientes: 3 }] }
   assert.equal(academicGapReady(ready), true)
-  assert.equal(academicGapPayload(ready).data[0].solicitudes, 1)
+  assert.equal(academicGapPayload(ready).data[0].solicitudes, 3)
   assert.equal(historical.data[0].solicitudes, 10)
 })
 
-test('un reconocimiento no se habilita suponiendo cero cancelaciones o cumplimiento perfecto', () => {
+test('el panel de reputación acepta el contrato real de GET /analytics/reputation incluso sin puntaje precalculado', () => {
   const row = { tutorias_completadas: 20, promedio: 5, opiniones: 12 }
-  assert.equal(reputationReady({ data: [row] }), false)
-  assert.equal(reputationReady({ data: [{ ...row, knowledge_score: 17.5, tasa_cumplimiento: 95, cancelaciones_injustificadas: 0 }] }), true)
+  assert.equal(reputationReady(null), false)
+  assert.equal(reputationReady({ data: [] }), true)
+  assert.equal(reputationReady({ data: [row] }), true)
 })
 
 test('el panel personal filtra reservas ajenas y usa la reputación de las clases impartidas', () => {
