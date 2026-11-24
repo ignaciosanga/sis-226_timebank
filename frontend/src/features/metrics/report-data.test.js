@@ -43,3 +43,15 @@ test('el panel personal filtra reservas ajenas y usa la reputación de las clase
   assert.equal(data.movements[0].displayAmount, '-0,5')
   assert.equal(data.movements[0].positive, false)
 })
+
+test('los anillos de estado y categorías reciben colores diferenciados', () => {
+  const data = adminReportData({
+    exchanges: { reservas: { estadoActual: { completadas: 4, confirmadas: 2, canceladas: 1 } } },
+    users: { porEstado: { Activo: 10, Inactivo: 2, Suspendido: 1 } },
+    skills: { porCategoria: [{ nombre: 'Software', cantidad: 12 }, { nombre: 'IA', cantidad: 5 }, { nombre: 'Básicas', cantidad: 8 }] },
+  })
+  assert.equal(data.hu04.exchangesByStatus.every(item => typeof item.color === 'string' && item.color.startsWith('#')), true)
+  assert.equal(new Set(data.hu04.exchangesByStatus.map(item => item.color)).size, 3)
+  assert.equal(new Set(data.hu06.usersByStatus.map(item => item.color)).size, 3)
+  assert.equal(new Set(data.hu07.skillsByCategory.map(item => item.color)).size, 3)
+})

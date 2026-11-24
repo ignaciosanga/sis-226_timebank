@@ -9,7 +9,6 @@ export const getUsers = (filters) => apiRequest(`/analytics/users${queryString(f
 export const getExchanges = (filters) => apiRequest(`/analytics/exchanges${queryString(filters)}`)
 export const getCredits = (filters) => apiRequest(`/analytics/credits${queryString(filters)}`)
 export const getSkills = (filters) => apiRequest(`/analytics/skills${queryString(filters)}`)
-export const getEconomy = (filters) => apiRequest(`/analytics/economy${queryString(filters)}`)
 
 async function getAllClasses() {
   const rows = []; let first
@@ -66,4 +65,17 @@ export function getAcademic({ from, to, codigo, area, semestre } = {}) {
   if (semestre) params.set('semestre', String(semestre))
   const qs = params.toString()
   return apiRequest(`/analytics/academic${qs ? `?${qs}` : ''}`)
+}
+
+// Monitor de Economía Dinámica (Parcial 3): GET /analytics/economy (solo ADMIN).
+// AcademicPeriodDto no acepta groupBy; solo from, to, codigo, area y semestre.
+export function getEconomy({ from, to, codigo, area, semestre } = {}) {
+  const params = new URLSearchParams()
+  if (from) params.set('from', from)
+  if (to) params.set('to', to)
+  if (codigo) params.set('codigo', codigo)
+  if (area) params.set('area', area)
+  if (semestre) params.set('semestre', String(semestre))
+  const qs = params.toString()
+  return apiRequest(`/analytics/economy${qs ? `?${qs}` : ''}`)
 }

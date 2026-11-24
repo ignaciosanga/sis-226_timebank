@@ -2,9 +2,11 @@ import { formatCredits } from './overview-format.js'
 const movementType = row => ({ Retencion:'Retención', Liberacion:'Liberación', Consumo:'Cobro', Penalizacion:'Cobro', BonoInicial:'Abono', Recompensa:'Abono', Transferencia:String(row.cantidad).startsWith('-') ? 'Cobro' : 'Abono' })[row.tipo] || row.tipo || 'Movimiento'
 const rows = value => Array.isArray(value) ? value : []
 const count = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null
-const named = value => rows(value).filter(row => count(row.cantidad) !== null).map(row => ({ label: row.nombre || 'Sin categoría', value: row.cantidad, color: '#005289' }))
+const PALETTE = ['#005289', '#177a51', '#f6c500', '#5b9ec7', '#b58d00', '#9c2b23', '#6b7280']
+const STATE_COLORS = { completadas: '#177a51', confirmadas: '#005289', canceladas: '#9c2b23', aceptadas: '#177a51', solicitadas: '#f6c500', rechazadas: '#9c2b23', Activo: '#177a51', Inactivo: '#6b7280', Suspendido: '#9c2b23', Pendiente: '#f6c500' }
+const named = (value, distinct = false) => rows(value).filter(row => count(row.cantidad) !== null).map((row, index) => ({ label: row.nombre || 'Sin categoría', value: row.cantidad, color: distinct ? PALETTE[index % PALETTE.length] : '#005289' }))
 const series = value => rows(value).filter(row => count(row.cantidad) !== null).map(row => ({ label: new Date(row.periodo).toLocaleDateString('es-BO', { timeZone: 'America/La_Paz', day: '2-digit', month: 'short' }), value: row.cantidad }))
-const byState = (value, labels) => Object.entries(labels).filter(([key]) => count(value?.[key]) !== null).map(([key, label]) => ({ label, value: value[key] }))
+const byState = (value, labels) => Object.entries(labels).filter(([key]) => count(value?.[key]) !== null).map(([key, label], index) => ({ label, value: value[key], color: STATE_COLORS[key] || PALETTE[index % PALETTE.length] }))
 
 export function adminReportData({ overview, users, exchanges, credits, skills, academic } = {}) {
   const statuses = exchanges?.reservas?.estadoActual
@@ -17,7 +19,7 @@ export function adminReportData({ overview, users, exchanges, credits, skills, a
       exchangesByStatus: byState(statuses, { completadas: 'Completadas', confirmadas: 'Confirmadas', canceladas: 'Canceladas' }) },
     hu05: { requestsByStatus: byState(exchanges?.solicitudes?.estadoActual, { aceptadas: 'Aceptadas', solicitadas: 'Pendientes', rechazadas: 'Rechazadas', canceladas: 'Canceladas' }), requestsTrend: [], cancellationReasons: [], demandHeatmap: { days: [], slots: [], matrix: [] } },
     hu06: { usersByCareer: named(users?.porCarrera), usersBySemester: [], usersByStatus: byState(users?.porEstado, { Activo: 'Activos', Inactivo: 'Inactivos', Suspendido: 'Suspendidos', Pendiente: 'Pendientes' }), registrationGrowth: series(users?.registrosPorPeriodo) },
-    hu07: { topOffered: named(skills?.estudiantesPorHabilidad), topRequested: named(skills?.masSolicitadas), skillsByCategory: named(skills?.porCategoria), supplyVsDemand: rows(academic?.data).filter(row => count(row.tutores_activos) !== null && count(row.solicitudes) !== null).slice(0, 10).map(row => ({ label: row.nombre || row.codigo, values: [row.tutores_activos, row.solicitudes] })) },
+    hu07: { topOffered: named(skills?.estudiantesPorHabilidad), topRequested: named(skills?.masSolicitadas), skillsByCategory: named(skills?.porCategoria, true), supplyVsDemand: rows(academic?.data).filter(row => count(row.tutores_activos) !== null && count(row.solicitudes) !== null).slice(0, 10).map(row => ({ label: row.nombre || row.codigo, values: [row.tutores_activos, row.solicitudes] })) },
   }
 }
 

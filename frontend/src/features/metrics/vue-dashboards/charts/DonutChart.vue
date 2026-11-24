@@ -8,6 +8,7 @@ const props = defineProps({
   size: { type: Number, default: 184 },
 })
 
+const FALLBACK_COLORS = ['#005289', '#177a51', '#f6c500', '#5b9ec7', '#b58d00', '#9c2b23', '#6b7280']
 const hovered = ref(-1)
 const radius = 64
 const circumference = 2 * Math.PI * radius
@@ -23,6 +24,7 @@ const segments = computed(() => {
     const length = ratio * circumference
     const seg = {
       ...item,
+      color: item.color || FALLBACK_COLORS[index % FALLBACK_COLORS.length],
       index,
       value,
       pct: Math.round(ratio * 100),

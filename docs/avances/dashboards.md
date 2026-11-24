@@ -166,3 +166,73 @@ Atendiendo la observación de incluir explícitamente el **Knowledge Gap Index**
 ### Dependencias
 
 - Carga de vistas y datos reales de BD V6 en Neon para activar el flujo 100% real en producción sin aviso demo.
+
+---
+
+## Parcial 3 — Monitor de Economía Dinámica, Horarios y Cancelaciones
+
+- **Fecha:** 2026-11-22
+- **Estado:** En progreso (implementado, sincronizado con `origin/main` y verificado con pruebas unitarias y build; pendiente validación en vivo con datos reales tras corrección de `groupBy` en `analytics.js` por Frontend)
+- **Responsables:** Pablo Soto, Gustavo Walter Quisbert Chana (Equipo Dashboards)
+
+### Descripción
+
+Se implementó el panel **Monitor de Economía Dinámica** dentro del dashboard de administración en Vue 3 para analizar la distribución de precios publicados frente a precios pactados con precisión decimal exacta (`NUMERIC`), identificar las franjas horarias pico en zona horaria `America/La_Paz`, auditar las cancelaciones por actor e injustificadas y monitorear el indicador agregado de cuentas activas con créditos sin uso.
+
+### Funcionalidades
+
+- **Normalización y precisión decimal (`economy.js`):**
+  - Ordenamiento y preservación de importes como strings decimales exactos (`compareDecimalStrings`, `decimalString`) sin conversión flotante (`"3.7"` ordenado antes de `"10"`).
+  - Relleno completo de las 24 horas locales (`00:00`–`23:00`), identificación de las 3 horas pico y cálculo seguro de tasa de cancelación sin divisiones por cero.
+  - Normalización defensiva de cancelaciones por actor, anticipación media, reglas de penalización e inactividad ante respuestas vacías o `null`.
+- **Tira de calor de 24 horas (`charts/EconomyHourHeat.vue`):** visualización responsive en dos filas (*Reservas* y *Cancelaciones*), 24 columnas en escritorio y dos bloques de 12 horas en móvil, con etiquetas accesibles y porcentaje por hora.
+- **Vista (`EconomyPanel.vue`) e integración (`AdminDashboardVue.vue`):**
+  - 4 tarjetas KPI (precio publicado más frecuente, precio pactado más frecuente, reservas por hora de inicio y cancelaciones de esa cohorte).
+  - Gráfico comparativo horizontal de precios publicados vs. pactados (`BarChart`).
+  - Tira de calor de 24 horas con chips de horas pico y tooltip explicativo de zona horaria.
+  - Bloque de cancelaciones por actor (`DonutChart` con colores explícitos), registradas, injustificadas, anticipación media, sin clasificar y pie de umbral/penalización.
+  - Indicador agregado de cuentas activas sin movimientos, saldo estancado y créditos retenidos, con aviso de definición provisional.
+  - Integrado en `AdminDashboardVue.vue` consumiendo directamente `props.sources.economy`, `props.errors.economy` y `emit('retry')` (sin peticiones duplicadas ni envío de `groupBy`).
+
+### Evidencias y pruebas
+
+- Rama `equipo/dashboards-parcial3-vue` sincronizada limpiamente con `origin/main` (`4aabf88`, 0 conflictos).
+- `node --test src/features/metrics/vue-dashboards/economy.test.js`: **8/8 pruebas aprobadas**.
+- `npm test` en `frontend/` (incluyendo `economy.test.js`, `knowledge-score.test.js`, `knowledge-gap.test.js`, `report-data.test.js` y `openapi-contract.test.js`): **164/164 pruebas aprobadas**.
+- `npm run build` en `frontend/`: compilación de producción limpia en Vite (6.56 s).
+- Verificación visual en navegador sobre `/administracion/metricas` en modo demostración (`?demo=1`).
+
+### Pruebas pendientes o limitaciones
+
+- **Corrección de Issue #61 aplicada en esta rama (`analytics.js` y `report-data.js`):** se ajustó `getEconomy()` para enviar únicamente `{ from, to, codigo, area, semestre }` (sin `groupBy`), se asignaron colores diferenciados en `byState()` y `skillsByCategory`, y se añadieron respaldos de color/estado vacío en `DonutChart.vue`, `BarChart.vue` y `HeatmapChart.vue`.
+- **Definición de inactividad (Backend / PO):** `GET /analytics/economy` entrega agregados de inactividad (`cuentas_sin_movimientos`, `saldo_actual_sin_movimientos`, `retenidos_actuales_sin_movimientos`) sin lista individual de usuarios por privacidad y con `criterio_sin_uso_PO: null` a la espera de definición formal de negocio.
+
+---
+
+## Parcial 3 — Panel de Actividad y Progreso del Estudiante y cierre de Issue #61
+
+- **Fecha:** 2026-11-23
+- **Estado:** Completado y verificado localmente en `equipo/dashboards-parcial3-vue` (listo para PR a `main`)
+- **Responsables:** Mayte Valentina Torrico Alejandro, Gustavo Walter Quisbert Chana (Equipo Dashboards)
+
+### Descripción
+
+Se completó el **Panel de Actividad y Progreso del Estudiante** en Vue 3 nativo (`StudentActivityPanel.vue`, integrado en `StudentDashboardVue.vue` y conectado vía props desde `ReportPanel.vue`) y se aplicó en esta misma rama la corrección del **Issue `#61`** (`getEconomy` sin `groupBy` en `analytics.js` y paleta de colores diferenciados en `report-data.js` + respaldo defensivo en `DonutChart.vue`, `BarChart.vue` y `HeatmapChart.vue`).
+
+### Funcionalidades
+
+- **Lógica y pruebas de actividad estudiantil (`student-activity.js`, `student-activity-data.js`, `student-activity.test.js`):**
+  - Balance *Aprendí vs. Enseñé* (clases, horas y créditos), priorizando `resumen` del backend.
+  - Promedio de reputación como tutor, evolución de calificaciones y listado de opiniones recientes filtrando estrictamente tutorías impartidas (`ensene`).
+  - Agenda de próximas tutorías confirmadas y solicitudes pendientes aisladas por `userId` autenticado.
+  - Progreso académico de las 49 materias consumiendo `props.sources.roadmap` (`GET /roadmap/me`) sin peticiones duplicadas.
+- **Corrección de Issue `#61`:**
+  - `getEconomy()` en `frontend/src/services/analytics.js` filtra únicamente `{ from, to, codigo, area, semestre }`, eliminando el error `400 property groupBy should not exist`.
+  - `report-data.js` asigna colores semánticos/diferenciados a `exchangesByStatus`, `usersByStatus` y `skillsByCategory`.
+  - `DonutChart.vue` cuenta con paleta de respaldo y `BarChart.vue` / `HeatmapChart.vue` muestran mensaje de estado vacío ante series sin datos.
+
+### Evidencias y pruebas
+
+- `node --test src/features/metrics/vue-dashboards/student-activity.test.js`: **10/10 pruebas aprobadas**.
+- `npm test` en `frontend/` (incluidas `knowledge-score.test.js` [4], `knowledge-gap.test.js` [3], `economy.test.js` [8], `student-activity.test.js` [10], `report-data.test.js` [6], `welcome-bi-recommendations.integration.test.js` [8] y `openapi-contract.test.js`): **175/175 pruebas aprobadas**.
+- `npm run build` en `frontend/`: compilación de producción limpia en Vite (7.51 s).

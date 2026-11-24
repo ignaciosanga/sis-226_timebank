@@ -20,7 +20,7 @@ function cellStyle(value) {
 </script>
 
 <template>
-  <div class="vd-heatmap-wrap">
+  <div v-if="days.length && slots.length && matrix.length" class="vd-heatmap-wrap">
     <table class="vd-heatmap">
       <thead>
         <tr>
@@ -52,4 +52,5 @@ function cellStyle(value) {
       <span>Mayor demanda</span>
     </div>
   </div>
+  <p v-else class="vd-empty">Sin datos horarios disponibles para este período.</p>
 </template>

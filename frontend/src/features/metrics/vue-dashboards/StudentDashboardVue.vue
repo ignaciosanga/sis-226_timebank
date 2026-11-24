@@ -7,9 +7,16 @@ import LineChart from './charts/LineChart.vue'
 import BarChart from './charts/BarChart.vue'
 import { buildStudentSprint0Data, formatDateTime } from './sprint0-data.js'
 import { studentReportData } from '../report-data.js'
+import StudentActivityPanel from './StudentActivityPanel.vue'
 import './vue-dashboards.css'
 
-const props = defineProps({ reportData: { type: Object, default: null } })
+const props = defineProps({
+  reportData: { type: Object, default: null },
+  sources: { type: Object, default: () => ({}) },
+  errors: { type: Object, default: () => ({}) },
+  loading: { type: Boolean, default: false },
+})
+const emit = defineEmits(['retry'])
 const store = useAppStore()
 const data = computed(() => props.reportData || (demoEnabled ? buildStudentSprint0Data(store, { isDemo: true }) : studentReportData({}, store)))
 
@@ -59,6 +66,19 @@ function movementClass(tipo) {
 
 <template>
   <div class="vd-shell">
+    <p v-if="demoEnabled" class="vd-demo-notice">
+      <strong>Datos ficticios de demostración.</strong>
+      Las tutorías, opiniones y avance académico mostrados pertenecen a la sesión demo y se reinician al recargar.
+    </p>
+
+    <StudentActivityPanel
+      :store="store"
+      :sources="props.sources"
+      :loading="props.loading"
+      :errors="props.errors"
+      @retry="emit('retry')"
+    />
+
     <!-- Panel personal del estudiante -->
     <section class="vd-section" aria-labelledby="hu01-title">
       <header class="vd-section-head">

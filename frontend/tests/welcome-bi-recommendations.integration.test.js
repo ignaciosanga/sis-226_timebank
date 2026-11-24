@@ -72,6 +72,7 @@ test('ADMIN carga los ocho informes reales y conserva los apartados que no falla
   await flush()
   assert.equal(calls.length, 8)
   assert.ok(calls.every(call => call.url.pathname.startsWith('/analytics/')))
+  assert.equal(calls.find(call => call.url.pathname === '/analytics/economy').url.searchParams.has('groupBy'), false)
   assert.equal(view.sources.value.overview.usuarios.activos, 0)
   assert.ok(view.errors.value.reputation)
   assert.equal(view.reportData.value.hu04.kpis.activeUsers, 0)

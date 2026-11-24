@@ -8,10 +8,12 @@ import BarChart from './charts/BarChart.vue'
 import HeatmapChart from './charts/HeatmapChart.vue'
 import KnowledgeScorePanel from './KnowledgeScorePanel.vue'
 import CommandCenterPanel from './CommandCenterPanel.vue'
+import EconomyPanel from './EconomyPanel.vue'
 import ReportContractState from '../ReportContractState.vue'
 import { buildAdminSprint0Data } from './sprint0-data.js'
 import { buildSyntheticReputationPayload } from './knowledge-score.js'
 import { buildSyntheticAcademicPayload } from './knowledge-gap.js'
+import { buildSyntheticEconomyPayload } from './economy.js'
 import { academicGapPayload, academicGapReady, adminReportData, reputationReady } from '../report-data.js'
 import './vue-dashboards.css'
 const props = defineProps({ reportData: { type: Object, default: null }, sources: { type: Object, default: () => ({}) }, errors: { type: Object, default: () => ({}) }, loading: Boolean })
@@ -26,9 +28,12 @@ const scoreReady = computed(() => demoEnabled || reputationReady(reputationData.
 const gapData = computed(() => demoEnabled ? academicData.value : academicGapPayload(academicData.value))
 const reputationLoading = computed(() => props.loading), academicLoading = computed(() => props.loading)
 const reputationError = computed(() => props.errors.reputation || ''), academicError = computed(() => props.errors.academic || '')
-const loadAcademic = () => emit('retry'), loadReputation = () => emit('retry')
+const loadAcademic = () => emit('retry'), loadReputation = () => emit('retry'), loadEconomy = () => emit('retry')
+const economyData = computed(() => demoEnabled ? buildSyntheticEconomyPayload() : props.sources.economy || null)
+const economyLoading = computed(() => demoEnabled ? false : props.loading)
+const economyError = computed(() => demoEnabled ? '' : props.errors.economy || '')
 const showDemoNotice = computed(() => demoEnabled)
-const tabs = [{ id:'command',label:'Command Center' },{ id:'reputation',label:'Reputación y tutores' },{ id:'all',label:'Vista completa' },{ id:'hu04',label:'Resumen general' },{ id:'hu05',label:'Intercambios y horarios' },{ id:'hu06',label:'Comunidad' },{ id:'hu07',label:'Habilidades y demanda' }]
+const tabs = [{ id:'command',label:'Command Center' },{ id:'economy',label:'Economía dinámica' },{ id:'reputation',label:'Reputación y tutores' },{ id:'all',label:'Vista completa' },{ id:'hu04',label:'Resumen general' },{ id:'hu05',label:'Intercambios y horarios' },{ id:'hu06',label:'Comunidad' },{ id:'hu07',label:'Habilidades y demanda' }]
 watch(periodGranularity, value => { if (!demoEnabled) emit('period', value === 'week' ? 'day' : 'month') })
 const show = id => activeTab.value === 'all' || activeTab.value === id
 const activitySeries = computed(() => periodGranularity.value === 'week' ? data.value.hu04.activityByWeek : data.value.hu04.activityByMonth)
@@ -62,6 +67,14 @@ const activitySeries = computed(() => periodGranularity.value === 'week' ? data.
     />
 
     <ReportContractState v-if="show('command') && !gapReady" kind="academic" :payload="academicData" :loading="loading" :error="academicError" />
+
+    <EconomyPanel
+      v-if="show('economy')"
+      :economy="economyData"
+      :loading="economyLoading"
+      :error="economyError"
+      @retry="loadEconomy"
+    />
 
     <!-- Reputación y reconocimiento de tutores (Knowledge Score) -->
     <KnowledgeScorePanel
